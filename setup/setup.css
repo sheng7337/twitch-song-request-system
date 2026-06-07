@@ -19,7 +19,7 @@
 html, body {
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Share Tech Mono', monospace;
+  font-family: 'Share Tech Mono', 'Noto Sans TC', monospace;
   color: var(--text);
   display: flex;
   align-items: center;
@@ -48,12 +48,33 @@ html, body {
 }
 
 .logo {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
   font-size: 14px;
   font-weight: 500;
   color: var(--purple);
   letter-spacing: 2px;
 }
+
+.lang-switch {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.lang-btn {
+  font-family: 'Share Tech Mono', 'Noto Sans TC', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.lang-btn:hover { color: var(--text); border-color: var(--purple-dim); }
+.lang-btn.active { color: var(--purple); border-color: var(--purple); }
 
 .step-indicator {
   display: flex;
@@ -91,7 +112,7 @@ html, body {
 .step.active { display: block; }
 
 .step-title {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
   font-size: 18px;
   font-weight: 500;
   color: var(--purple);
@@ -155,7 +176,7 @@ ol.steps-list a:hover { text-decoration: underline; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 14px;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: 'Share Tech Mono', 'Noto Sans TC', monospace;
   font-size: 13px;
   color: var(--text);
   outline: none;
@@ -194,7 +215,7 @@ ol.steps-list a:hover { text-decoration: underline; }
   margin: 20px 0;
 }
 .device-code {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
   font-size: 32px;
   font-weight: 700;
   color: var(--purple);
@@ -332,7 +353,7 @@ ol.steps-list a:hover { text-decoration: underline; }
 
 /* ── Buttons ── */
 .btn {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: 'Share Tech Mono', 'Noto Sans TC', monospace;
   font-size: 13px;
   padding: 10px 20px;
   border-radius: 6px;

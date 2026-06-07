@@ -37,7 +37,7 @@ Write-Host ""
 Write-Host "  ---------------------------------------------" -ForegroundColor DarkMagenta
 Write-Host "  控制台：http://localhost:3000/dashboard" -ForegroundColor White
 Write-Host "  顯示層：http://localhost:3000/overlay/index.html" -ForegroundColor White
-Write-Host "  安裝精靈：http://localhost:3000/setup" -ForegroundColor DarkGray
+Write-Host "  安裝精靈：http://localhost:3000/setup?lang=zh-TW" -ForegroundColor DarkGray
 Write-Host "  ---------------------------------------------" -ForegroundColor DarkMagenta
 Write-Host ""
 Write-Host "  直播結束後按 Ctrl+C 停止伺服器。" -ForegroundColor DarkGray
@@ -47,7 +47,7 @@ Write-Host ""
 Set-Location $PSScriptRoot
 
 # Open browser 3s after server starts (setup if unconfigured, dashboard otherwise)
-$openUrl = if (-not (Test-Path (Join-Path $PSScriptRoot ".env")) -or (Get-Content (Join-Path $PSScriptRoot ".env") -Raw) -notmatch "TWITCH_USER_ACCESS_TOKEN=.+") { "http://localhost:3000/setup" } else { "http://localhost:3000/dashboard" }
+$openUrl = if (-not (Test-Path (Join-Path $PSScriptRoot ".env")) -or (Get-Content (Join-Path $PSScriptRoot ".env") -Raw) -notmatch "TWITCH_USER_ACCESS_TOKEN=.+") { "http://localhost:3000/setup?lang=zh-TW" } else { "http://localhost:3000/dashboard" }
 Write-Host "  正在開啟瀏覽器... $openUrl" -ForegroundColor DarkGray
 Start-Job -ScriptBlock { param($u) Start-Sleep 3; Start-Process $u } -ArgumentList $openUrl | Out-Null
 

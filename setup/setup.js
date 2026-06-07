@@ -30,8 +30,24 @@ let state = {
 let devicePollTimer = null;
 let deviceTimerInterval = null;
 
+// ── Language switcher ─────────────────────────────────────────────────────────
+function renderLangSwitch() {
+  const el = document.getElementById('lang-switch');
+  if (!el) return;
+  const lang = getLang();
+  el.innerHTML = `
+    <button class="lang-btn ${lang === 'en' ? 'active' : ''}" onclick="setLang('en')">EN</button>
+    <button class="lang-btn ${lang === 'zh-TW' ? 'active' : ''}" onclick="setLang('zh-TW')">中文</button>
+  `;
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  document.documentElement.lang = getLang();
+  document.title = T().title;
+  document.getElementById('logo').textContent = T().logo;
+  renderLangSwitch();
+
   try {
     const status = await api('GET', '/setup/api/status');
     if (status.displayName) state.displayName = status.displayName;
@@ -88,6 +104,8 @@ function renderStepDots() {
 
   const backBtn = document.getElementById('btn-back');
   const nextBtn = document.getElementById('btn-next');
+  backBtn.textContent = T().back;
+  nextBtn.textContent = T().next;
   backBtn.style.display = currentStep > 0 && currentStep < STEPS.length - 1 ? 'block' : 'none';
   nextBtn.style.display = 'none'; // each step controls its own next button
 }
@@ -115,104 +133,91 @@ function renderStep() {
 
 // ── Step 1: Welcome ───────────────────────────────────────────────────────────
 function renderWelcome(el) {
+  const t = T().welcome;
   el.innerHTML = `
-    <div class="step-title">Welcome! 👋</div>
-    <div class="step-subtitle">
-      This wizard will set up your VTuber Song Queue system in about 15 minutes.<br>
-      Viewers on your Twitch channel will be able to request songs using Channel Points.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div class="info-box">
-      <div class="info-label">What you need</div>
-      ✅ A Twitch account (your streaming channel)<br>
-      ✅ A Google account (for your song list in Google Sheets)
+      <div class="info-label">${t.needTitle}</div>
+      ${t.need1}<br>
+      ${t.need2}
     </div>
     <div class="info-box green">
-      <div class="info-label">What this wizard does</div>
-      Connects to your Twitch channel, creates the Channel Points rewards,
-      and links your Google Sheets song list — automatically.
+      <div class="info-label">${t.doesTitle}</div>
+      ${t.doesBody}
     </div>
     <br>
-    <button class="btn btn-primary" onclick="goNext()">Let's get started →</button>
+    <button class="btn btn-primary" onclick="goNext()">${t.cta}</button>
   `;
 }
 
 // ── Step 2: Twitch App ────────────────────────────────────────────────────────
 function renderTwitchApp(el) {
+  const t = T().twitchApp;
   el.innerHTML = `
-    <div class="step-title">Step 1 — Twitch App</div>
-    <div class="step-subtitle">
-      We need to register a small app on Twitch's developer site.<br>
-      Think of it as giving our system a name tag so Twitch knows who's talking to it.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div class="info-box">
-      <div class="info-label">How to get your Client ID</div>
+      <div class="info-label">${t.howToTitle}</div>
       <ol class="steps-list">
-        <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank">dev.twitch.tv/console/apps</a></li>
-        <li>Click <strong>[Register Your Application]</strong></li>
-        <li>Name: anything you like (e.g. <em>Song Queue</em>)</li>
-        <li>OAuth Redirect URL: <code>http://localhost</code></li>
-        <li>Category: <strong>Other</strong> → click Create</li>
-        <li>Click <strong>[Manage]</strong> on your new app</li>
-        <li>Copy the <strong>Client ID</strong> shown at the top</li>
+        ${t.steps.map(s => `<li>${s}</li>`).join('')}
       </ol>
     </div>
     <div class="field">
-      <label>Client ID</label>
-      <input type="text" id="client-id-input" placeholder="e.g. abc123def456ghi789" />
-      <div class="hint">This is a public identifier — safe to share. No password needed here.</div>
+      <label>${t.fieldLabel}</label>
+      <input type="text" id="client-id-input" placeholder="${t.placeholder}" />
+      <div class="hint">${t.hint}</div>
     </div>
     <div id="client-status" class="status-line"></div>
-    <button class="btn btn-primary" onclick="validateClientId()">Verify & Continue →</button>
+    <button class="btn btn-primary" onclick="validateClientId()">${t.verifyBtn}</button>
   `;
 }
 
 async function validateClientId() {
+  const t = T().twitchApp;
   const clientId = document.getElementById('client-id-input').value.trim();
   const status = document.getElementById('client-status');
-  if (!clientId) { showStatus(status, 'error', 'Please enter your Client ID'); return; }
+  if (!clientId) { showStatus(status, 'error', t.errEmpty); return; }
 
-  showStatus(status, 'info', '<span class="spinner"></span> Verifying...');
+  showStatus(status, 'info', t.verifying);
   try {
     await api('POST', '/setup/api/validate-client-id', { clientId });
     state.clientId = clientId;
-    showStatus(status, 'ok', '✓ Client ID verified!');
+    showStatus(status, 'ok', t.verified);
     setTimeout(goNext, 800);
   } catch (err) {
-    showStatus(status, 'error', '✗ ' + (err.message || 'Invalid Client ID'));
+    showStatus(status, 'error', '✗ ' + (err.message || t.errInvalid));
   }
 }
 
 // ── Step 3: Twitch Auth ───────────────────────────────────────────────────────
 function renderTwitchAuth(el) {
+  const t = T().twitchAuth;
   el.innerHTML = `
-    <div class="step-title">Step 2 — Connect Your Channel</div>
-    <div class="step-subtitle">
-      We need your permission to create Channel Points rewards on your behalf.<br>
-      Click the button below, then enter the code shown at <strong>twitch.tv/activate</strong>.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div id="auth-start">
       <div class="info-box amber">
-        <div class="info-label">Important</div>
-        Make sure your browser is signed in to your <strong>broadcaster Twitch account</strong>
-        (the channel you stream on) before clicking the button below.
+        <div class="info-label">${t.importantTitle}</div>
+        ${t.importantBody}
       </div>
-      <button class="btn btn-primary" onclick="startDeviceAuth()">Connect Twitch Account →</button>
+      <button class="btn btn-primary" onclick="startDeviceAuth()">${t.connectBtn}</button>
     </div>
     <div id="auth-waiting" style="display:none">
       <div class="device-code-box">
-        <div style="font-size:13px; color:var(--text-dim)">Visit this page in your browser:</div>
+        <div style="font-size:13px; color:var(--text-dim)">${t.visitPage}</div>
         <a class="device-url" href="https://www.twitch.tv/activate" target="_blank">twitch.tv/activate ↗</a>
-        <div style="font-size:13px; color:var(--text-dim); margin-top:16px;">Enter this code:</div>
+        <div style="font-size:13px; color:var(--text-dim); margin-top:16px;">${t.enterCode}</div>
         <div class="device-code" id="device-code-display">----</div>
-        <div class="device-timer" id="device-timer">Waiting for authorization...</div>
+        <div class="device-timer" id="device-timer">${t.waitingForAuth}</div>
       </div>
       <div id="auth-status" class="status-line info">
-        <span class="spinner"></span> Waiting for you to enter the code at twitch.tv/activate...
+        ${t.waitingStatus}
       </div>
     </div>
     <div id="auth-done" style="display:none">
       <div class="info-box green">
-        <div class="info-label">Connected!</div>
+        <div class="info-label">${t.connectedTitle}</div>
         <div id="auth-name"></div>
       </div>
     </div>
@@ -220,6 +225,7 @@ function renderTwitchAuth(el) {
 }
 
 async function startDeviceAuth() {
+  const t = T().twitchAuth;
   document.getElementById('auth-start').style.display = 'none';
   document.getElementById('auth-waiting').style.display = 'block';
 
@@ -234,7 +240,7 @@ async function startDeviceAuth() {
       remaining--;
       const mins = Math.floor(remaining / 60);
       const secs = remaining % 60;
-      timerEl.textContent = `Code expires in ${mins}:${secs.toString().padStart(2,'0')}`;
+      timerEl.textContent = t.codeExpiresIn(mins, secs.toString().padStart(2, '0'));
       if (remaining < 60) timerEl.classList.add('urgent');
       if (remaining <= 0) clearInterval(deviceTimerInterval);
     }, 1000);
@@ -244,11 +250,12 @@ async function startDeviceAuth() {
   } catch (err) {
     document.getElementById('auth-start').style.display = 'block';
     document.getElementById('auth-waiting').style.display = 'none';
-    alert('Error starting auth: ' + err.message);
+    alert(t.errStarting(err.message));
   }
 }
 
 async function pollDeviceAuth(interval) {
+  const t = T().twitchAuth;
   const res = await api('GET', '/setup/api/poll-device-auth');
   if (res.status === 'authorized') {
     clearInterval(deviceTimerInterval);
@@ -256,16 +263,15 @@ async function pollDeviceAuth(interval) {
     state.broadcasterId = res.broadcasterId;
     document.getElementById('auth-waiting').style.display = 'none';
     document.getElementById('auth-done').style.display = 'block';
-    document.getElementById('auth-name').innerHTML =
-      `✓ Connected as <strong style="color:var(--purple)">${res.displayName}</strong>`;
+    document.getElementById('auth-name').innerHTML = t.connectedAs(res.displayName);
     setTimeout(goNext, 1500);
   } else if (res.status === 'expired') {
     clearInterval(deviceTimerInterval);
-    alert('Code expired. Please try again.');
+    alert(t.codeExpired);
     renderStep();
   } else if (res.status === 'error') {
     clearInterval(deviceTimerInterval);
-    alert('Error: ' + res.error);
+    alert(t.errGeneric(res.error));
     renderStep();
   } else {
     // pending — keep polling
@@ -278,15 +284,13 @@ let rewardsList = [];
 let rewardsDone = { song: false, random: false };
 
 async function renderRewards(el) {
+  const t = T().rewards;
   rewardsDone = { song: false, random: false };
   el.innerHTML = `
-    <div class="step-title">Step 3 — Channel Points Rewards</div>
-    <div class="step-subtitle">
-      Choose which of your existing Channel Points rewards to use for song requests,
-      or create new ones.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div id="rewards-loading" class="status-line info">
-      <span class="spinner"></span> Loading your rewards...
+      ${t.loading}
     </div>
     <div id="rewards-body" style="display:none">
       <div id="reward-song-section"></div>
@@ -306,34 +310,35 @@ async function renderRewards(el) {
     rewardsList = res.rewards || [];
     loadingEl.style.display = 'none';
     document.getElementById('rewards-body').style.display = 'block';
-    renderRewardPicker('reward-song-section', 'song', '🎵 Song Request', 'Viewers type a song title when they redeem this.', true);
-    renderRewardPicker('reward-random-section', 'random', '🎲 Random Song', 'Picks a random song from your list automatically.', false);
+    renderRewardPicker('reward-song-section', 'song', t.songLabel, t.songHint, true);
+    renderRewardPicker('reward-random-section', 'random', t.randomLabel, t.randomHint, false);
   } catch (err) {
     console.error('[rewards] Error:', err);
     if (!loadingEl) return;
     loadingEl.className = 'status-line error';
-    loadingEl.innerHTML = `✗ Could not load rewards: ${err.message}<br>
-      <button class="btn btn-ghost" style="margin-top:8px" onclick="renderRewards(document.getElementById('wizard-body'))">Retry</button>`;
+    loadingEl.innerHTML = `${t.errLoad(err.message)}<br>
+      <button class="btn btn-ghost" style="margin-top:8px" onclick="renderRewards(document.getElementById('wizard-body'))">${t.retry}</button>`;
   }
 }
 
 function renderRewardPicker(containerId, type, label, hint, requiresText) {
+  const t = T().rewards;
   const container = document.getElementById(containerId);
   const listHtml = rewardsList.length > 0
     ? `<div class="reward-list" id="reward-list-${type}">
         ${rewardsList.map((r, i) => `
           <div class="reward-option" onclick="pickReward('${type}', ${i})" id="reward-opt-${type}-${i}">
-            <div class="reward-opt-tag">${r.is_user_input_required ? '[text input]' : '[no text]'}</div>
+            <div class="reward-opt-tag">${r.is_user_input_required ? t.textInputTag : t.noTextTag}</div>
             <div class="reward-opt-name">${esc(r.title)}</div>
             <div class="reward-opt-cost">${r.cost} pts</div>
           </div>`).join('')}
         <div class="reward-option reward-option-new" onclick="showCreateForm('${type}')">
-          <div class="reward-opt-tag">[new]</div>
-          <div class="reward-opt-name">Create a new reward...</div>
+          <div class="reward-opt-tag">${t.newTag}</div>
+          <div class="reward-opt-name">${t.createNewOption}</div>
           <div class="reward-opt-cost"></div>
         </div>
       </div>`
-    : `<div class="info-box amber"><div class="info-label">No rewards found</div>Channel may not be Affiliate yet, or try refreshing.</div>`;
+    : `<div class="info-box amber"><div class="info-label">${t.noRewardsTitle}</div>${t.noRewardsBody}</div>`;
 
   container.innerHTML = `
     <div style="font-size:11px; letter-spacing:2px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase">${label}</div>
@@ -341,21 +346,22 @@ function renderRewardPicker(containerId, type, label, hint, requiresText) {
     ${listHtml}
     <div id="create-form-${type}" style="display:none; margin-top:12px">
       <div class="field" style="margin-bottom:10px">
-        <label>Reward name</label>
-        <input type="text" id="new-name-${type}" placeholder="e.g. Song Request" />
+        <label>${t.nameLabel}</label>
+        <input type="text" id="new-name-${type}" placeholder="${t.namePlaceholder}" />
       </div>
       <div class="field" style="margin-bottom:10px">
-        <label>Point cost</label>
+        <label>${t.costLabel}</label>
         <input type="number" id="new-cost-${type}" value="${requiresText ? 500 : 300}" min="1" />
       </div>
-      <button class="btn btn-primary" style="font-size:11px; padding:6px 14px" onclick="createNewReward('${type}', ${requiresText})">Create →</button>
-      <button class="btn btn-ghost" style="margin-left:8px" onclick="hideCreateForm('${type}')">Cancel</button>
+      <button class="btn btn-primary" style="font-size:11px; padding:6px 14px" onclick="createNewReward('${type}', ${requiresText})">${t.createBtn}</button>
+      <button class="btn btn-ghost" style="margin-left:8px" onclick="hideCreateForm('${type}')">${t.cancelBtn}</button>
     </div>
     <div id="reward-done-${type}" style="display:none" class="status-line ok"></div>
   `;
 }
 
 async function pickReward(type, idx) {
+  const t = T().rewards;
   const reward = rewardsList[idx];
   // Highlight selection
   document.querySelectorAll(`#reward-list-${type} .reward-option`).forEach(el => el.classList.remove('selected'));
@@ -366,7 +372,7 @@ async function pickReward(type, idx) {
     document.getElementById(`reward-list-${type}`).style.display = 'none';
     const doneEl = document.getElementById(`reward-done-${type}`);
     doneEl.style.display = 'block';
-    doneEl.innerHTML = `✓ Using: ${esc(reward.title)}`;
+    doneEl.innerHTML = t.using(esc(reward.title));
     rewardsDone[type] = true;
     checkRewardsDone();
   } catch (err) {
@@ -382,19 +388,20 @@ function hideCreateForm(type) {
 }
 
 async function createNewReward(type, requiresText) {
+  const t = T().rewards;
   const title = document.getElementById(`new-name-${type}`).value.trim();
   const cost = parseInt(document.getElementById(`new-cost-${type}`).value) || 500;
   const status = document.getElementById('rewards-status');
-  if (!title) { showStatus(status, 'error', 'Please enter a reward name'); return; }
+  if (!title) { showStatus(status, 'error', t.errEmptyName); return; }
 
-  showStatus(status, 'info', '<span class="spinner"></span> Creating reward...');
+  showStatus(status, 'info', t.creating);
   try {
     const res = await api('POST', '/setup/api/create-rewards', { mode: 'create', rewardType: type, title, cost, requiresText });
     document.getElementById(`create-form-${type}`).style.display = 'none';
     document.getElementById(`reward-list-${type}`).style.display = 'none';
     const doneEl = document.getElementById(`reward-done-${type}`);
     doneEl.style.display = 'block';
-    doneEl.innerHTML = `✓ Created: ${esc(res.title || title)}`;
+    doneEl.innerHTML = t.created(esc(res.title || title));
     rewardsDone[type] = true;
     showStatus(status, 'ok', '');
     checkRewardsDone();
@@ -411,23 +418,14 @@ function checkRewardsDone() {
 
 // ── Step 5: Google Credentials ────────────────────────────────────────────────
 function renderGoogleCreds(el) {
+  const t = T().googleCreds;
   el.innerHTML = `
-    <div class="step-title">Step 4 — Google Account Access</div>
-    <div class="step-subtitle">
-      Your song list lives in Google Sheets. We need a <em>service account</em> — a special
-      helper account for programs, not people — to read your sheet.<br>
-      <span style="color:var(--text-dim)">Think of it as giving a trusted robot a library card.</span>
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div class="info-box">
-      <div class="info-label">Create a service account (one-time setup)</div>
+      <div class="info-label">${t.createTitle}</div>
       <ol class="steps-list">
-        <li>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></li>
-        <li>Click the project dropdown (top left) → <strong>New Project</strong> → name it anything → Create</li>
-        <li>Search for <strong>Google Sheets API</strong> at the top → click Enable</li>
-        <li>Left menu → <strong>IAM & Admin → Service Accounts → + Create Service Account</strong></li>
-        <li>Name it anything (e.g. <em>song-queue</em>) → click Done</li>
-        <li>Click the new service account → <strong>Keys tab → Add Key → Create new key → JSON</strong></li>
-        <li>A file downloads — drag it into the box below</li>
+        ${t.steps.map(s => `<li>${s}</li>`).join('')}
       </ol>
     </div>
     <div class="upload-area" id="upload-area" onclick="document.getElementById('creds-file').click()"
@@ -436,7 +434,7 @@ function renderGoogleCreds(el) {
          ondrop="handleCredsDrop(event)">
       <input type="file" id="creds-file" accept=".json" onchange="handleCredsFile(this.files[0])">
       <div class="upload-icon">📄</div>
-      <div class="upload-text">Drop your <strong>google-credentials.json</strong> here<br>or <span>click to browse</span></div>
+      <div class="upload-text">${t.dropText}</div>
     </div>
     <div id="creds-status" class="status-line"></div>
   `;
@@ -450,89 +448,85 @@ function handleCredsDrop(e) {
 }
 
 async function handleCredsFile(file) {
+  const t = T().googleCreds;
   const status = document.getElementById('creds-status');
   if (!file) return;
   if (!file.name.endsWith('.json')) {
-    showStatus(status, 'error', '✗ Wrong file type — please upload the .json file downloaded from Google Cloud Console');
+    showStatus(status, 'error', t.errWrongType);
     return;
   }
-  showStatus(status, 'info', '<span class="spinner"></span> Reading file...');
+  showStatus(status, 'info', t.reading);
   let json;
   try {
     const text = await file.text();
     json = JSON.parse(text);
   } catch (err) {
-    showStatus(status, 'error', '✗ This does not look like a valid JSON file. Make sure you downloaded the key as JSON from Google Cloud Console → Service Accounts → Keys → Add Key → JSON.');
+    showStatus(status, 'error', t.errNotJson);
     return;
   }
   if (json.type !== 'service_account') {
-    showStatus(status, 'error', '✗ This JSON file is not a service account key. Go to Google Cloud Console → IAM & Admin → Service Accounts → click your account → Keys → Add Key → Create new key → JSON.');
+    showStatus(status, 'error', t.errNotServiceAccount);
     return;
   }
-  showStatus(status, 'info', '<span class="spinner"></span> Uploading...');
+  showStatus(status, 'info', t.uploading);
   try {
     const res = await api('POST', '/setup/api/upload-credentials', json);
     state.serviceEmail = res.clientEmail;
     document.getElementById('upload-area').innerHTML =
-      `<div class="upload-icon">✅</div><div class="upload-text">Uploaded successfully!<br><span style="color:var(--green)">${res.clientEmail}</span></div>`;
-    showStatus(status, 'ok', '✓ Service account connected');
+      `<div class="upload-icon">✅</div><div class="upload-text">${t.uploadedText(res.clientEmail)}</div>`;
+    showStatus(status, 'ok', t.connected);
     setTimeout(goNext, 1000);
   } catch (err) {
-    showStatus(status, 'error', '✗ ' + (err.message || 'Upload failed'));
+    showStatus(status, 'error', t.errUpload(err.message));
   }
 }
 
 // ── Step 6: Song Sheet ────────────────────────────────────────────────────────
 function renderSongSheet(el) {
+  const t = T().songSheet;
   el.innerHTML = `
-    <div class="step-title">Step 5 — Your Song List</div>
-    <div class="step-subtitle">
-      Paste the URL of your Google Sheet song list below.<br>
-      <span style="color:var(--text-dim)">We'll automatically read it to identify the columns.</span>
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     ${state.serviceEmail ? `
       <div class="info-box green">
-        <div class="info-label">Important — share your sheet</div>
-        Before continuing, open your sheet → click <strong>Share</strong> → paste this email → set to <strong>Viewer</strong>:<br>
-        <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
-          <code style="color:var(--green); flex:1;">${state.serviceEmail}</code>
-          <button class="copy-btn" onclick="copyText('${state.serviceEmail}', this)">Copy</button>
-        </div>
+        <div class="info-label">${t.shareTitle}</div>
+        ${t.shareBody(state.serviceEmail)}
       </div>` : ''}
     <div class="field">
-      <label>Google Sheet URL</label>
-      <input type="url" id="sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." />
-      <div class="hint">Paste the full URL from your browser's address bar.</div>
+      <label>${t.fieldLabel}</label>
+      <input type="url" id="sheet-url" placeholder="${t.placeholder}" />
+      <div class="hint">${t.hint}</div>
     </div>
     <div id="sheet-status" class="status-line"></div>
-    <button class="btn btn-primary" onclick="validateSheet()">Load Sheet →</button>
+    <button class="btn btn-primary" onclick="validateSheet()">${t.loadBtn}</button>
     <div id="column-picker" style="display:none; margin-top:24px;">
       <div class="step-subtitle" style="margin-bottom:12px;">
-        Click the column headers to identify each one:
+        ${t.pickColumnsHint}
       </div>
       <div class="column-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> Song Title (required)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Artist Name (required)</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Key / Transpose (optional)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> ${t.legendSong}</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> ${t.legendArtist}</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> ${t.legendKey}</div>
       </div>
       <table class="column-table" id="col-table"></table>
       <div id="col-status" class="status-line"></div>
-      <button class="btn btn-primary" style="margin-top:12px" onclick="saveColumns()">Confirm Columns →</button>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="saveColumns()">${t.confirmBtn}</button>
     </div>
   `;
 }
 
 async function validateSheet() {
+  const t = T().songSheet;
   const url = document.getElementById('sheet-url').value.trim();
   const status = document.getElementById('sheet-status');
-  if (!url) { showStatus(status, 'error', 'Please paste your sheet URL'); return; }
-  showStatus(status, 'info', '<span class="spinner"></span> Connecting to sheet...');
+  if (!url) { showStatus(status, 'error', t.errEmpty); return; }
+  showStatus(status, 'info', t.connecting);
   try {
     const res = await api('POST', '/setup/api/validate-sheet', { sheetUrl: url });
     state.sheetId = res.sheetId;
     state.headers = res.headers;
     state.preview = res.preview;
-    showStatus(status, 'ok', `✓ Sheet found — ${res.headers.length} columns detected`);
+    showStatus(status, 'ok', t.sheetFound(res.headers.length));
     renderColumnPicker();
     document.getElementById('column-picker').style.display = 'block';
   } catch (err) {
@@ -541,13 +535,14 @@ async function validateSheet() {
 }
 
 function renderColumnPicker() {
+  const t = T().songSheet;
   const table = document.getElementById('col-table');
   const headers = state.headers;
   const preview = state.preview;
 
   // Header row — clickable
   const headerRow = headers.map((h, i) =>
-    `<th data-idx="${i}" onclick="selectColumn(${i})">${h || '(empty)'}</th>`
+    `<th data-idx="${i}" onclick="selectColumn(${i})">${h || t.emptyHeader}</th>`
   ).join('');
 
   // Preview rows
@@ -562,10 +557,11 @@ function renderColumnPicker() {
 
 let colClickState = 0; // 0=song, 1=artist, 2=key
 function selectColumn(idx) {
+  const t = T().songSheet;
   const header = state.headers[idx];
   const types = ['song', 'artist', 'key'];
   const classes = ['selected-song', 'selected-artist', 'selected-key'];
-  const labels = ['Song Title', 'Artist Name', 'Key (optional)'];
+  const labels = [t.labelSong, t.labelArtist, t.labelKey];
   const type = types[colClickState];
   const cls = classes[colClickState];
 
@@ -585,18 +581,19 @@ function selectColumn(idx) {
   if (colClickState < 2) {
     colClickState++;
     if (colClickState === 2) {
-      showStatus(status, 'info', 'Click the key/transpose column (optional) or click Confirm Columns to skip');
+      showStatus(status, 'info', t.selectKeyHint);
     }
   }
   if (selected >= 2) {
-    showStatus(status, 'ok', `✓ Song: "${state.songCol}", Artist: "${state.artistCol}"${state.keyCol ? `, Key: "${state.keyCol}"` : ''}`);
+    showStatus(status, 'ok', t.selectedSummary(state.songCol, state.artistCol, state.keyCol));
   }
 }
 
 async function saveColumns() {
+  const t = T().songSheet;
   const status = document.getElementById('col-status');
   if (!state.songCol || !state.artistCol) {
-    showStatus(status, 'error', 'Please select at least the Song Title and Artist Name columns');
+    showStatus(status, 'error', t.errSelectRequired);
     return;
   }
   try {
@@ -606,7 +603,7 @@ async function saveColumns() {
       artistColumn: state.artistCol,
       keyColumn: state.keyCol || '',
     });
-    showStatus(status, 'ok', '✓ Columns saved!');
+    showStatus(status, 'ok', t.saved);
     setTimeout(goNext, 800);
   } catch (err) {
     showStatus(status, 'error', '✗ ' + err.message);
@@ -615,46 +612,40 @@ async function saveColumns() {
 
 // ── Step 7: History Sheet ─────────────────────────────────────────────────────
 function renderHistorySheet(el) {
+  const t = T().historySheet;
   el.innerHTML = `
-    <div class="step-title">Step 6 — Request History <span style="color:var(--text-dim);font-size:13px">(optional)</span></div>
-    <div class="step-subtitle">
-      We can track how many times each song gets requested and who requested it — across all your streams.
-      This is completely optional.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     ${state.serviceEmail ? `
       <div class="info-box">
-        <div class="info-label">To set this up</div>
+        <div class="info-label">${t.setupTitle}</div>
         <ol class="steps-list">
-          <li>Go to <a href="https://sheets.new" target="_blank">sheets.new</a> to create a blank sheet</li>
-          <li>Click <strong>Share</strong> → paste this email → set to <strong>Editor</strong>:<br>
-            <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
-              <code style="color:var(--green); flex:1;">${state.serviceEmail}</code>
-              <button class="copy-btn" onclick="copyText('${state.serviceEmail}', this)">Copy</button>
-            </div>
-          </li>
-          <li>Paste the sheet URL below</li>
+          <li>${t.step1}</li>
+          <li>${t.step2(state.serviceEmail)}</li>
+          <li>${t.step3}</li>
         </ol>
       </div>` : ''}
     <div class="field">
-      <label>History Sheet URL (optional)</label>
-      <input type="url" id="history-url" placeholder="https://docs.google.com/spreadsheets/d/..." />
+      <label>${t.fieldLabel}</label>
+      <input type="url" id="history-url" placeholder="${t.placeholder}" />
     </div>
     <div id="history-status" class="status-line"></div>
     <div style="display:flex; gap:12px; flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="saveHistory()">Save & Continue →</button>
-      <button class="btn btn-ghost" onclick="skipHistory()">Skip for now</button>
+      <button class="btn btn-primary" onclick="saveHistory()">${t.saveBtn}</button>
+      <button class="btn btn-ghost" onclick="skipHistory()">${t.skipBtn}</button>
     </div>
   `;
 }
 
 async function saveHistory() {
+  const t = T().historySheet;
   const url = document.getElementById('history-url').value.trim();
   const status = document.getElementById('history-status');
   if (!url) { skipHistory(); return; }
-  showStatus(status, 'info', '<span class="spinner"></span> Connecting...');
+  showStatus(status, 'info', t.connecting);
   try {
     await api('POST', '/setup/api/validate-sheet', { sheetUrl: url, historyMode: true });
-    showStatus(status, 'ok', '✓ History sheet connected!');
+    showStatus(status, 'ok', t.connected);
     setTimeout(goNext, 800);
   } catch (err) {
     showStatus(status, 'error', '✗ ' + err.message);
@@ -668,47 +659,40 @@ function skipHistory() {
 
 // ── Step 8: OBS ───────────────────────────────────────────────────────────────
 function renderOBS(el) {
+  const t = T().obs;
   const overlayUrl = `${location.origin}/overlay/index.html`;
   const css = `body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }`;
 
+  const urlBlock = `<div class="code-block"><span>${overlayUrl}</span><button class="copy-btn" onclick="copyText('${overlayUrl}', this)">${T().copy}</button></div>`;
+  const cssBlock = `<div class="code-block"><span>${css}</span><button class="copy-btn" onclick="copyText(\`${css}\`, this)">${T().copy}</button></div>`;
+
   el.innerHTML = `
-    <div class="step-title">Step 7 — Add to OBS</div>
-    <div class="step-subtitle">
-      Add the song queue overlay to your streaming software.
-      It will update automatically whenever a song is requested.
-    </div>
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
     <div class="tabs">
-      <div class="tab active" onclick="switchTab('obs-tab', this)">OBS Studio</div>
-      <div class="tab" onclick="switchTab('streamlabs-tab', this)">Streamlabs</div>
+      <div class="tab active" onclick="switchTab('obs-tab', this)">${t.obsTab}</div>
+      <div class="tab" onclick="switchTab('streamlabs-tab', this)">${t.streamlabsTab}</div>
     </div>
     <div class="tab-content active" id="obs-tab">
       <ol class="steps-list" style="margin-bottom:16px">
-        <li>In OBS, click <strong>+</strong> under Sources → <strong>Browser</strong></li>
-        <li>Paste this URL:
-          <div class="code-block"><span>${overlayUrl}</span><button class="copy-btn" onclick="copyText('${overlayUrl}', this)">Copy</button></div>
-        </li>
-        <li>Width: <code>960</code> — Height: <code>800</code></li>
-        <li>Paste this into <strong>Custom CSS</strong>:
-          <div class="code-block"><span>${css}</span><button class="copy-btn" onclick="copyText(\`${css}\`, this)">Copy</button></div>
-        </li>
-        <li>Uncheck <strong>"Shutdown source when not visible"</strong></li>
+        <li>${t.obsSteps[0]}</li>
+        <li>${t.obsSteps[1]}${urlBlock}</li>
+        <li>${t.obsSteps[2]}</li>
+        <li>${t.obsSteps[3]}${cssBlock}</li>
+        <li>${t.obsSteps[4]}</li>
       </ol>
     </div>
     <div class="tab-content" id="streamlabs-tab">
       <ol class="steps-list" style="margin-bottom:16px">
-        <li>In Streamlabs, add a new source → <strong>Browser Source</strong></li>
-        <li>Paste this URL:
-          <div class="code-block"><span>${overlayUrl}</span><button class="copy-btn" onclick="copyText('${overlayUrl}', this)">Copy</button></div>
-        </li>
-        <li>Width: <code>960</code> — Height: <code>800</code></li>
-        <li>Paste this into <strong>Custom CSS</strong>:
-          <div class="code-block"><span>${css}</span><button class="copy-btn" onclick="copyText(\`${css}\`, this)">Copy</button></div>
-        </li>
+        <li>${t.streamlabsSteps[0]}</li>
+        <li>${t.streamlabsSteps[1]}${urlBlock}</li>
+        <li>${t.streamlabsSteps[2]}</li>
+        <li>${t.streamlabsSteps[3]}${cssBlock}</li>
       </ol>
     </div>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
-      <button class="btn btn-primary" onclick="goNext()">All done! →</button>
-      <button class="btn btn-ghost" onclick="window.open('${overlayUrl}', '_blank')">Preview overlay</button>
+      <button class="btn btn-primary" onclick="goNext()">${t.allDoneBtn}</button>
+      <button class="btn btn-ghost" onclick="window.open('${overlayUrl}', '_blank')">${t.previewBtn}</button>
     </div>
   `;
 }
@@ -722,37 +706,37 @@ function switchTab(tabId, clickedTab) {
 
 // ── Step 9: Done ──────────────────────────────────────────────────────────────
 function renderDone(el) {
+  const t = T().done;
   el.innerHTML = `
     <div class="done-icon">🎉</div>
-    <div class="step-title" style="text-align:center">You're all set!</div>
+    <div class="step-title" style="text-align:center">${t.title}</div>
     <div class="step-subtitle" style="text-align:center; margin-bottom:24px">
-      Your song queue system is ready. Here's what was configured:
+      ${t.subtitle}
     </div>
     <div class="summary-grid">
       <div class="summary-item">
         <span class="check">✓</span>
-        <span class="label">Twitch account</span>
-        <span class="value">${state.displayName || 'Connected'}</span>
+        <span class="label">${t.twitchAccount}</span>
+        <span class="value">${state.displayName || t.connectedFallback}</span>
       </div>
       <div class="summary-item">
         <span class="check">✓</span>
-        <span class="label">Channel Points rewards</span>
+        <span class="label">${t.channelPointsRewards}</span>
         <span class="value">點歌券 + 隨機點歌券</span>
       </div>
       <div class="summary-item">
         <span class="check">✓</span>
-        <span class="label">Song list sheet</span>
-        <span class="value">${state.songCol || 'Configured'}</span>
+        <span class="label">${t.songListSheet}</span>
+        <span class="value">${state.songCol || t.configuredFallback}</span>
       </div>
     </div>
     <div class="info-box green">
-      <div class="info-label">Every stream</div>
-      Just run <code>npm start</code> (or <code>start.ps1</code>) and you're live.
-      No other setup needed — ever again.
+      <div class="info-label">${t.everyStreamTitle}</div>
+      ${t.everyStreamBody}
     </div>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
-      <a class="btn btn-green" href="/dashboard">Open Dashboard →</a>
-      <button class="btn btn-ghost" onclick="goToStep('twitch-app')">Re-run setup</button>
+      <a class="btn btn-green" href="/dashboard">${t.openDashboard}</a>
+      <button class="btn btn-ghost" onclick="goToStep('twitch-app')">${t.rerunSetup}</button>
     </div>
   `;
 }
@@ -782,7 +766,7 @@ function esc(s) {
 function copyText(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
-    btn.textContent = 'Copied!';
+    btn.textContent = T().copied;
     setTimeout(() => btn.textContent = orig, 1500);
   });
 }
