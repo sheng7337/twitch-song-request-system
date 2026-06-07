@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VTuber Song Queue — Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+<div class="wizard">
+  <div class="wizard-header">
+    <div class="logo">🎵 VTuber Song Queue</div>
+    <div class="step-indicator" id="step-indicator"></div>
+  </div>
+
+  <div class="wizard-body" id="wizard-body">
+    <!-- Steps injected by setup.js -->
+  </div>
+
+  <div class="wizard-footer">
+    <button class="btn btn-secondary" id="btn-back" onclick="goBack()" style="display:none">← Back</button>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="btn-next" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<script>
+// Must be served via http://localhost:3000/setup — not opened as a file
+if (location.protocol === 'file:') {
+  document.body.innerHTML = `
+    <div style="font-family:monospace;max-width:560px;margin:80px auto;padding:32px;background:#0d0d1e;border:1px solid rgba(255,90,90,0.4);border-radius:12px;color:#d4c8f0">
+      <div style="color:#ff5a5a;font-size:18px;margin-bottom:16px">⚠ Wrong way to open this file</div>
+      <p style="color:#7a6a9a;line-height:1.7;margin-bottom:20px">
+        This setup wizard must be served by the Node.js server.<br>
+        You cannot open it directly as a file.
+      </p>
+      <div style="background:#111128;border:1px solid rgba(120,60,220,0.3);border-radius:6px;padding:16px;margin-bottom:20px">
+        <div style="font-size:10px;letter-spacing:3px;color:#7b4fb5;margin-bottom:10px">HOW TO START</div>
+        1. Open a terminal / PowerShell in the project folder<br>
+        2. Run: <span style="color:#b06aff">npm start</span><br>
+        3. Open: <a href="http://localhost:3000/setup" style="color:#5a9aff">http://localhost:3000/setup</a>
+      </div>
+      <div style="font-size:12px;color:#3a3060">Or run <span style="color:#7a6a9a">start.ps1</span> / <span style="color:#7a6a9a">start_zh.ps1</span> which starts the server automatically.</div>
+    </div>`;
+}
+</script>
+<script src="setup.js"></script>
+</body>
+</html>
