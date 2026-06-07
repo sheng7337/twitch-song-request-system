@@ -73,9 +73,11 @@ Write-Host "  前往：https://dev.twitch.tv/console/apps" -ForegroundColor Dark
 Write-Host "  點擊 [Register Your Application]，填寫：" -ForegroundColor DarkGray
 Write-Host "    名稱：隨意（例如 Song Queue Bot）" -ForegroundColor DarkGray
 Write-Host "    OAuth 轉址 URL：http://localhost" -ForegroundColor DarkGray
-Write-Host "    類別：Other" -ForegroundColor DarkGray
+Write-Host "    類別（Category）：Other" -ForegroundColor DarkGray
+Write-Host "    用戶端類型（Client Type）：Public（不要選 Confidential）" -ForegroundColor DarkGray
 Write-Host "  建立完成後點擊 [Manage]，Client ID 顯示在頁面上方。" -ForegroundColor DarkGray
-Write-Host "  注意：不需要 Client Secret。" -ForegroundColor DarkGray
+Write-Host "  注意：不需要 Client Secret —— 本系統使用裝置授權流程" -ForegroundColor DarkGray
+Write-Host "  （Device Authorization Flow），這只適用於 Public 類型的應用程式。" -ForegroundColor DarkGray
 Write-Host ""
 
 $clientId = Get-EnvValue "TWITCH_CLIENT_ID"

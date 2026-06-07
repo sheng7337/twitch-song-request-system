@@ -102,11 +102,14 @@ https://docs.google.com/spreadsheets/d/THIS_PART_HERE/edit
    - Name: anything (e.g. `Song Queue Bot`)
    - OAuth Redirect URL: `http://localhost:3000/setup/callback`
    - Category: **Other**
+   - Client Type: **Public** (not Confidential)
 2. Click **Manage** → copy **Client ID**
 3. Paste it into `.env` as `TWITCH_CLIENT_ID`
 
-> No Client Secret is needed — this app authenticates as a public client via Device
-> Authorization Flow, so there's no secret to leak or rotate.
+> **Why Public, not Confidential?** This app authenticates via Device Authorization
+> Flow, which only works for Public clients and never needs a Client Secret. Choosing
+> Confidential would generate a secret this app can't use — and would be a liability to
+> protect for no benefit, since it never leaves your own machine.
 
 ### Get a user access token (Device Authorization Flow)
 

@@ -73,8 +73,10 @@ Write-Host "  Click [Register Your Application] and fill in:" -ForegroundColor D
 Write-Host "    Name: anything (e.g. Song Queue Bot)" -ForegroundColor DarkGray
 Write-Host "    OAuth Redirect URL: http://localhost" -ForegroundColor DarkGray
 Write-Host "    Category: Other" -ForegroundColor DarkGray
+Write-Host "    Client Type: Public (NOT Confidential)" -ForegroundColor DarkGray
 Write-Host "  After creating, click [Manage] -- Client ID is shown at the top." -ForegroundColor DarkGray
-Write-Host "  Note: you do NOT need a Client Secret." -ForegroundColor DarkGray
+Write-Host "  Note: you do NOT need a Client Secret -- this app uses Device" -ForegroundColor DarkGray
+Write-Host "  Authorization Flow, which only works for Public clients." -ForegroundColor DarkGray
 Write-Host ""
 
 $clientId = Get-EnvValue "TWITCH_CLIENT_ID"
