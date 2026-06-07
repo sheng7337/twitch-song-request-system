@@ -1,7 +1,8 @@
 # 🎵 VTuber Song Queue — Manual Setup Guide
 
-> This guide is for those who prefer to set up everything manually without scripts.
-> If you prefer an automated setup, use `setup.ps1` and `start.ps1` instead — see `SETUP.md`.
+> This guide is for those who prefer to set up everything manually without the wizard.
+> If you'd rather be walked through it, just run `start.ps1` (or `start_zh.ps1`) — your
+> browser opens to a step-by-step setup wizard at `http://localhost:3000/setup`. See `SETUP.md`.
 
 ---
 
@@ -10,7 +11,7 @@
 ```
 Viewer redeems Channel Points (Song Request or Random Song)
         ↓
-Twitch webhook → your server (via ngrok tunnel)
+Twitch EventSub (outbound WebSocket) → your local server
         ↓
 🎵 Song Request: fuzzy-match → queue or Pending (dashboard)
 🎲 Random Song: weighted random pick from your sheet
@@ -20,12 +21,14 @@ OBS overlay updates live via WebSocket
 Request recorded in history Google Sheet
 ```
 
+The server opens an outbound WebSocket connection to Twitch — there's no inbound
+webhook, no public URL, and therefore no ngrok or tunnel to manage.
+
 ---
 
 ## Prerequisites
 
 - **Node.js LTS** → https://nodejs.org (check "Add to PATH" during install)
-- **ngrok** → https://ngrok.com/download (sign up for free, unzip to `C:\ngrok\`)
 
 ---
 
@@ -91,30 +94,65 @@ https://docs.google.com/spreadsheets/d/THIS_PART_HERE/edit
 
 ---
 
-## Step 4 — Twitch app credentials
+## Step 4 — Twitch app & authorization
+
+### Register a Twitch app
 
 1. Go to https://dev.twitch.tv/console/apps → **Register Your Application**
    - Name: anything (e.g. `Song Queue Bot`)
-   - OAuth Redirect URL: `http://localhost`
+   - OAuth Redirect URL: `http://localhost:3000/setup/callback`
    - Category: **Other**
 2. Click **Manage** → copy **Client ID**
-3. Click **New Secret** → copy the **Client Secret** (shown once only)
-4. Paste both into `.env`
+3. Paste it into `.env` as `TWITCH_CLIENT_ID`
+
+> No Client Secret is needed — this app authenticates as a public client via Device
+> Authorization Flow, so there's no secret to leak or rotate.
+
+### Get a user access token (Device Authorization Flow)
+
+Instead of copy-pasting tokens out of a redirect URL, request a device code and
+authorize it from any browser:
+
+```powershell
+$res = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
+  client_id = "YOUR_CLIENT_ID"
+  scopes    = "channel:read:redemptions channel:manage:redemptions"
+}
+$res.user_code        # e.g. ABCD-1234
+```
+
+Visit **https://www.twitch.tv/activate**, log in as your **broadcaster** account, and
+enter the code shown. Then poll for the token (the device code is valid for ~30 minutes):
+
+```powershell
+$token = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/token" -Body @{
+  client_id   = "YOUR_CLIENT_ID"
+  device_code = $res.device_code
+  grant_type  = "urn:ietf:params:oauth:grant-type:device_code"
+}
+$token.access_token
+$token.refresh_token
+```
+
+Paste the results into `.env`:
+
+```env
+TWITCH_USER_ACCESS_TOKEN=<access_token>
+TWITCH_USER_REFRESH_TOKEN=<refresh_token>
+TWITCH_USER_TOKEN_EXPIRES_AT=<current unix time in ms + (expires_in * 1000)>
+```
+
+The server refreshes this token automatically and rewrites `.env` whenever it renews —
+you should never need to repeat this step.
 
 ### Get your Broadcaster ID
 
-Go to https://streamweasels.com/tools/convert-twitch-username-to-user-id/ and enter your Twitch username. Paste the number into `.env` as `TWITCH_BROADCASTER_ID`.
-
-### Get a User Token
-
-Paste this URL into your browser while logged in as your broadcaster account (replace `YOUR_CLIENT_ID`):
-
-```
-https://id.twitch.tv/oauth2/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=http://localhost&response_type=token&scope=channel:read:redemptions+channel:manage:redemptions
+```powershell
+Invoke-RestMethod -Uri "https://api.twitch.tv/helix/users" `
+  -Headers @{ "Client-Id" = "YOUR_CLIENT_ID"; "Authorization" = "Bearer $($token.access_token)" }
 ```
 
-Click **Authorize**. Your browser redirects to `http://localhost` (fails to load — that's fine).
-Copy the token from the URL bar between `access_token=` and `&token_type`.
+Copy the `id` field into `.env` as `TWITCH_BROADCASTER_ID`.
 
 ### Create Channel Points rewards
 
@@ -143,34 +181,14 @@ Copy the `id` field for each reward into `.env` as `TWITCH_REWARD_ID` and `TWITC
 
 ## Step 5 — Fill in `.env`
 
-Open `.env` and fill in all values. See `.env.example` for descriptions of each field.
+Open `.env` and fill in any remaining values. See `.env.example` for descriptions of each field.
 
-Your `TWITCH_WEBHOOK_SECRET` can be any random string you make up.
-
----
-
-## Step 6 — ngrok
-
-Twitch needs a public HTTPS URL to send webhooks to your local server.
-
-```powershell
-C:\ngrok\ngrok.exe config add-authtoken YOUR_NGROK_TOKEN
-```
-
-Then each stream, in a **separate terminal**:
-
-```powershell
-C:\ngrok\ngrok.exe http 3000
-```
-
-Copy the `https://xxxx.ngrok-free.app` URL → paste into `.env` as `PUBLIC_URL`.
-
-> **Tip:** ngrok free plan gives a new URL each restart. To avoid updating `.env` every stream,
-> set up a free static domain at https://dashboard.ngrok.com/domains.
+There's no webhook secret and no `PUBLIC_URL` to set — EventSub connects outbound over
+a WebSocket, so nothing needs to be publicly reachable.
 
 ---
 
-## Step 7 — Streamlabs / OBS Browser Source
+## Step 6 — Streamlabs / OBS Browser Source
 
 1. Add Source → **Browser**
 2. URL: `http://localhost:3000/overlay/index.html`
@@ -183,9 +201,7 @@ Copy the `https://xxxx.ngrok-free.app` URL → paste into `.env` as `PUBLIC_URL`
 
 ---
 
-## Step 8 — Run it
-
-After updating `PUBLIC_URL` in `.env`, start the server:
+## Step 7 — Run it
 
 ```powershell
 npm start
@@ -196,20 +212,24 @@ Expected output:
 🎵 VTuber Song Queue starting...
 [sheets] Loaded 180 songs from Google Sheet (3 tabs)
 [history] Loaded 42 songs from history sheet
-[twitch] EventSub subscription registered!
+[twitch] EventSub WebSocket connected — session established
+[twitch] Subscribed to channel point redemptions
 ✅ Server running at http://localhost:3000
    Overlay URL:  http://localhost:3000/overlay/index.html
    Dashboard:    http://localhost:3000/dashboard
-[webhook] Verification challenge received — subscription confirmed!
 ```
 
 ---
 
 ## Every-stream startup
 
-1. **Terminal 1** — start ngrok, copy the URL, update `PUBLIC_URL` in `.env`
-2. **Terminal 2** — `npm start`
-3. **Browser** — open `http://localhost:3000/dashboard`
+```powershell
+npm start
+```
+
+Then open `http://localhost:3000/dashboard` in your browser. Nothing else to start,
+copy, or update — the EventSub WebSocket connection and token refresh are handled
+automatically on launch.
 
 ---
 
@@ -271,7 +291,8 @@ Fine-tune weights in `server/config.js` (`RANDOM_NEVER_REQUESTED_WEIGHT`, `RANDO
 
 ```
 vtuber-song-queue/
-├── setup.ps1                 ← automated setup wizard
+├── setup/                    ← browser-based setup wizard (served at /setup)
+├── setup.ps1                 ← automated terminal setup wizard
 ├── start.ps1                 ← automated stream startup
 ├── .env                      ← secrets (never commit!)
 ├── .env.example              ← template with descriptions
@@ -283,7 +304,8 @@ vtuber-song-queue/
 │   ├── sheets.js             ← song list reader
 │   ├── matcher.js            ← fuzzy matching
 │   ├── queue.js              ← queue state + WebSocket
-│   ├── twitch.js             ← EventSub + webhook auth
+│   ├── twitch.js             ← EventSub WebSocket client + Device Auth token handling
+│   ├── setup-routes.js       ← API endpoints behind the setup wizard
 │   ├── history.js            ← request history writer
 │   └── random.js             ← random song picker
 ├── overlay/
@@ -298,5 +320,6 @@ vtuber-song-queue/
 
 - Song list **auto-refreshes every 5 minutes** — no restart needed after adding songs
 - History sheet **updates within ~2 seconds** of each request
-- If ngrok URL changes: update `PUBLIC_URL` in `.env` and restart — the server auto-deletes the old EventSub subscription
-- For **permanent hosting** (no ngrok ever): deploy to Railway or Render
+- The user access token **refreshes itself automatically** and rewrites `.env` — you
+  should never need to repeat the Device Authorization step
+- Want it running 24/7 without your PC on? Deploy to Railway or Render

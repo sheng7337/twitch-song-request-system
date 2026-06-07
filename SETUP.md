@@ -5,7 +5,7 @@
 ```
 Viewer redeems Channel Points (Song Request or Random Song)
         ↓
-Twitch webhook → your server (via ngrok tunnel)
+Twitch EventSub (outbound WebSocket) → your local server
         ↓
 🎵 Song Request: fuzzy-match → queue or Pending (dashboard)
 🎲 Random Song: weighted random pick from your sheet
@@ -15,40 +15,43 @@ OBS overlay updates live via WebSocket
 Request recorded in history Google Sheet
 ```
 
+No public URL, no tunnel, no ngrok — the server connects straight out to Twitch.
+
 ---
 
 ## Prerequisites
 
-Install these before running the setup script:
+Install this before getting started:
 
 - **Node.js LTS** → https://nodejs.org (check "Add to PATH")
-- **ngrok** → https://ngrok.com/download (sign up free, unzip to `C:\ngrok\`)
+
+That's it — nothing else to download or configure ahead of time.
 
 ---
 
 ## First-time setup
 
 ```powershell
-.\setup.ps1        # English
-.\setup_zh.ps1     # Traditional Chinese / 繁體中文
+.\start.ps1        # English
+.\start_zh.ps1     # Traditional Chinese / 繁體中文
 ```
 
-The script walks you through everything interactively:
+The first time you run it, your browser opens straight to a **step-by-step setup wizard**
+at `http://localhost:3000/setup`. It walks you through everything in plain language —
+no terminal commands, no manual `.env` editing:
 
-1. Installs npm packages
-2. Asks for your Twitch Client ID & Secret → gets tokens automatically
-3. Looks up your Broadcaster ID from your username
-4. Creates the 🎵 Song Request and 🎲 Random Song Channel Points rewards automatically
-5. Asks for your Google Sheet IDs
-6. Configures ngrok authtoken
-7. Writes everything to `.env`
+1. Create a small Twitch app and paste in its Client ID
+2. Connect your Twitch account (enter a short code at twitch.tv/activate — no copy-pasting tokens)
+3. Create the 🎵 Song Request and 🎲 Random Song Channel Points rewards automatically
+4. Upload your Google **service account** key and pick your song-list sheet from a live preview
+5. (Optional) Connect a history sheet to track requesters and request dates
+6. Add the OBS overlay to your scene
 
-The only manual step it can't do for you is the **Google Service Account** — follow this once:
+The wizard validates each step as you go and explains exactly what to do and why.
+If you're interrupted partway through, it picks up where you left off.
 
-1. https://console.cloud.google.com → new project → enable **Google Sheets API**
-2. **IAM & Admin → Service Accounts → Create** → **Keys → JSON**
-3. Rename the downloaded file to **`google-credentials.json`** → place in project root
-4. Share your **song list sheet** (Viewer) and **history sheet** (Editor) with the service account email
+> Prefer the terminal? `setup.ps1` / `setup_zh.ps1` walk through the same steps
+> (Twitch Device Authorization, reward creation, Google Sheets) interactively in PowerShell.
 
 ---
 
@@ -59,12 +62,8 @@ The only manual step it can't do for you is the **Google Service Account** — f
 .\start_zh.ps1     # Traditional Chinese / 繁體中文
 ```
 
-That's it. The script:
-- Starts ngrok and reads the public URL automatically
-- Updates `PUBLIC_URL` in `.env`
-- Starts the server
-
-Then open **http://localhost:3000/dashboard** in your browser.
+That's it — no ngrok, no URLs to copy, no `.env` to update. The script starts the
+server and opens your browser straight to **http://localhost:3000/dashboard**.
 
 ---
 
@@ -158,7 +157,8 @@ Songs already in queue/Now Playing are always excluded.
 
 ```
 vtuber-song-queue/
-├── setup.ps1                 ← run once for first-time setup
+├── setup/                    ← browser-based setup wizard (served at /setup)
+├── setup.ps1                 ← optional terminal setup wizard
 ├── start.ps1                 ← run every stream
 ├── .env                      ← secrets (never commit!)
 ├── .env.example              ← template with descriptions
@@ -170,7 +170,8 @@ vtuber-song-queue/
 │   ├── sheets.js             ← song list reader
 │   ├── matcher.js            ← fuzzy matching
 │   ├── queue.js              ← queue state + WebSocket
-│   ├── twitch.js             ← EventSub + webhook auth
+│   ├── twitch.js             ← EventSub WebSocket client + Device Auth token handling
+│   ├── setup-routes.js       ← API endpoints behind the setup wizard
 │   ├── history.js            ← request history writer
 │   └── random.js             ← random song picker
 ├── overlay/
@@ -185,5 +186,5 @@ vtuber-song-queue/
 
 - Song list **auto-refreshes every 5 minutes** — no restart needed after adding songs
 - History sheet **updates within ~2 seconds** of each request
-- If ngrok URL changes: just run `.\start.ps1` again — it updates `.env` automatically
-- For **permanent hosting** (no ngrok ever): deploy to Railway or Render
+- Your Twitch connection **renews itself automatically** — no token to babysit, no tunnel to restart
+- Want it running 24/7 without your PC on? Deploy to Railway or Render

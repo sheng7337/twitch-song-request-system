@@ -5,7 +5,7 @@
 ```
 觀眾兌換頻道點數（點歌券 或 隨機點歌券）
         ↓
-Twitch Webhook → 你的本機伺服器（透過 ngrok 通道）
+Twitch EventSub（伺服器主動連線的 WebSocket）→ 你的本機伺服器
         ↓
 🎵 點歌券：模糊比對歌名 → 加入歌單 或 待審核（控制台）
 🎲 隨機點歌券：從歌曲清單中加權隨機選歌
@@ -15,41 +15,44 @@ OBS 顯示層透過 WebSocket 即時更新
 點歌紀錄寫入 Google 試算表
 ```
 
+不需要對外公開網址、不需要通道（tunnel），當然也不需要 ngrok —— 伺服器會主動連線到 Twitch。
+
 ---
 
 ## 事前準備
 
-執行安裝腳本前，請先安裝以下工具：
+只需要先安裝這一項：
 
 - **Node.js LTS** → https://nodejs.org（安裝時記得勾選「Add to PATH」）
-- **ngrok** → https://ngrok.com/download（免費註冊，解壓縮至 `C:\ngrok\`）
+
+就這樣，不需要額外下載或預先設定任何東西。
 
 ---
 
 ## 首次安裝
 
 ```powershell
-.\setup_zh.ps1
+.\start_zh.ps1
 ```
 
-> 也提供英文版：`.\setup.ps1`
+> 也提供英文版：`.\start.ps1`
 
-腳本會以互動式引導完成所有設定：
+第一次執行時，瀏覽器會自動開啟一個**逐步引導的安裝精靈**，網址為
+`http://localhost:3000/setup?lang=zh-TW`。全程使用淺顯易懂的中文說明 —— 不需要打指令、
+也不需要手動編輯 `.env`：
 
-1. 安裝 npm 套件
-2. 輸入 Twitch Client ID 與 Secret → 自動取得存取金鑰
-3. 透過使用者名稱自動查詢你的 Broadcaster ID
-4. 自動建立 🎵 點歌券 與 🎲 隨機點歌券 頻道點數兌換項目
-5. 輸入 Google 試算表 ID
-6. 設定 ngrok 驗證金鑰（Authtoken）
-7. 將所有設定寫入 `.env`
+1. 建立一個小型 Twitch 應用程式，貼上它的 Client ID
+2. 連結你的 Twitch 帳號（在 twitch.tv/activate 輸入一組短代碼即可，不需要複製貼上金鑰）
+3. 自動建立 🎵 點歌券 與 🎲 隨機點歌券 頻道點數兌換項目
+4. 上傳 Google **服務帳戶**金鑰，並從即時預覽畫面中選擇你的歌曲清單試算表
+5. （選填）連結點歌紀錄試算表，追蹤點歌者與點歌時間
+6. 將顯示層加入 OBS 場景
 
-唯一需要手動完成的步驟是 **Google 服務帳戶** — 只需設定一次：
+精靈會在每個步驟即時驗證輸入內容，並清楚說明該做什麼、為什麼要這麼做。
+如果中途離開，下次回來會從中斷的地方繼續。
 
-1. 前往 https://console.cloud.google.com → 建立新專案 → 啟用 **Google Sheets API**
-2. **IAM 與管理 → 服務帳戶 → 建立** → **金鑰 → JSON**
-3. 將下載的檔案重新命名為 **`google-credentials.json`** → 放入專案根目錄
-4. 將 **歌曲清單試算表**（檢視者權限）與 **點歌紀錄試算表**（編輯者權限）共用給服務帳戶的電子郵件
+> 偏好用終端機操作？`setup.ps1` / `setup_zh.ps1` 也能在 PowerShell 中以互動方式
+> 完成相同的步驟（Twitch 裝置授權、建立兌換項目、設定 Google 試算表）。
 
 ---
 
@@ -61,12 +64,8 @@ OBS 顯示層透過 WebSocket 即時更新
 
 > 也提供英文版：`.\start.ps1`
 
-就這樣。腳本會自動：
-- 啟動 ngrok 並讀取公開網址
-- 將 `PUBLIC_URL` 更新至 `.env`
-- 啟動伺服器
-
-接著在瀏覽器開啟 **http://localhost:3000/dashboard** 即可。
+就這樣 —— 不需要 ngrok、不需要複製網址、也不需要更新 `.env`。
+腳本會啟動伺服器，並自動開啟瀏覽器前往 **http://localhost:3000/dashboard**。
 
 ---
 
@@ -162,7 +161,8 @@ OBS 顯示層透過 WebSocket 即時更新
 
 ```
 vtuber-song-queue/
-├── setup.ps1                 ← 首次安裝精靈（只需執行一次）
+├── setup/                    ← 瀏覽器版安裝精靈（於 /setup 提供服務）
+├── setup.ps1                 ← 選用的終端機安裝精靈
 ├── start.ps1                 ← 每次直播開始時執行
 ├── .env                      ← 金鑰設定（請勿上傳至 Git！）
 ├── .env.example              ← 設定範本與說明
@@ -174,7 +174,8 @@ vtuber-song-queue/
 │   ├── sheets.js             ← 歌曲清單讀取器
 │   ├── matcher.js            ← 模糊比對（fuse.js）
 │   ├── queue.js              ← 歌單狀態 + WebSocket 廣播
-│   ├── twitch.js             ← EventSub 訂閱與 Webhook 驗證
+│   ├── twitch.js             ← EventSub WebSocket 用戶端 + 裝置授權權杖管理
+│   ├── setup-routes.js       ← 安裝精靈背後的 API 端點
 │   ├── history.js            ← 點歌紀錄寫入器
 │   └── random.js             ← 隨機選歌器
 ├── overlay/
@@ -189,5 +190,5 @@ vtuber-song-queue/
 
 - 歌曲清單**每 5 分鐘自動更新** — 新增歌曲後不需重新啟動伺服器
 - 點歌紀錄**約 2 秒內寫入**試算表（有防抖設計，不會頻繁呼叫 API）
-- 若 ngrok 網址改變：重新執行 `.\start.ps1` 即可 — 腳本會自動更新 `.env`
-- 想**永久架設**（不再需要 ngrok）：可部署至 Railway 或 Render 等平台
+- Twitch 連線會**自動續約** — 不需要手動更新權杖，也不需要重啟通道
+- 想讓系統 24 小時運作而不必開著電腦？可部署至 Railway 或 Render 等平台
