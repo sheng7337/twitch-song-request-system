@@ -41,6 +41,7 @@ function writeEnvValues(values) {
     process.env[key] = value;
   }
   fs.writeFileSync(ENV_PATH, content, { encoding: 'utf8' });
+  if (onConfigChange) onConfigChange();
 }
 
 function saveProgress(data) {
@@ -57,6 +58,13 @@ function loadProgress() {
 
 // In-memory state for Device Auth polling
 let deviceAuthState = null;
+
+// Called after every .env write so the server can start the song queue
+// services (sheets, history, Twitch connection) the moment setup finishes —
+// without this, finishing the wizard mid-run leaves the dashboard open with
+// no song list until the process is restarted.
+let onConfigChange = null;
+function setConfigChangeCallback(fn) { onConfigChange = fn; }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -407,3 +415,4 @@ router.post('/save-history', (req, res) => {
 });
 
 module.exports = router;
+module.exports.setConfigChangeCallback = setConfigChangeCallback;

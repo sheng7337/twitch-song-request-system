@@ -56,6 +56,23 @@ app.get('/', (req, res) => {
   res.redirect('/dashboard');
 });
 
+// Starts the song queue services (sheets, history, Twitch connection) the
+// first time configuration becomes complete — either at boot, or mid-run
+// when the setup wizard finishes writing .env. Without this, finishing the
+// wizard would leave the dashboard open with no song list until restart.
+let serviceStarted = false;
+async function activateServiceIfReady() {
+  if (serviceStarted || !isSetupComplete()) return;
+  serviceStarted = true;
+  console.log('\n[setup] Configuration complete — starting song queue services...\n');
+  await startAutoRefresh();
+  await initHistory();
+  connectTwitch();
+}
+setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {
+  console.error('Error starting services after setup:', err);
+}));
+
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
 setEventHandler(async (event) => {
   const requestText = event?.user_input?.trim();
@@ -158,9 +175,7 @@ async function start() {
   console.log('\n🎵 VTuber Song Queue starting...\n');
 
   if (isSetupComplete()) {
-    await startAutoRefresh();
-    await initHistory();
-    connectTwitch();
+    await activateServiceIfReady();
   } else {
     console.log('[setup] Configuration incomplete.');
     console.log('[setup] Please open http://localhost:' + PORT + '/setup to configure.');
