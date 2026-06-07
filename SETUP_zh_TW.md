@@ -23,7 +23,7 @@ OBS 顯示層透過 WebSocket 即時更新
 
 只需要先安裝這一項：
 
-- **Node.js LTS** → https://nodejs.org（安裝時記得勾選「Add to PATH」）
+- **Node.js LTS** → https://nodejs.org （安裝時記得勾選「Add to PATH」）
 
 就這樣，不需要額外下載或預先設定任何東西。
 
