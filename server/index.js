@@ -56,18 +56,26 @@ app.get('/', (req, res) => {
   res.redirect('/dashboard');
 });
 
-// Starts the song queue services (sheets, history, Twitch connection) the
+// Starts the song queue services (sheets, Twitch connection, history) the
 // first time configuration becomes complete — either at boot, or mid-run
 // when the setup wizard finishes writing .env. Without this, finishing the
 // wizard would leave the dashboard open with no song list until restart.
-let serviceStarted = false;
+//
+// initHistory() is called every time (it's a cheap no-op once initialized)
+// rather than gated behind the one-time flag below: HISTORY_SHEET_ID comes
+// from the wizard's *optional* history-sheet step, which the user can
+// complete after the required fields already triggered this function — so
+// it may not exist yet on the first pass and needs a later retry.
+let coreServicesStarted = false;
 async function activateServiceIfReady() {
-  if (serviceStarted || !isSetupComplete()) return;
-  serviceStarted = true;
-  console.log('\n[setup] Configuration complete — starting song queue services...\n');
-  await startAutoRefresh();
+  if (!isSetupComplete()) return;
+  if (!coreServicesStarted) {
+    coreServicesStarted = true;
+    console.log('\n[setup] Configuration complete — starting song queue services...\n');
+    await startAutoRefresh();
+    connectTwitch();
+  }
   await initHistory();
-  connectTwitch();
 }
 setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {
   console.error('Error starting services after setup:', err);
