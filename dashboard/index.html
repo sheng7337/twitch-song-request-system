@@ -56,6 +56,18 @@
   .status-dot.off { background: #ff4444; animation: none; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .topbar-spacer { flex: 1; }
+  .cooldown-group {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--text-muted);
+  }
+  .cooldown-input {
+    width: 52px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 4px; padding: 5px 6px;
+    font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text);
+    outline: none; transition: border-color .15s;
+  }
+  .cooldown-input:focus { border-color: var(--purple); }
   .topbar-hint { font-size: 10px; color: var(--text-muted); }
 
   .btn {
@@ -367,6 +379,13 @@
   <span class="topbar-title">Song Queue Dashboard</span>
   <span class="topbar-spacer"></span>
   <span class="topbar-hint">drag songs between columns to move them</span>
+  <span class="cooldown-group" title="Minimum days after a song is requested before the Random Song reward can pick it again — 0 disables the cooldown (max 60 days / ~2 months)">
+    🎲 cooldown
+    <input type="number" class="cooldown-input" id="cooldown-input" min="0" max="60" step="1"
+           onkeydown="if(event.key==='Enter') saveCooldown()" />
+    days
+    <button class="btn" onclick="saveCooldown()">Save</button>
+  </span>
   <button class="btn skip" onclick="api('skip')">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm('Clear entire queue?')) api('clear')">✕ Clear All</button>
 </div>
@@ -678,6 +697,36 @@ async function loadHistory() {
   } catch(_) {}
 }
 
+const COOLDOWN_MAX_DAYS = 60; // ~2 months
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const settings = await res.json();
+    document.getElementById('cooldown-input').value = settings.randomCooldownDays;
+  } catch(_) {}
+}
+
+async function saveCooldown() {
+  const input = document.getElementById('cooldown-input');
+  const days = Number(input.value);
+  if (!Number.isFinite(days) || days < 0 || days > COOLDOWN_MAX_DAYS) {
+    showToast(`cooldown must be between 0 and ${COOLDOWN_MAX_DAYS} days`, true);
+    return;
+  }
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ randomCooldownDays: days }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(days > 0 ? `random cooldown set to ${days} day${days === 1 ? '' : 's'}` : 'random cooldown disabled');
+  } catch(_) {
+    showToast('failed to save cooldown', true);
+  }
+}
+
 function daysAgo(dateStr) {
   if (!dateStr) return null;
   const then = new Date(dateStr.replace(' ', 'T') + 'Z');
@@ -819,6 +868,7 @@ function esc(s) {
 connect();
 loadSongList();
 loadHistory();
+loadSettings();
 </script>
 </body>
 </html>

@@ -7,13 +7,38 @@
 
 const { getSongs } = require('./sheets');
 const config = require('./config');
-const { getHistory } = require('./history');
+const { getHistory, getLastRequestedAt } = require('./history');
 
 const MS_PER_DAY = 86400000;
+
+// How long a song stays off the random-pick pool after being requested,
+// configurable at runtime via the dashboard (RANDOM_COOLDOWN_DAYS in .env).
+// 0 or unset = no cooldown.
+function getCooldownMs() {
+  const days = parseFloat(process.env.RANDOM_COOLDOWN_DAYS);
+  return Number.isFinite(days) && days > 0 ? days * MS_PER_DAY : 0;
+}
+
 function getEligibleSongs(excludeTitles = []) {
   const songs = getSongs();
   const excludeSet = new Set(excludeTitles.map(t => t.toLowerCase().trim()));
-  return songs.filter(s => !excludeSet.has(s.title.toLowerCase().trim()));
+  const cooldownMs = getCooldownMs();
+  const now = Date.now();
+
+  return songs.filter(s => {
+    const title = s.title.toLowerCase().trim();
+    if (excludeSet.has(title)) return false;
+
+    if (cooldownMs > 0) {
+      const lastRequestedAt = getLastRequestedAt(title);
+      if (lastRequestedAt) {
+        const lastDate = new Date(lastRequestedAt.replace(' ', 'T') + 'Z');
+        if (now - lastDate.getTime() < cooldownMs) return false;
+      }
+    }
+
+    return true;
+  });
 }
 
 function pickPure(songs) {

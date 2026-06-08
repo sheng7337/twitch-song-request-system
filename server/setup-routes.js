@@ -416,3 +416,4 @@ router.post('/save-history', (req, res) => {
 
 module.exports = router;
 module.exports.setConfigChangeCallback = setConfigChangeCallback;
+module.exports.writeEnvValues = writeEnvValues;

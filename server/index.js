@@ -92,10 +92,11 @@ setEventHandler(async (event) => {
   // Random song reward
   const randomRewardId = process.env.TWITCH_RANDOM_REWARD_ID;
   if (randomRewardId && rewardId === randomRewardId) {
-    const { queue, nowPlaying } = getState();
+    const { queue, nowPlaying, playedSongs } = getState();
     const excludeTitles = [
       ...(nowPlaying ? [nowPlaying.title] : []),
       ...queue.map(s => s.title),
+      ...playedSongs.map(s => s.title),
     ];
     const picked = pickRandom(excludeTitles);
     if (picked) {
@@ -168,6 +169,23 @@ app.get('/api/history', (req, res) => res.json(getHistory()));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');
   res.json(getSongs());
+});
+
+// ── Settings (dashboard-adjustable behaviour) ─────────────────────────────────
+const RANDOM_COOLDOWN_MAX_DAYS = 60; // ~2 months
+
+app.get('/api/settings', (req, res) => {
+  const days = parseFloat(process.env.RANDOM_COOLDOWN_DAYS);
+  res.json({ randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : 0 });
+});
+
+app.post('/api/settings', (req, res) => {
+  const days = Number(req.body.randomCooldownDays);
+  if (!Number.isFinite(days) || days < 0 || days > RANDOM_COOLDOWN_MAX_DAYS) {
+    return res.status(400).json({ error: `randomCooldownDays must be between 0 and ${RANDOM_COOLDOWN_MAX_DAYS}` });
+  }
+  setupRouter.writeEnvValues({ RANDOM_COOLDOWN_DAYS: String(days) });
+  res.json({ ok: true, randomCooldownDays: days });
 });
 
 // ── WebSocket (overlay) ───────────────────────────────────────────────────────

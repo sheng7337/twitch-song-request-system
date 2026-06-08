@@ -246,4 +246,12 @@ async function recordRequest({ title, artist, requester }) {
   }
 }
 
-module.exports = { init, recordRequest, getHistory: () => startupSnapshot };
+// Live lookup (unlike getHistory(), which returns the frozen startup snapshot) —
+// used by the random picker's cooldown check, which must see requests made
+// earlier in the current session too.
+function getLastRequestedAt(title) {
+  const rec = rowData[title.toLowerCase().trim()];
+  return rec ? rec.last_requested_at : null;
+}
+
+module.exports = { init, recordRequest, getHistory: () => startupSnapshot, getLastRequestedAt };
