@@ -279,9 +279,15 @@ ol.steps-list a:hover { text-decoration: underline; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.column-legend { display: flex; gap: 16px; font-size: 11px; margin-bottom: 12px; flex-wrap: wrap; }
-.legend-item { display: flex; align-items: center; gap: 6px; }
-.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.column-legend { display: flex; gap: 10px; font-size: 11px; margin-bottom: 12px; flex-wrap: wrap; }
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.legend-item:hover { background: rgba(176,106,255,0.08); }
+/* Active highlight color is set inline per-type (matches its column highlight) */
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
 /* ── Status / error ── */
 .status-line {

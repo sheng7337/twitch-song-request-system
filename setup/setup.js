@@ -24,6 +24,7 @@ let state = {
   songCol: null,
   artistCol: null,
   keyCol: null,
+  activeColType: 'song', // which field a column-header click currently assigns: song | artist | key
 };
 
 // ── Polling state ─────────────────────────────────────────────────────────────
@@ -503,11 +504,7 @@ function renderSongSheet(el) {
       <div class="step-subtitle" style="margin-bottom:12px;">
         ${t.pickColumnsHint}
       </div>
-      <div class="column-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> ${t.legendSong}</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> ${t.legendArtist}</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> ${t.legendKey}</div>
-      </div>
+      <div class="column-legend" id="col-legend"></div>
       <table class="column-table" id="col-table"></table>
       <div id="col-status" class="status-line"></div>
       <button class="btn btn-primary" style="margin-top:12px" onclick="saveColumns()">${t.confirmBtn}</button>
@@ -526,6 +523,11 @@ async function validateSheet() {
     state.sheetId = res.sheetId;
     state.headers = res.headers;
     state.preview = res.preview;
+    // Loading a (possibly different) sheet starts column assignment fresh
+    state.songCol = null;
+    state.artistCol = null;
+    state.keyCol = null;
+    state.activeColType = 'song';
     showStatus(status, 'ok', t.sheetFound(res.headers.length));
     renderColumnPicker();
     document.getElementById('column-picker').style.display = 'block';
@@ -534,18 +536,29 @@ async function validateSheet() {
   }
 }
 
+// Maps a column "role" to the field it fills in `state` and its highlight class.
+const COL_TYPES = ['song', 'artist', 'key'];
+const COL_STATE_KEY = { song: 'songCol', artist: 'artistCol', key: 'keyCol' };
+const COL_CLASS = { song: 'selected-song', artist: 'selected-artist', key: 'selected-key' };
+
+// Re-derives the whole picker UI from `state` — the single source of truth —
+// so switching the active role or re-clicking a column always reflects reality,
+// and a wrong pick can simply be reassigned rather than getting stuck.
 function renderColumnPicker() {
   const t = T().songSheet;
   const table = document.getElementById('col-table');
   const headers = state.headers;
   const preview = state.preview;
+  const labels = { song: t.labelSong, artist: t.labelArtist, key: t.labelKey };
+  const roleOf = (header) => COL_TYPES.find(type => state[COL_STATE_KEY[type]] === header) || null;
 
-  // Header row — clickable
-  const headerRow = headers.map((h, i) =>
-    `<th data-idx="${i}" onclick="selectColumn(${i})">${h || t.emptyHeader}</th>`
-  ).join('');
+  const headerRow = headers.map((h, i) => {
+    const role = roleOf(h);
+    const cls = role ? COL_CLASS[role] : '';
+    const text = role ? `${h || t.emptyHeader} ← ${labels[role]}` : (h || t.emptyHeader);
+    return `<th data-idx="${i}" class="${cls}" onclick="selectColumn(${i})">${text}</th>`;
+  }).join('');
 
-  // Preview rows
   const previewRows = preview.map(row =>
     '<tr>' + headers.map((_, i) =>
       `<td>${row[i] || ''}</td>`
@@ -553,40 +566,71 @@ function renderColumnPicker() {
   ).join('');
 
   table.innerHTML = `<thead><tr>${headerRow}</tr></thead><tbody>${previewRows}</tbody>`;
+
+  renderColumnLegend();
+  updateColumnStatus();
 }
 
-let colClickState = 0; // 0=song, 1=artist, 2=key
-function selectColumn(idx) {
+// The legend doubles as a role switcher — click a label to choose what the
+// next column-header click assigns, so any earlier pick can be revisited.
+function renderColumnLegend() {
   const t = T().songSheet;
-  const header = state.headers[idx];
-  const types = ['song', 'artist', 'key'];
-  const classes = ['selected-song', 'selected-artist', 'selected-key'];
-  const labels = [t.labelSong, t.labelArtist, t.labelKey];
-  const type = types[colClickState];
-  const cls = classes[colClickState];
+  const legend = document.getElementById('col-legend');
+  if (!legend) return;
+  // Same colors as the matching .column-table th.selected-* highlight, so the
+  // active legend item visually matches the column it will highlight.
+  const items = [
+    { type: 'song',   color: 'var(--purple)', bg: 'rgba(176,106,255,0.2)',  label: t.legendSong },
+    { type: 'artist', color: 'var(--blue)',   bg: 'rgba(90,154,255,0.2)',   label: t.legendArtist },
+    { type: 'key',    color: 'var(--green)',  bg: 'rgba(74,255,154,0.15)',  label: t.legendKey },
+  ];
+  legend.innerHTML = items.map(({ type, color, bg, label }) => {
+    const active = state.activeColType === type;
+    const style = active ? `border-color:${color}; background:${bg}; color:${color};` : '';
+    return `
+    <div class="legend-item ${active ? 'active' : ''}" style="${style}" onclick="setActiveColType('${type}')">
+      <div class="legend-dot" style="background:${color}"></div> ${label}
+    </div>
+  `;
+  }).join('');
+}
 
-  // Remove existing selection for this type
-  document.querySelectorAll(`th.${cls}`).forEach(th => th.classList.remove(cls));
+function setActiveColType(type) {
+  state.activeColType = type;
+  renderColumnLegend();
+  updateColumnStatus();
+}
 
-  // Apply selection
-  const th = document.querySelector(`th[data-idx="${idx}"]`);
-  th.classList.add(cls);
-  th.textContent = `${state.headers[idx]} ← ${labels[colClickState]}`;
-
-  state[`${type}Col`] = header;
-
+function updateColumnStatus() {
+  const t = T().songSheet;
   const status = document.getElementById('col-status');
-  const selected = [state.songCol, state.artistCol].filter(Boolean).length;
-
-  if (colClickState < 2) {
-    colClickState++;
-    if (colClickState === 2) {
-      showStatus(status, 'info', t.selectKeyHint);
-    }
-  }
-  if (selected >= 2) {
+  const labels = { song: t.labelSong, artist: t.labelArtist, key: t.labelKey };
+  if (state.songCol && state.artistCol) {
     showStatus(status, 'ok', t.selectedSummary(state.songCol, state.artistCol, state.keyCol));
+  } else {
+    showStatus(status, 'info', t.activeColHint(labels[state.activeColType]));
   }
+}
+
+function selectColumn(idx) {
+  const header = state.headers[idx];
+  const type = state.activeColType;
+  const key = COL_STATE_KEY[type];
+
+  if (state[key] === header) {
+    // Clicking the current selection again clears it
+    state[key] = null;
+  } else {
+    // Free this column from any other role it currently holds
+    COL_TYPES.forEach(t => { if (state[COL_STATE_KEY[t]] === header) state[COL_STATE_KEY[t]] = null; });
+    state[key] = header;
+    // Auto-advance to the next unfilled role for a smooth first pass —
+    // the legend remains clickable at any time to go back and change a pick
+    if (type === 'song' && !state.artistCol) state.activeColType = 'artist';
+    else if (type === 'artist' && !state.keyCol) state.activeColType = 'key';
+  }
+
+  renderColumnPicker();
 }
 
 async function saveColumns() {
