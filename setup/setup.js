@@ -325,21 +325,45 @@ async function renderRewards(el) {
 function renderRewardPicker(containerId, type, label, hint, requiresText) {
   const t = T().rewards;
   const container = document.getElementById(containerId);
-  const listHtml = rewardsList.length > 0
-    ? `<div class="reward-list" id="reward-list-${type}">
-        ${rewardsList.map((r, i) => `
-          <div class="reward-option" onclick="pickReward('${type}', ${i})" id="reward-opt-${type}-${i}">
+  // Song Request needs viewers to type a title, Random Song must not have
+  // text input -- only offer existing rewards that match, so picking one
+  // here can't produce a reward that's unusable for that purpose.
+  const matching = rewardsList
+    .map((r, i) => ({ ...r, _idx: i }))
+    .filter(r => Boolean(r.is_user_input_required) === requiresText);
+
+  const newOptionHtml = `
+    <div class="reward-option reward-option-new" onclick="showCreateForm('${type}')">
+      <div class="reward-opt-tag">${t.newTag}</div>
+      <div class="reward-opt-name">${t.createNewOption}</div>
+      <div class="reward-opt-cost"></div>
+    </div>`;
+
+  let listHtml;
+  if (rewardsList.length === 0) {
+    // Genuinely no custom rewards exist yet (often: channel isn't Affiliate)
+    listHtml = `<div class="info-box amber"><div class="info-label">${t.noRewardsTitle}</div>${t.noRewardsBody}</div>`;
+  } else if (matching.length > 0) {
+    listHtml = `<div class="reward-list" id="reward-list-${type}">
+        ${matching.map(r => `
+          <div class="reward-option" onclick="pickReward('${type}', ${r._idx})" id="reward-opt-${type}-${r._idx}">
             <div class="reward-opt-tag">${r.is_user_input_required ? t.textInputTag : t.noTextTag}</div>
             <div class="reward-opt-name">${esc(r.title)}</div>
             <div class="reward-opt-cost">${r.cost} pts</div>
           </div>`).join('')}
-        <div class="reward-option reward-option-new" onclick="showCreateForm('${type}')">
-          <div class="reward-opt-tag">${t.newTag}</div>
-          <div class="reward-opt-name">${t.createNewOption}</div>
-          <div class="reward-opt-cost"></div>
+        ${newOptionHtml}
+      </div>`;
+  } else {
+    // Existing rewards exist, but none have the right text-input setting for
+    // this purpose (e.g. all require text, but Random Song must not) --
+    // explain why they're hidden and offer to create a suitable one.
+    listHtml = `<div class="reward-list" id="reward-list-${type}">
+        <div class="info-box amber" style="margin-bottom:6px">
+          <div class="info-label">${t.noMatchingTitle}</div>${t.noMatchingBody(requiresText)}
         </div>
-      </div>`
-    : `<div class="info-box amber"><div class="info-label">${t.noRewardsTitle}</div>${t.noRewardsBody}</div>`;
+        ${newOptionHtml}
+      </div>`;
+  }
 
   container.innerHTML = `
     <div style="font-size:11px; letter-spacing:2px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase">${label}</div>
