@@ -52,8 +52,11 @@ function isSetupComplete() {
 }
 
 app.get('/', (req, res) => {
-  if (!isSetupComplete()) return res.redirect('/setup');
-  res.redirect('/dashboard');
+  // Forward the query string (e.g. ?lang=zh-TW from the startup scripts) so the
+  // wizard opens in the right language even on a redirect from here.
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  if (!isSetupComplete()) return res.redirect('/setup' + qs);
+  res.redirect('/dashboard' + qs);
 });
 
 // Starts the song queue services (sheets, Twitch connection, history) the

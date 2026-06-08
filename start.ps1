@@ -45,9 +45,13 @@ Write-Host ""
 
 Set-Location $PSScriptRoot
 
-# Open browser after short delay so server has time to start
-$openUrl = if (-not (Test-Path (Join-Path $PSScriptRoot ".env")) -or (Get-Content (Join-Path $PSScriptRoot ".env") -Raw) -notmatch "TWITCH_USER_ACCESS_TOKEN=.+") { "http://localhost:3000/setup" } else { "http://localhost:3000/dashboard" }
-Write-Host "  Opening setup wizard in browser... $openUrl" -ForegroundColor DarkGray
+# Open browser after short delay so server has time to start. The server
+# itself decides whether configuration is actually complete (isSetupComplete()
+# checks every required field, not just one) and redirects to /setup or
+# /dashboard accordingly -- so we always open the root URL and let it route
+# correctly either way.
+$openUrl = "http://localhost:3000/"
+Write-Host "  Opening browser... $openUrl" -ForegroundColor DarkGray
 Start-Job -ScriptBlock { param($u) Start-Sleep 3; Start-Process $u } -ArgumentList $openUrl | Out-Null
 
 npm start

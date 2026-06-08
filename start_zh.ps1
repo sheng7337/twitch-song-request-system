@@ -46,8 +46,11 @@ Write-Host ""
 
 Set-Location $PSScriptRoot
 
-# Open browser 3s after server starts (setup if unconfigured, dashboard otherwise)
-$openUrl = if (-not (Test-Path (Join-Path $PSScriptRoot ".env")) -or (Get-Content (Join-Path $PSScriptRoot ".env") -Raw) -notmatch "TWITCH_USER_ACCESS_TOKEN=.+") { "http://localhost:3000/setup?lang=zh-TW" } else { "http://localhost:3000/dashboard" }
+# Open browser 3s after server starts. The server itself decides whether
+# configuration is actually complete (isSetupComplete() checks every required
+# field, not just one) and redirects to /setup or /dashboard accordingly --
+# so we always open the root URL and let it route correctly either way.
+$openUrl = "http://localhost:3000/?lang=zh-TW"
 Write-Host "  正在開啟瀏覽器... $openUrl" -ForegroundColor DarkGray
 Start-Job -ScriptBlock { param($u) Start-Sleep 3; Start-Process $u } -ArgumentList $openUrl | Out-Null
 
