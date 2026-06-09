@@ -119,6 +119,9 @@ setEventHandler(async (event) => {
     addSong({ title: result.song.title, artist: result.song.artist, key: result.song.key || '', requester });
     recordRequest({ title: result.song.title, artist: result.song.artist, requester });
     console.log(`[queue] Added "${result.song.title}" for @${requester} (${result.confidence}%)`);
+  } else if (result.candidates?.length > 1) {
+    addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: result.confidence, candidates: result.candidates });
+    console.log(`[queue] ${result.candidates.length} candidates for "${requestText}" → pending`);
   } else if (result.matched && !result.confident) {
     addPending({ title: result.song.title, artist: result.song.artist, requester, originalRequest: requestText, confidence: result.confidence });
     console.log(`[queue] Weak match "${result.song.title}" (${result.confidence}%) → pending`);
@@ -156,8 +159,8 @@ app.post('/api/move', (req, res) => {
 });
 
 app.post('/api/accept-pending', (req, res) => {
-  const { index, title, artist } = req.body;
-  const result = acceptPending(index, title, artist);
+  const { index, title, artist, candidateIndex } = req.body;
+  const result = acceptPending(index, title, artist, candidateIndex != null ? Number(candidateIndex) : null);
   if (!result) return res.status(400).json({ error: 'invalid index' });
   res.json({ ok: true });
 });

@@ -21,6 +21,8 @@ function getFuseOptions() {
   };
 }
 
+const MAX_CANDIDATES = 5;
+
 function matchSong(requestText) {
   const songs = getSongs();
 
@@ -40,14 +42,44 @@ function matchSong(requestText) {
   }
 
   const best = results[0];
-  const confidence = Math.round((1 - best.score) * 100);
-  const confident = confidence >= AUTO_ACCEPT_THRESHOLD;
+  const topConfidence = Math.round((1 - best.score) * 100);
 
+  // Collect all results that cross the auto-accept threshold
+  const candidates = results
+    .slice(0, MAX_CANDIDATES + 1)
+    .map(r => ({ ...r.item, confidence: Math.round((1 - r.score) * 100) }))
+    .filter(c => c.confidence >= AUTO_ACCEPT_THRESHOLD)
+    .slice(0, MAX_CANDIDATES);
+
+  // Multiple confident candidates — let broadcaster pick
+  if (candidates.length > 1) {
+    return {
+      matched: true,
+      confident: false,
+      candidates,
+      song: best.item,
+      confidence: topConfidence,
+      originalRequest: requestText,
+    };
+  }
+
+  // Single confident match — auto-accept
+  if (topConfidence >= AUTO_ACCEPT_THRESHOLD) {
+    return {
+      matched: true,
+      confident: true,
+      song: best.item,
+      confidence: topConfidence,
+      originalRequest: requestText,
+    };
+  }
+
+  // Weak or no match
   return {
     matched: true,
-    confident,
+    confident: false,
     song: best.item,
-    confidence,
+    confidence: topConfidence,
     originalRequest: requestText,
   };
 }

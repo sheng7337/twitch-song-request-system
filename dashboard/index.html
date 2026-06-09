@@ -219,6 +219,24 @@
   }
   .pending-del:hover { background: rgba(255,90,90,0.15); color: var(--red); border-color: rgba(255,90,90,0.5); }
 
+  /* Candidate picker (multiple matches) */
+  .pending-candidates { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+  .candidate-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    background: rgba(10,8,20,0.6);
+    border: 1px solid rgba(120,60,220,0.2); border-radius: 4px;
+    cursor: pointer; transition: background .1s, border-color .1s;
+  }
+  .candidate-item:hover { background: rgba(74,255,154,0.08); border-color: rgba(74,255,154,0.3); }
+  .candidate-conf {
+    font-size: 9px; padding: 2px 5px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+    background: rgba(80,45,10,0.5); border: 1px solid rgba(160,90,20,0.3); color: var(--orange);
+  }
+  .candidate-info { flex: 1; min-width: 0; }
+  .candidate-title { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .candidate-artist { font-size: 9px; color: var(--text-dim); display: block; }
+
   .drag-handle {
     color: var(--text-muted); font-size: 14px; cursor: grab; flex-shrink: 0;
     display: flex; flex-direction: column; gap: 2px; padding: 2px;
@@ -560,6 +578,34 @@ function render() {
     const hasMatch = item.confidence !== null;
     const confLabel = hasMatch ? `${item.confidence}% match` : 'no match';
     const confClass = hasMatch ? '' : 'no-match';
+
+    if (item.candidates?.length > 1) {
+      // Multiple candidates — show picker
+      const candidatesHtml = item.candidates.map((c, ci) => `
+        <div class="candidate-item" onclick="pickCandidate(${i},${ci})">
+          <span class="candidate-conf">${c.confidence}%</span>
+          <div class="candidate-info">
+            <span class="candidate-title">${esc(c.title)}</span>
+            ${c.artist ? `<span class="candidate-artist">${esc(c.artist)}</span>` : ''}
+          </div>
+          ${c.key != null && c.key !== '' ? `<span class="key-badge" style="width:28px;height:28px;min-width:28px;min-height:28px;font-size:10px;">${Number(c.key) >= 0 ? '+' : ''}${esc(c.key)}</span>` : ''}
+        </div>`).join('');
+      return `
+      <div class="pending-card" id="pending-card-${i}">
+        <div class="pending-top">
+          <span class="pending-original" title="Viewer typed: ${esc(item.originalRequest)}">
+            ❝ ${esc(item.originalRequest)}
+          </span>
+          <span class="pending-confidence">${item.candidates.length} matches</span>
+        </div>
+        <div class="pending-req">@${esc(item.requester)}</div>
+        <div class="pending-candidates">${candidatesHtml}</div>
+        <div class="pending-actions">
+          <button class="pending-del" style="width:auto;padding:4px 10px;" onclick="deleteSong('pending',${i})" title="Dismiss">✕ Dismiss</button>
+        </div>
+      </div>`;
+    }
+
     return `
     <div class="pending-card" id="pending-card-${i}">
       <div class="pending-top">
@@ -678,6 +724,10 @@ function acceptPending(index) {
   const artist = document.getElementById(`pending-artist-${index}`)?.value.trim();
   if (!title) { showToast('enter a song title first', true); return; }
   api('accept-pending', { index, title, artist });
+}
+
+function pickCandidate(pendingIndex, candidateIndex) {
+  api('accept-pending', { index: pendingIndex, candidateIndex });
 }
 
 // ── Manual Request ─────────────────────────────────────────────────────────────

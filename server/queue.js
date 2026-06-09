@@ -36,14 +36,15 @@ function addSong({ title, artist, key, requester }) {
   return entry;
 }
 
-// Add to pending (weak match or no match)
-function addPending({ title, artist, requester, originalRequest, confidence }) {
+// Add to pending (weak match, no match, or multiple candidates)
+function addPending({ title, artist, requester, originalRequest, confidence, candidates }) {
   const entry = {
     title: title || '',
     artist: artist || '',
     requester,
     originalRequest,
-    confidence,   // null = no match at all
+    confidence,     // null = no match at all
+    candidates: candidates || null,   // array of songs when multiple confident matches exist
     addedAt: Date.now(),
   };
   pending.push(entry);
@@ -51,16 +52,25 @@ function addPending({ title, artist, requester, originalRequest, confidence }) {
   return entry;
 }
 
-// Accept a pending entry (with optionally edited title/artist) → move to queue
-function acceptPending(index, editedTitle, editedArtist) {
+// Accept a pending entry → move to queue.
+// When candidateIndex is provided, picks from entry.candidates[]; otherwise uses editedTitle/editedArtist.
+function acceptPending(index, editedTitle, editedArtist, candidateIndex) {
   if (index < 0 || index >= pending.length) return false;
   const entry = pending.splice(index, 1)[0];
-  addSong({
-    title: editedTitle || entry.title || entry.originalRequest,
-    artist: editedArtist !== undefined ? editedArtist : entry.artist,
-    key: entry.key != null ? String(entry.key) : '',
-    requester: entry.requester,
-  });
+
+  let title, artist, key;
+  if (candidateIndex != null && entry.candidates?.[candidateIndex]) {
+    const c = entry.candidates[candidateIndex];
+    title = c.title;
+    artist = c.artist;
+    key = c.key || '';
+  } else {
+    title = editedTitle || entry.title || entry.originalRequest;
+    artist = editedArtist !== undefined ? editedArtist : entry.artist;
+    key = entry.key != null ? String(entry.key) : '';
+  }
+
+  addSong({ title, artist, key, requester: entry.requester });
   return true;
 }
 
@@ -120,10 +130,11 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
   } else if (fromZone === 'pending') {
     if (fromIndex < 0 || fromIndex >= pending.length) return false;
     const p = pending.splice(fromIndex, 1)[0];
-    // Promote pending to a proper song entry
+    const chosen = p.candidates?.[0];
     song = {
-      title: p.title || p.originalRequest,
-      artist: p.artist || '',
+      title: chosen?.title || p.title || p.originalRequest,
+      artist: chosen?.artist || p.artist || '',
+      key: chosen?.key || p.key || '',
       requester: p.requester,
       addedAt: p.addedAt,
     };
