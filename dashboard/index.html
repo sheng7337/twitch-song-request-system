@@ -418,12 +418,12 @@
     <span class="opacity-value" id="opacity-value">0.92</span>
     <button class="btn" onclick="saveOpacity()">Save</button>
   </span>
-  <span class="cooldown-group" title="Overlay contrast — 0.5 is low, 2 is high, 1 is normal">
-    🔆 contrast
-    <input type="range" class="opacity-slider" id="contrast-input" min="0.5" max="2" step="0.05"
-           oninput="document.getElementById('contrast-value').textContent = this.value" />
-    <span class="opacity-value" id="contrast-value">1</span>
-    <button class="btn" onclick="saveContrast()">Save</button>
+  <span class="cooldown-group" title="Overlay brightness — 0.5 is darker, 2 is brighter, 1 is normal">
+    🔆 brightness
+    <input type="range" class="opacity-slider" id="brightness-input" min="0.5" max="2" step="0.05"
+           oninput="document.getElementById('brightness-value').textContent = this.value" />
+    <span class="opacity-value" id="brightness-value">1</span>
+    <button class="btn" onclick="saveBrightness()">Save</button>
   </span>
   <button class="btn skip" onclick="api('skip')">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm('Clear entire queue?')) api('clear')">✕ Clear All</button>
@@ -777,8 +777,8 @@ async function loadSettings() {
     document.getElementById('cooldown-input').value = settings.randomCooldownDays;
     document.getElementById('opacity-input').value = settings.panelBgAlpha;
     document.getElementById('opacity-value').textContent = settings.panelBgAlpha;
-    document.getElementById('contrast-input').value = settings.textContrast;
-    document.getElementById('contrast-value').textContent = settings.textContrast;
+    document.getElementById('brightness-input').value = settings.textBrightness;
+    document.getElementById('brightness-value').textContent = settings.textBrightness;
   } catch(_) {}
 }
 
@@ -822,23 +822,23 @@ async function saveOpacity() {
   }
 }
 
-async function saveContrast() {
-  const input = document.getElementById('contrast-input');
-  const contrast = Number(input.value);
-  if (!Number.isFinite(contrast) || contrast < 0.5 || contrast > 2) {
-    showToast('contrast must be between 0.5 and 2', true);
+async function saveBrightness() {
+  const input = document.getElementById('brightness-input');
+  const brightness = Number(input.value);
+  if (!Number.isFinite(brightness) || brightness < 0.5 || brightness > 2) {
+    showToast('brightness must be between 0.5 and 2', true);
     return;
   }
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ textContrast: contrast }),
+      body: JSON.stringify({ textBrightness: brightness }),
     });
     if (!res.ok) throw new Error('save failed');
-    showToast(`overlay contrast set to ${contrast}`);
+    showToast(`overlay brightness set to ${brightness}`);
   } catch(_) {
-    showToast('failed to save contrast', true);
+    showToast('failed to save brightness', true);
   }
 }
 
