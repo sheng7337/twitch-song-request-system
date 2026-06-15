@@ -31,11 +31,11 @@ OBS 顯示層透過 WebSocket 即時更新
 
 ## 首次安裝
 
-```powershell
-.\start_zh.ps1
-```
+**直接雙擊 `start_zh.bat`**（英文版為 `start.bat`）。
 
-> 也提供英文版：`.\start.ps1`
+> 偏好用終端機？`.\start_zh.ps1` / `.\start.ps1` 效果相同。如果 PowerShell 出現「無法載入，
+> 因為在此系統上停用了執行原則」之類的訊息，請改用 `.bat` 檔 —— 它不需要更改任何系統設定
+> 即可繞過該限制。
 
 第一次執行時，瀏覽器會自動開啟一個**逐步引導的安裝精靈**，網址為
 `http://localhost:3000/setup?lang=zh-TW`。全程使用淺顯易懂的中文說明 —— 不需要打指令、
@@ -58,11 +58,7 @@ OBS 顯示層透過 WebSocket 即時更新
 
 ## 每次直播開始
 
-```powershell
-.\start_zh.ps1
-```
-
-> 也提供英文版：`.\start.ps1`
+**直接雙擊 `start_zh.bat`**（英文版為 `start.bat`）。
 
 就這樣 —— 不需要 ngrok、不需要複製網址、也不需要更新 `.env`。
 腳本會啟動伺服器，並自動開啟瀏覽器前往 **http://localhost:3000/dashboard**。
@@ -164,6 +160,7 @@ vtuber-song-queue/
 ├── setup/                    ← 瀏覽器版安裝精靈（於 /setup 提供服務）
 ├── setup.ps1                 ← 選用的終端機安裝精靈
 ├── start.ps1                 ← 每次直播開始時執行
+├── start_zh.bat / setup_zh.bat ← 雙擊執行用啟動檔（避免 PowerShell 執行原則問題）
 ├── .env                      ← 金鑰設定（請勿上傳至 Git！）
 ├── .env.example              ← 設定範本與說明
 ├── google-credentials.json   ← 服務帳戶金鑰（請勿上傳至 Git！）

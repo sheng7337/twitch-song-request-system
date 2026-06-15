@@ -31,10 +31,12 @@ That's it — nothing else to download or configure ahead of time.
 
 ## First-time setup
 
-```powershell
-.\start.ps1        # English
-.\start_zh.ps1     # Traditional Chinese / 繁體中文
-```
+**Double-click `start.bat`** (English) or **`start_zh.bat`** (Traditional Chinese / 繁體中文).
+
+> If you'd rather use a terminal: `.\start.ps1` / `.\start_zh.ps1` do the same thing. If
+> PowerShell refuses to run them with a message about "execution policies", use the
+> `.bat` files instead — they sidestep that setting entirely without changing anything
+> on your system.
 
 The first time you run it, your browser opens straight to a **step-by-step setup wizard**
 at `http://localhost:3000/setup`. It walks you through everything in plain language —
@@ -57,10 +59,7 @@ If you're interrupted partway through, it picks up where you left off.
 
 ## Every stream
 
-```powershell
-.\start.ps1        # English
-.\start_zh.ps1     # Traditional Chinese / 繁體中文
-```
+**Double-click `start.bat`** (English) or **`start_zh.bat`** (Traditional Chinese / 繁體中文).
 
 That's it — no ngrok, no URLs to copy, no `.env` to update. The script starts the
 server and opens your browser straight to **http://localhost:3000/dashboard**.
@@ -160,6 +159,7 @@ vtuber-song-queue/
 ├── setup/                    ← browser-based setup wizard (served at /setup)
 ├── setup.ps1                 ← optional terminal setup wizard
 ├── start.ps1                 ← run every stream
+├── start.bat / setup.bat     ← double-click launchers (avoid PowerShell execution policy issues)
 ├── .env                      ← secrets (never commit!)
 ├── .env.example              ← template with descriptions
 ├── google-credentials.json   ← service account key (never commit!)

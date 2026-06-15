@@ -1,8 +1,8 @@
 # 🎵 VTuber Song Queue — Manual Setup Guide
 
 > This guide is for those who prefer to set up everything manually without the wizard.
-> If you'd rather be walked through it, just run `start.ps1` (or `start_zh.ps1`) — your
-> browser opens to a step-by-step setup wizard at `http://localhost:3000/setup`. See `SETUP.md`.
+> If you'd rather be walked through it, just double-click `start.bat` (or `start_zh.bat`) —
+> your browser opens to a step-by-step setup wizard at `http://localhost:3000/setup`. See `SETUP.md`.
 
 ---
 
@@ -297,6 +297,7 @@ vtuber-song-queue/
 ├── setup/                    ← browser-based setup wizard (served at /setup)
 ├── setup.ps1                 ← automated terminal setup wizard
 ├── start.ps1                 ← automated stream startup
+├── start.bat / setup.bat     ← double-click launchers (avoid PowerShell execution policy issues)
 ├── .env                      ← secrets (never commit!)
 ├── .env.example              ← template with descriptions
 ├── google-credentials.json   ← service account key (never commit!)
