@@ -16,6 +16,9 @@
     text-rendering: optimizeLegibility;
     background: transparent !important;
     background-color: transparent !important;
+    /* Render at 2x and let OBS/Streamlabs downscale the Browser Source by
+       50% -- supersampling makes text and edges noticeably sharper. */
+    zoom: 2;
   }
 
   :root {

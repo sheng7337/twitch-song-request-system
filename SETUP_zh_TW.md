@@ -71,12 +71,14 @@ OBS 顯示層透過 WebSocket 即時更新
 
 1. 在 OBS/Streamlabs 新增來源 → **瀏覽器（Browser）**
 2. 網址：`http://localhost:3000/overlay/index.html`
-3. 寬度：`960`，高度：`800`（以 2 倍解析度渲染，較清晰，再於場景中縮小至適當大小）
+3. 寬度：`960`，高度：`1362`（顯示層會以 2 倍解析度渲染，較清晰）
 4. 在 **自訂 CSS（Custom CSS）** 欄位貼上：
    ```css
    body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
    ```
 5. 取消勾選 **「來源不可見時關閉（Shutdown source when not visible）」**
+6. 在場景中選取這個來源，將大小縮小至 `480 x 681`（即 50%）——
+   這一步才是讓 2 倍渲染變得清晰、而不是單純放大的關鍵
 
 伺服器啟動後顯示層會自動連線，並即時更新歌單內容。
 
