@@ -369,14 +369,15 @@ router.post('/validate-sheet', async (req, res) => {
     });
 
     const rows = r.data.values || [];
-    if (rows.length === 0) return res.status(400).json({ error: 'Sheet appears to be empty' });
 
     if (historyMode) {
-      // For history sheet — just confirm access
+      // For history sheet — just confirm access. A brand-new sheet is
+      // expected to be empty (the server writes headers on first run).
       writeEnvValues({ HISTORY_SHEET_ID: sheetId });
       res.json({ ok: true, sheetId });
     } else {
       // For song list — return headers and preview for column selection
+      if (rows.length === 0) return res.status(400).json({ error: 'Sheet appears to be empty' });
       res.json({
         ok: true,
         sheetId,
