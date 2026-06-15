@@ -418,6 +418,13 @@
     <span class="opacity-value" id="opacity-value">0.92</span>
     <button class="btn" onclick="saveOpacity()">Save</button>
   </span>
+  <span class="cooldown-group" title="Overlay contrast — 0.5 is low, 2 is high, 1 is normal">
+    🔆 contrast
+    <input type="range" class="opacity-slider" id="contrast-input" min="0.5" max="2" step="0.05"
+           oninput="document.getElementById('contrast-value').textContent = this.value" />
+    <span class="opacity-value" id="contrast-value">1</span>
+    <button class="btn" onclick="saveContrast()">Save</button>
+  </span>
   <button class="btn skip" onclick="api('skip')">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm('Clear entire queue?')) api('clear')">✕ Clear All</button>
 </div>
@@ -770,6 +777,8 @@ async function loadSettings() {
     document.getElementById('cooldown-input').value = settings.randomCooldownDays;
     document.getElementById('opacity-input').value = settings.panelBgAlpha;
     document.getElementById('opacity-value').textContent = settings.panelBgAlpha;
+    document.getElementById('contrast-input').value = settings.textContrast;
+    document.getElementById('contrast-value').textContent = settings.textContrast;
   } catch(_) {}
 }
 
@@ -810,6 +819,26 @@ async function saveOpacity() {
     showToast(`overlay panel opacity set to ${alpha}`);
   } catch(_) {
     showToast('failed to save opacity', true);
+  }
+}
+
+async function saveContrast() {
+  const input = document.getElementById('contrast-input');
+  const contrast = Number(input.value);
+  if (!Number.isFinite(contrast) || contrast < 0.5 || contrast > 2) {
+    showToast('contrast must be between 0.5 and 2', true);
+    return;
+  }
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ textContrast: contrast }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(`overlay contrast set to ${contrast}`);
+  } catch(_) {
+    showToast('failed to save contrast', true);
   }
 }
 

@@ -20,6 +20,7 @@
 
   :root {
     --panel-bg-alpha: 0.92;
+    --text-contrast: 1;
     --bg-panel: rgba(8, 8, 20, var(--panel-bg-alpha));
     --bg-card: rgba(15, 10, 30, 0.95);
     --border: rgba(120, 60, 220, 0.3);
@@ -50,6 +51,7 @@
     padding: 12px 14px;
     position: relative;
     backdrop-filter: blur(8px);
+    filter: contrast(var(--text-contrast));
     display: flex;
     flex-direction: column;
   }
@@ -244,9 +246,12 @@ function connect() {
   };
 }
 
-function applySettings({ panelBgAlpha }) {
+function applySettings({ panelBgAlpha, textContrast }) {
   if (panelBgAlpha != null) {
     document.documentElement.style.setProperty('--panel-bg-alpha', panelBgAlpha);
+  }
+  if (textContrast != null) {
+    document.documentElement.style.setProperty('--text-contrast', textContrast);
   }
 }
 

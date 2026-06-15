@@ -181,6 +181,9 @@ app.get('/api/songs', (req, res) => {
 const RANDOM_COOLDOWN_MAX_DAYS = 60; // ~2 months
 const RANDOM_COOLDOWN_DEFAULT_DAYS = 7;
 const PANEL_BG_ALPHA_DEFAULT = 0.92;
+const TEXT_CONTRAST_DEFAULT = 1;
+const TEXT_CONTRAST_MIN = 0.5;
+const TEXT_CONTRAST_MAX = 2;
 
 app.get('/api/settings', (req, res) => {
   const rawDays = process.env.RANDOM_COOLDOWN_DAYS;
@@ -189,9 +192,13 @@ app.get('/api/settings', (req, res) => {
   const rawAlpha = process.env.OVERLAY_PANEL_BG_ALPHA;
   const alpha = rawAlpha == null || rawAlpha === '' ? PANEL_BG_ALPHA_DEFAULT : parseFloat(rawAlpha);
 
+  const rawContrast = process.env.OVERLAY_TEXT_CONTRAST;
+  const contrast = rawContrast == null || rawContrast === '' ? TEXT_CONTRAST_DEFAULT : parseFloat(rawContrast);
+
   res.json({
     randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS,
     panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
+    textContrast: Number.isFinite(contrast) && contrast >= TEXT_CONTRAST_MIN && contrast <= TEXT_CONTRAST_MAX ? contrast : TEXT_CONTRAST_DEFAULT,
   });
 });
 
@@ -215,6 +222,16 @@ app.post('/api/settings', (req, res) => {
     updates.panelBgAlpha = alpha;
     setupRouter.writeEnvValues({ OVERLAY_PANEL_BG_ALPHA: String(alpha) });
     broadcastSettings({ panelBgAlpha: alpha });
+  }
+
+  if (req.body.textContrast !== undefined) {
+    const contrast = Number(req.body.textContrast);
+    if (!Number.isFinite(contrast) || contrast < TEXT_CONTRAST_MIN || contrast > TEXT_CONTRAST_MAX) {
+      return res.status(400).json({ error: `textContrast must be between ${TEXT_CONTRAST_MIN} and ${TEXT_CONTRAST_MAX}` });
+    }
+    updates.textContrast = contrast;
+    setupRouter.writeEnvValues({ OVERLAY_TEXT_CONTRAST: String(contrast) });
+    broadcastSettings({ textContrast: contrast });
   }
 
   res.json({ ok: true, ...updates });
