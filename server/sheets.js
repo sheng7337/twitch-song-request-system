@@ -97,10 +97,11 @@ async function fetchSongs() {
       allSongs.push(...songs);
     }
 
-    // Deduplicate by title (case-insensitive)
+    // Deduplicate by title+artist (case-insensitive) — songs with the same
+    // title but different artists are different songs and must both be kept
     const seen = new Set();
     const deduped = allSongs.filter(s => {
-      const key = s.title.toLowerCase();
+      const key = `${s.title.toLowerCase()}|${s.artist.toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
