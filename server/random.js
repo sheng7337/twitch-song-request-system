@@ -13,9 +13,12 @@ const MS_PER_DAY = 86400000;
 
 // How long a song stays off the random-pick pool after being requested,
 // configurable at runtime via the dashboard (RANDOM_COOLDOWN_DAYS in .env).
-// 0 or unset = no cooldown.
+// Defaults to 7 days if unset; 0 = no cooldown.
+const DEFAULT_COOLDOWN_DAYS = 7;
+
 function getCooldownMs() {
-  const days = parseFloat(process.env.RANDOM_COOLDOWN_DAYS);
+  const raw = process.env.RANDOM_COOLDOWN_DAYS;
+  const days = raw == null || raw === '' ? DEFAULT_COOLDOWN_DAYS : parseFloat(raw);
   return Number.isFinite(days) && days > 0 ? days * MS_PER_DAY : 0;
 }
 

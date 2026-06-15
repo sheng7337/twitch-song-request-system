@@ -179,10 +179,12 @@ app.get('/api/songs', (req, res) => {
 
 // ── Settings (dashboard-adjustable behaviour) ─────────────────────────────────
 const RANDOM_COOLDOWN_MAX_DAYS = 60; // ~2 months
+const RANDOM_COOLDOWN_DEFAULT_DAYS = 7;
 
 app.get('/api/settings', (req, res) => {
-  const days = parseFloat(process.env.RANDOM_COOLDOWN_DAYS);
-  res.json({ randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : 0 });
+  const raw = process.env.RANDOM_COOLDOWN_DAYS;
+  const days = raw == null || raw === '' ? RANDOM_COOLDOWN_DEFAULT_DAYS : parseFloat(raw);
+  res.json({ randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS });
 });
 
 app.post('/api/settings', (req, res) => {
