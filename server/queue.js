@@ -14,6 +14,14 @@ function broadcastState() {
   }
 }
 
+// Push dashboard-adjustable display settings (e.g. overlay panel opacity) to all overlay clients
+function broadcastSettings(settings) {
+  const msg = JSON.stringify({ type: 'settings', ...settings });
+  for (const client of clients) {
+    if (client.readyState === 1) client.send(msg);
+  }
+}
+
 function registerClient(ws) {
   clients.add(ws);
   ws.send(JSON.stringify({ type: 'state', nowPlaying, queue, playedSongs, pending }));
@@ -163,4 +171,5 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
 module.exports = {
   registerClient, addSong, addPending, acceptPending,
   skipSong, clearQueue, getState, deleteSong, moveSong,
+  broadcastSettings,
 };

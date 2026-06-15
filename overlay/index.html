@@ -19,7 +19,8 @@
   }
 
   :root {
-    --bg-panel: rgba(8, 8, 20, 0.92);
+    --panel-bg-alpha: 0.92;
+    --bg-panel: rgba(8, 8, 20, var(--panel-bg-alpha));
     --bg-card: rgba(15, 10, 30, 0.95);
     --border: rgba(120, 60, 220, 0.3);
     --purple: #b06aff;
@@ -238,8 +239,22 @@ function connect() {
     try {
       const m = JSON.parse(e.data);
       if (m.type === 'state') renderState(m);
+      if (m.type === 'settings') applySettings(m);
     } catch(_) {}
   };
+}
+
+function applySettings({ panelBgAlpha }) {
+  if (panelBgAlpha != null) {
+    document.documentElement.style.setProperty('--panel-bg-alpha', panelBgAlpha);
+  }
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    applySettings(await res.json());
+  } catch(_) {}
 }
 
 function renderState({ nowPlaying, queue, playedSongs }) {
@@ -348,6 +363,7 @@ function esc(s) {
 }
 
 connect();
+loadSettings();
 </script>
 </body>
 </html>

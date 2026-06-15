@@ -8,7 +8,7 @@ const fs = require('fs');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong } = require('./queue');
+const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, broadcastSettings } = require('./queue');
 const { connect: connectTwitch, setEventHandler } = require('./twitch');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
@@ -180,20 +180,44 @@ app.get('/api/songs', (req, res) => {
 // ── Settings (dashboard-adjustable behaviour) ─────────────────────────────────
 const RANDOM_COOLDOWN_MAX_DAYS = 60; // ~2 months
 const RANDOM_COOLDOWN_DEFAULT_DAYS = 7;
+const PANEL_BG_ALPHA_DEFAULT = 0.92;
 
 app.get('/api/settings', (req, res) => {
-  const raw = process.env.RANDOM_COOLDOWN_DAYS;
-  const days = raw == null || raw === '' ? RANDOM_COOLDOWN_DEFAULT_DAYS : parseFloat(raw);
-  res.json({ randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS });
+  const rawDays = process.env.RANDOM_COOLDOWN_DAYS;
+  const days = rawDays == null || rawDays === '' ? RANDOM_COOLDOWN_DEFAULT_DAYS : parseFloat(rawDays);
+
+  const rawAlpha = process.env.OVERLAY_PANEL_BG_ALPHA;
+  const alpha = rawAlpha == null || rawAlpha === '' ? PANEL_BG_ALPHA_DEFAULT : parseFloat(rawAlpha);
+
+  res.json({
+    randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS,
+    panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
+  });
 });
 
 app.post('/api/settings', (req, res) => {
-  const days = Number(req.body.randomCooldownDays);
-  if (!Number.isFinite(days) || days < 0 || days > RANDOM_COOLDOWN_MAX_DAYS) {
-    return res.status(400).json({ error: `randomCooldownDays must be between 0 and ${RANDOM_COOLDOWN_MAX_DAYS}` });
+  const updates = {};
+
+  if (req.body.randomCooldownDays !== undefined) {
+    const days = Number(req.body.randomCooldownDays);
+    if (!Number.isFinite(days) || days < 0 || days > RANDOM_COOLDOWN_MAX_DAYS) {
+      return res.status(400).json({ error: `randomCooldownDays must be between 0 and ${RANDOM_COOLDOWN_MAX_DAYS}` });
+    }
+    updates.randomCooldownDays = days;
+    setupRouter.writeEnvValues({ RANDOM_COOLDOWN_DAYS: String(days) });
   }
-  setupRouter.writeEnvValues({ RANDOM_COOLDOWN_DAYS: String(days) });
-  res.json({ ok: true, randomCooldownDays: days });
+
+  if (req.body.panelBgAlpha !== undefined) {
+    const alpha = Number(req.body.panelBgAlpha);
+    if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) {
+      return res.status(400).json({ error: 'panelBgAlpha must be between 0 and 1' });
+    }
+    updates.panelBgAlpha = alpha;
+    setupRouter.writeEnvValues({ OVERLAY_PANEL_BG_ALPHA: String(alpha) });
+    broadcastSettings({ panelBgAlpha: alpha });
+  }
+
+  res.json({ ok: true, ...updates });
 });
 
 // ── WebSocket (overlay) ───────────────────────────────────────────────────────
