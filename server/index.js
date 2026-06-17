@@ -104,7 +104,6 @@ setEventHandler(async (event) => {
     const picked = pickRandom(excludeTitles);
     if (picked) {
       addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true });
-      recordRequest({ title: picked.title, artist: picked.artist, requester });
       console.log(`[random] Added "${picked.title}" for @${requester}`);
     }
     return;
@@ -117,7 +116,6 @@ setEventHandler(async (event) => {
 
   if (result.matched && result.confident) {
     addSong({ title: result.song.title, artist: result.song.artist, key: result.song.key || '', requester });
-    recordRequest({ title: result.song.title, artist: result.song.artist, requester });
     console.log(`[queue] Added "${result.song.title}" for @${requester} (${result.confidence}%)`);
   } else if (result.candidates?.length > 1) {
     addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: result.confidence, candidates: result.candidates });
@@ -133,14 +131,17 @@ setEventHandler(async (event) => {
 
 // ── REST API ──────────────────────────────────────────────────────────────────
 app.get('/api/queue', (req, res) => res.json(getState()));
-app.post('/api/skip', (req, res) => res.json({ nowPlaying: skipSong() }));
+app.post('/api/skip', (req, res) => {
+  const { nowPlaying } = getState();
+  if (nowPlaying) recordRequest({ title: nowPlaying.title, artist: nowPlaying.artist, requester: nowPlaying.requester });
+  res.json({ nowPlaying: skipSong() });
+});
 app.post('/api/clear', (req, res) => { clearQueue(); res.json({ ok: true }); });
 
 app.post('/api/add', (req, res) => {
   const { title, artist, key, requester } = req.body;
   if (!title) return res.status(400).json({ error: 'title required' });
   const entry = addSong({ title: title.trim(), artist: artist || '', key: key || '', requester: requester || 'manual' });
-  recordRequest({ title: title.trim(), artist: artist || '', requester: requester || 'manual' });
   res.json({ ok: true, entry });
 });
 
@@ -154,51 +155,24 @@ app.post('/api/delete', (req, res) => {
 app.post('/api/move', (req, res) => {
   const { fromZone, fromIndex, toZone, toIndex } = req.body;
 
-  // When dragging a pending card into the queue, record history with the resolved title
-  let pendingToRecord = null;
-  if (fromZone === 'pending' && toZone !== 'pending') {
-    const entry = getState().pending[fromIndex];
-    if (entry) {
-      const chosen = entry.candidates?.[0];
-      const title = chosen?.title || entry.title || entry.originalRequest;
-      if (title) {
-        pendingToRecord = {
-          title,
-          artist: chosen?.artist || entry.artist || '',
-          requester: entry.requester,
-        };
-      }
-    }
+  // Record history only when nowPlaying is moved to played (song was actually performed)
+  let toRecord = null;
+  if (fromZone === 'nowPlaying' && toZone === 'played') {
+    const { nowPlaying } = getState();
+    if (nowPlaying) toRecord = { title: nowPlaying.title, artist: nowPlaying.artist, requester: nowPlaying.requester };
   }
 
   const result = moveSong(fromZone, fromIndex, toZone, toIndex);
   if (!result) return res.status(400).json({ error: 'invalid move' });
-  if (pendingToRecord) recordRequest(pendingToRecord);
+  if (toRecord) recordRequest(toRecord);
   res.json({ ok: true });
 });
 
 app.post('/api/accept-pending', (req, res) => {
   const { index, title, artist, candidateIndex } = req.body;
-
-  // Peek at the entry before removing it so we can record history
-  const entry = getState().pending[index];
-  if (!entry) return res.status(400).json({ error: 'invalid index' });
-
   const ci = candidateIndex != null ? Number(candidateIndex) : null;
   const result = acceptPending(index, title, artist, ci);
   if (!result) return res.status(400).json({ error: 'invalid index' });
-
-  // Determine final title/artist (mirrors the logic in queue.js acceptPending)
-  let finalTitle, finalArtist;
-  if (ci != null && entry.candidates?.[ci]) {
-    finalTitle = entry.candidates[ci].title;
-    finalArtist = entry.candidates[ci].artist;
-  } else {
-    finalTitle = title || entry.title || entry.originalRequest;
-    finalArtist = artist !== undefined ? artist : (entry.artist || '');
-  }
-  if (finalTitle) recordRequest({ title: finalTitle, artist: finalArtist, requester: entry.requester });
-
   res.json({ ok: true });
 });
 
@@ -227,7 +201,6 @@ app.post('/api/redraw', (req, res) => {
   const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester });
   if (!ok) return res.status(400).json({ error: 'redraw failed' });
 
-  recordRequest({ title: picked.title, artist: picked.artist, requester: currentSong.requester });
   console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);
   res.json({ ok: true });
 });
