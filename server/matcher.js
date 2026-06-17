@@ -30,6 +30,35 @@ function matchSong(requestText) {
     return { matched: false, confident: false, reason: 'Song list is empty' };
   }
 
+  // ── Fix 1: Exact title match (case-insensitive) ───────────────────────────
+  // Users often copy song names directly from the list, so an exact hit should
+  // bypass fuzzy scoring entirely and go straight to the queue.
+  const needle = requestText.trim().toLowerCase();
+  const exactMatches = songs.filter(s => s.title.toLowerCase() === needle);
+
+  if (exactMatches.length === 1) {
+    return {
+      matched: true,
+      confident: true,
+      song: exactMatches[0],
+      confidence: 100,
+      originalRequest: requestText,
+    };
+  }
+
+  if (exactMatches.length > 1) {
+    // Same title, different artists — broadcaster picks which one
+    return {
+      matched: true,
+      confident: false,
+      candidates: exactMatches.map(s => ({ ...s, confidence: 100 })),
+      song: exactMatches[0],
+      confidence: 100,
+      originalRequest: requestText,
+    };
+  }
+
+  // ── Fuzzy matching ────────────────────────────────────────────────────────
   const fuse = new Fuse(songs, getFuseOptions());
   const results = fuse.search(requestText.trim());
 
@@ -41,13 +70,24 @@ function matchSong(requestText) {
     };
   }
 
-  const best = results[0];
-  const topConfidence = Math.round((1 - best.score) * 100);
+  // ── Fix 2: Length-ratio penalty ───────────────────────────────────────────
+  // Fuse.js scores a prefix match near-perfectly regardless of how much shorter
+  // the query is than the title (e.g. "彩虹" vs "彩虹金剛" → 100%).  Scale the
+  // confidence by query_length / title_length so a short query cannot
+  // auto-accept a much longer title.
+  function adjustedConfidence(rawScore, songTitle) {
+    const raw = Math.round((1 - rawScore) * 100);
+    const ratio = Math.min(1, needle.length / songTitle.length);
+    return Math.round(raw * ratio);
+  }
 
-  // Collect all results that cross the auto-accept threshold
+  const best = results[0];
+  const topConfidence = adjustedConfidence(best.score, best.item.title);
+
+  // Collect all results that still cross the threshold after adjustment
   const candidates = results
     .slice(0, MAX_CANDIDATES + 1)
-    .map(r => ({ ...r.item, confidence: Math.round((1 - r.score) * 100) }))
+    .map(r => ({ ...r.item, confidence: adjustedConfidence(r.score, r.item.title) }))
     .filter(c => c.confidence >= AUTO_ACCEPT_THRESHOLD)
     .slice(0, MAX_CANDIDATES);
 
