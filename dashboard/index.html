@@ -386,6 +386,31 @@
     vertical-align: middle; line-height: 1;
   }
 
+  .copy-btn {
+    flex-shrink: 0; padding: 0 5px; height: 20px;
+    background: transparent; border: 1px solid rgba(90,154,255,0.2);
+    border-radius: 3px; color: rgba(90,154,255,0.35);
+    cursor: pointer; font-size: 10px; letter-spacing: 0.5px;
+    display: flex; align-items: center;
+    transition: all .15s; white-space: nowrap;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .copy-btn:hover { background: rgba(90,154,255,0.1); color: var(--blue); border-color: rgba(90,154,255,0.4); }
+
+  .redraw-btn {
+    flex-shrink: 0; width: 22px; height: 22px;
+    background: transparent; border: 1px solid rgba(120,60,220,0.2);
+    border-radius: 3px; color: rgba(176,106,255,0.45);
+    cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+  }
+  .redraw-btn:hover { background: rgba(176,106,255,0.12); color: var(--purple); border-color: rgba(176,106,255,0.5); }
+
+  .song-history { display: flex; gap: 8px; margin-top: 2px; }
+  .h-days { font-size: 9px; color: var(--text-muted); }
+  .h-req  { font-size: 9px; color: var(--blue); opacity: 0.6; }
+
   .toast {
     font-size: 10px; padding: 4px 10px; border-radius: 3px;
     opacity: 0; transition: opacity .3s;
@@ -488,7 +513,8 @@
       <span class="col-title orange">Pending Review</span>
       <span class="col-badge orange" id="pending-badge">0</span>
     </div>
-    <div class="drop-zone" id="zone-pending" style="overflow-y:auto;">
+    <div class="drop-zone" id="zone-pending" data-zone="pending" style="overflow-y:auto;"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,0)">
       <p class="empty-state" id="pending-empty">no pending requests</p>
       <div id="pending-list"></div>
     </div>
@@ -538,6 +564,8 @@ function render() {
           ${historyHtml(nowPlaying.title)}
         </div>
         ${nowPlaying.key != null && nowPlaying.key !== '' ? `<span class="key-badge">${nowPlaying.key >= 0 ? '+' : ''}${esc(nowPlaying.key)}</span>` : ''}
+        <button class="copy-btn" onclick="copyTitle('${esc(nowPlaying.title)}')" title="Copy title">⧉</button>
+        ${nowPlaying.isRandom ? `<button class="redraw-btn" onclick="callRedraw('nowPlaying',0)" title="Redraw random song">🎲</button>` : ''}
         <button class="finish-btn" onclick="api('skip')" title="Mark as finished and move to Played">✓ Finished</button>
         <button class="del-btn" onclick="deleteSong('nowPlaying',0)" title="Remove">✕</button>
       </div>`;
@@ -566,6 +594,8 @@ function render() {
         ${historyHtml(item.title)}
       </div>
       ${item.key != null && item.key !== '' ? `<span class="key-badge">${item.key >= 0 ? '+' : ''}${esc(item.key)}</span>` : ''}
+      <button class="copy-btn" onclick="copyTitle('${esc(item.title)}')" title="Copy title">⧉</button>
+      ${item.isRandom ? `<button class="redraw-btn" onclick="callRedraw('queue',${i})" title="Redraw random song">🎲</button>` : ''}
       <button class="del-btn" onclick="deleteSong('queue',${i})" title="Remove">✕</button>
     </div>`).join('');
 
@@ -588,6 +618,7 @@ function render() {
         ${historyHtml(item.title)}
       </div>
       ${item.key != null && item.key !== '' ? `<span class="key-badge">${item.key >= 0 ? '+' : ''}${esc(item.key)}</span>` : ''}
+      <button class="copy-btn" onclick="copyTitle('${esc(item.title)}')" title="Copy title">⧉</button>
       <button class="del-btn" onclick="deleteSong('played',${i})" title="Remove">✕</button>
     </div>`).join('');
 
@@ -596,11 +627,12 @@ function render() {
   document.getElementById('pending-badge').textContent = pendingList.length;
   document.getElementById('pending-empty').style.display = pendingList.length === 0 ? 'block' : 'none';
   document.getElementById('pending-list').innerHTML = pendingList.map((item, i) => {
+    const isDragged = !item.originalRequest;  // dragged manually — no viewer input
     const hasMatch = item.confidence !== null;
     const confLabel = hasMatch ? `${item.confidence}% match` : 'no match';
     const confClass = hasMatch ? '' : 'no-match';
 
-    if (item.candidates?.length > 1) {
+    if (!isDragged && item.candidates?.length > 1) {
       // Multiple candidates — show picker
       const candidatesHtml = item.candidates.map((c, ci) => `
         <div class="candidate-item" onclick="pickCandidate(${i},${ci})">
@@ -629,12 +661,12 @@ function render() {
 
     return `
     <div class="pending-card" id="pending-card-${i}">
-      <div class="pending-top">
-        <span class="pending-original" title="Viewer typed: ${esc(item.originalRequest)}">
-          ❝ ${esc(item.originalRequest)}
-        </span>
-        <span class="pending-confidence ${confClass}">${confLabel}</span>
-      </div>
+      ${isDragged
+        ? `<div class="pending-top"><span class="pending-original" style="color:var(--text-muted);font-size:10px;">✎ dragged for editing</span></div>`
+        : `<div class="pending-top">
+             <span class="pending-original" title="Viewer typed: ${esc(item.originalRequest)}">❝ ${esc(item.originalRequest)}</span>
+             <span class="pending-confidence ${confClass}">${confLabel}</span>
+           </div>`}
       <div class="pending-req">@${esc(item.requester)}</div>
       <div class="pending-fields">
         <input class="pending-field" id="pending-title-${i}" placeholder="song title"
@@ -963,6 +995,31 @@ function showToast(msg, isError = false) {
   t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+
+async function copyTitle(title) {
+  try {
+    await navigator.clipboard.writeText(title);
+    showToast(`copied: ${title}`);
+  } catch(_) {
+    showToast('copy failed', true);
+  }
+}
+
+async function callRedraw(zone, index) {
+  try {
+    const res = await fetch('/api/redraw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zone, index }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'redraw failed', true);
+    }
+  } catch(_) {
+    showToast('redraw failed', true);
+  }
+}
 
 async function api(endpoint, body = {}) {
   try {

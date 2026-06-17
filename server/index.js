@@ -8,7 +8,7 @@ const fs = require('fs');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, broadcastSettings } = require('./queue');
+const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings } = require('./queue');
 const { connect: connectTwitch, setEventHandler } = require('./twitch');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
@@ -103,7 +103,7 @@ setEventHandler(async (event) => {
     ];
     const picked = pickRandom(excludeTitles);
     if (picked) {
-      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester });
+      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true });
       recordRequest({ title: picked.title, artist: picked.artist, requester });
       console.log(`[random] Added "${picked.title}" for @${requester}`);
     }
@@ -153,15 +153,82 @@ app.post('/api/delete', (req, res) => {
 
 app.post('/api/move', (req, res) => {
   const { fromZone, fromIndex, toZone, toIndex } = req.body;
+
+  // When dragging a pending card into the queue, record history with the resolved title
+  let pendingToRecord = null;
+  if (fromZone === 'pending' && toZone !== 'pending') {
+    const entry = getState().pending[fromIndex];
+    if (entry) {
+      const chosen = entry.candidates?.[0];
+      const title = chosen?.title || entry.title || entry.originalRequest;
+      if (title) {
+        pendingToRecord = {
+          title,
+          artist: chosen?.artist || entry.artist || '',
+          requester: entry.requester,
+        };
+      }
+    }
+  }
+
   const result = moveSong(fromZone, fromIndex, toZone, toIndex);
   if (!result) return res.status(400).json({ error: 'invalid move' });
+  if (pendingToRecord) recordRequest(pendingToRecord);
   res.json({ ok: true });
 });
 
 app.post('/api/accept-pending', (req, res) => {
   const { index, title, artist, candidateIndex } = req.body;
-  const result = acceptPending(index, title, artist, candidateIndex != null ? Number(candidateIndex) : null);
+
+  // Peek at the entry before removing it so we can record history
+  const entry = getState().pending[index];
+  if (!entry) return res.status(400).json({ error: 'invalid index' });
+
+  const ci = candidateIndex != null ? Number(candidateIndex) : null;
+  const result = acceptPending(index, title, artist, ci);
   if (!result) return res.status(400).json({ error: 'invalid index' });
+
+  // Determine final title/artist (mirrors the logic in queue.js acceptPending)
+  let finalTitle, finalArtist;
+  if (ci != null && entry.candidates?.[ci]) {
+    finalTitle = entry.candidates[ci].title;
+    finalArtist = entry.candidates[ci].artist;
+  } else {
+    finalTitle = title || entry.title || entry.originalRequest;
+    finalArtist = artist !== undefined ? artist : (entry.artist || '');
+  }
+  if (finalTitle) recordRequest({ title: finalTitle, artist: finalArtist, requester: entry.requester });
+
+  res.json({ ok: true });
+});
+
+app.post('/api/redraw', (req, res) => {
+  const { zone, index } = req.body;
+  const state = getState();
+
+  // Get the song being replaced (to preserve its requester)
+  let currentSong;
+  if (zone === 'nowPlaying') currentSong = state.nowPlaying;
+  else if (zone === 'queue') currentSong = state.queue[index];
+  else return res.status(400).json({ error: 'invalid zone' });
+  if (!currentSong) return res.status(400).json({ error: 'no song at that position' });
+
+  // Exclude everything currently in the queue (including the song being replaced,
+  // so it won't be re-drawn on the next pick)
+  const excludeTitles = [
+    ...(state.nowPlaying ? [state.nowPlaying.title] : []),
+    ...state.queue.map(s => s.title),
+    ...state.playedSongs.map(s => s.title),
+  ];
+
+  const picked = pickRandom(excludeTitles);
+  if (!picked) return res.status(400).json({ error: 'no songs available to redraw' });
+
+  const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester });
+  if (!ok) return res.status(400).json({ error: 'redraw failed' });
+
+  recordRequest({ title: picked.title, artist: picked.artist, requester: currentSong.requester });
+  console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);
   res.json({ ok: true });
 });
 

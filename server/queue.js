@@ -36,8 +36,9 @@ function registerClient(ws) {
   });
 }
 
-function addSong({ title, artist, key, requester }) {
+function addSong({ title, artist, key, requester, isRandom }) {
   const entry = { title, artist, key: key != null ? String(key) : '', requester, addedAt: Date.now() };
+  if (isRandom) entry.isRandom = true;
   if (!nowPlaying) { nowPlaying = entry; }
   else { queue.push(entry); }
   broadcastState();
@@ -160,6 +161,19 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
   } else if (toZone === 'played') {
     const i = Math.max(0, Math.min(toIndex, playedSongs.length));
     playedSongs.splice(i, 0, song);
+  } else if (toZone === 'pending') {
+    // Broadcaster dragged a card to pending for editing
+    const entry = {
+      title: song.title,
+      artist: song.artist || '',
+      requester: song.requester,
+      originalRequest: null,   // no viewer input — manually dragged
+      confidence: null,
+      candidates: null,
+      addedAt: song.addedAt || Date.now(),
+    };
+    const i = Math.max(0, Math.min(toIndex, pending.length));
+    pending.splice(i, 0, entry);
   } else {
     return false;
   }
@@ -168,8 +182,31 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
   return true;
 }
 
+// Replace a random-picked song in place (for the redraw feature).
+function redrawSong(zone, index, newSong) {
+  const entry = {
+    title: newSong.title,
+    artist: newSong.artist || '',
+    key: newSong.key != null ? String(newSong.key) : '',
+    requester: newSong.requester,
+    addedAt: Date.now(),
+    isRandom: true,
+  };
+  if (zone === 'nowPlaying') {
+    if (!nowPlaying) return false;
+    nowPlaying = entry;
+  } else if (zone === 'queue') {
+    if (index < 0 || index >= queue.length) return false;
+    queue[index] = entry;
+  } else {
+    return false;
+  }
+  broadcastState();
+  return true;
+}
+
 module.exports = {
   registerClient, addSong, addPending, acceptPending,
-  skipSong, clearQueue, getState, deleteSong, moveSong,
+  skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong,
   broadcastSettings,
 };
