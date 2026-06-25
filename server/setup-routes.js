@@ -87,6 +87,10 @@ router.get('/status', (req, res) => {
       sheets: !!(env.GOOGLE_SHEET_ID && env.SHEET_SONG_COLUMN),
       history: !!env.HISTORY_SHEET_ID,
     },
+    // Exposed so the wizard can tell "Twitch app already registered, just
+    // need to re-authorize" apart from "never registered an app at all" —
+    // the former should skip straight to the device auth step.
+    clientId: env.TWITCH_CLIENT_ID || null,
     displayName: progress.displayName || null,
     broadcasterId: env.TWITCH_BROADCASTER_ID || null,
   });

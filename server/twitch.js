@@ -57,8 +57,14 @@ async function ensureFreshToken() {
   } catch (err) {
     if (err.response?.status === 400) {
       // Refresh token was rejected (rotated/revoked, or expired from
-      // inactivity). Clear the stale tokens so isSetupComplete() goes
-      // false and the user is routed back to /setup to reauthorize.
+      // inactivity). Log the actual reason Twitch gave so a recurring
+      // failure can be diagnosed instead of just disappearing into a
+      // generic "expired" message.
+      console.error('[twitch] Refresh token rejected:', JSON.stringify(err.response.data));
+      // Clear the stale tokens so isSetupComplete() goes false and the user
+      // is routed back to /setup to reauthorize. TWITCH_CLIENT_ID and
+      // TWITCH_BROADCASTER_ID are left intact so the wizard can skip
+      // straight to the device-auth step instead of starting over.
       setEnvValue('TWITCH_USER_ACCESS_TOKEN', '');
       setEnvValue('TWITCH_USER_REFRESH_TOKEN', '');
       setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '');

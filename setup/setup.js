@@ -62,6 +62,13 @@ async function init() {
       currentStep = STEPS.indexOf('google-creds');
     } else if (status.configured.twitch) {
       currentStep = STEPS.indexOf('rewards');
+    } else if (status.clientId) {
+      // Twitch app already registered (Client ID known) but the user
+      // authorization expired/was revoked — this happens when the refresh
+      // token gets rejected. No need to re-enter the Client ID or redo
+      // rewards/sheets — just re-authorize.
+      state.clientId = status.clientId;
+      currentStep = STEPS.indexOf('twitch-auth');
     }
   } catch (_) {}
 
