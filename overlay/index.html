@@ -230,11 +230,10 @@ const WS_URL = `ws://${location.host}`;
 let ws, reconnectTimer;
 
 const tickers = {
-  queue:  { el: null, inner: null, offset: 0, raf: null, lastTime: null },
-  played: { el: null, inner: null, offset: 0, raf: null, lastTime: null },
+  queue:  { el: null, inner: null, offset: 0, loopAt: 0, raf: null, lastTime: null },
+  played: { el: null, inner: null, offset: 0, loopAt: 0, raf: null, lastTime: null },
 };
-// Scroll speed — to change this, edit OVERLAY_SCROLL_PX_PER_SEC in server/config.js
-const SCROLL_PX_PER_SEC = 28;
+const SCROLL_PX_PER_SEC = 16;
 
 function connect() {
   ws = new WebSocket(WS_URL);
@@ -327,39 +326,45 @@ function renderState({ nowPlaying, queue, playedSongs }) {
 function resetTicker(key, container, inner) {
   const t = tickers[key];
   if (t.raf) { cancelAnimationFrame(t.raf); t.raf = null; }
+
+  // Remove clones from any previous run
+  inner.querySelectorAll('[data-clone]').forEach(el => el.remove());
+
   t.el = container;
   t.inner = inner;
   t.offset = 0;
+  t.loopAt = 0;
   t.lastTime = null;
   inner.style.transform = 'translateY(0)';
+
   requestAnimationFrame(() => {
-    if (inner.scrollHeight > container.clientHeight) {
+    if (inner.scrollHeight <= container.clientHeight) return;
+
+    // Duplicate all items — seamless loop: when we've scrolled one copy,
+    // wrap offset back to 0; the clone looks identical so there's no jump.
+    Array.from(inner.children).forEach(child => {
+      const clone = child.cloneNode(true);
+      clone.setAttribute('data-clone', '1');
+      inner.appendChild(clone);
+    });
+
+    requestAnimationFrame(() => {
+      const firstClone = inner.querySelector('[data-clone]');
+      t.loopAt = firstClone ? firstClone.offsetTop : 0;
       setTimeout(() => startTicker(key), 2000);
-    }
+    });
   });
 }
 
 function startTicker(key) {
   const t = tickers[key];
-  if (!t.el || !t.inner) return;
+  if (!t.el || !t.inner || !t.loopAt) return;
   function step(timestamp) {
     if (!t.lastTime) t.lastTime = timestamp;
     const delta = (timestamp - t.lastTime) / 1000;
     t.lastTime = timestamp;
-    const maxScroll = t.inner.scrollHeight - t.el.clientHeight;
-    if (maxScroll <= 0) return;
     t.offset += SCROLL_PX_PER_SEC * delta;
-    if (t.offset >= maxScroll) {
-      t.offset = maxScroll;
-      t.inner.style.transform = `translateY(-${t.offset}px)`;
-      setTimeout(() => {
-        t.offset = 0;
-        t.lastTime = null;
-        t.inner.style.transform = 'translateY(0)';
-        setTimeout(() => startTicker(key), 2000);
-      }, 2000);
-      return;
-    }
+    if (t.offset >= t.loopAt) t.offset -= t.loopAt;
     t.inner.style.transform = `translateY(-${t.offset}px)`;
     t.raf = requestAnimationFrame(step);
   }
