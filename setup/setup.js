@@ -25,6 +25,7 @@ let state = {
   artistCol: null,
   keyCol: null,
   activeColType: 'song', // which field a column-header click currently assigns: song | artist | key
+  reauth: false,
 };
 
 // ── Polling state ─────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ async function init() {
       // token gets rejected. No need to re-enter the Client ID or redo
       // rewards/sheets — just re-authorize.
       state.clientId = status.clientId;
+      state.reauth = true;
       currentStep = STEPS.indexOf('twitch-auth');
     }
   } catch (_) {}
@@ -272,7 +274,7 @@ async function pollDeviceAuth(interval) {
     document.getElementById('auth-waiting').style.display = 'none';
     document.getElementById('auth-done').style.display = 'block';
     document.getElementById('auth-name').innerHTML = t.connectedAs(res.displayName);
-    setTimeout(goNext, 1500);
+    setTimeout(state.reauth ? () => goToStep('done') : goNext, 1500);
   } else if (res.status === 'expired') {
     clearInterval(deviceTimerInterval);
     alert(t.codeExpired);
