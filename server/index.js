@@ -76,8 +76,11 @@ async function activateServiceIfReady() {
     coreServicesStarted = true;
     console.log('\n[setup] Configuration complete — starting song queue services...\n');
     await startAutoRefresh();
-    connectTwitch();
   }
+  // Called every time setup is complete — handles both first start and
+  // re-auth after token expiry. connect() is idempotent: it no-ops when a
+  // socket already exists, so this is safe to call on any config change.
+  connectTwitch();
   await initHistory();
 }
 setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {

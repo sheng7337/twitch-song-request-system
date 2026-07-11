@@ -160,6 +160,12 @@ async function connect() {
     return;
   }
 
+  // Socket already exists (open, connecting, or closed-but-reconnecting via
+  // the close handler). Don't open a second connection — let existing
+  // machinery handle it. Only proceed when ws is null, which happens when
+  // the server started with an expired token and never got to connectEventSub().
+  if (ws !== null) return;
+
   try {
     await ensureFreshToken();
   } catch (err) {
