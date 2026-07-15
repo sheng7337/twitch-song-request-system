@@ -12,6 +12,7 @@
 // without a proxy — no CORS issues on Twitch's clip CDN.
 
 const axios = require('axios');
+const { setLast } = require('../media-history');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -124,17 +125,17 @@ module.exports = function register(registerCommand, broadcastRaw) {
         return;
       }
 
-      broadcastRaw({
-        type: 'clip',
-        clip: {
-          id: clip.id,
-          title: clip.title,
-          broadcasterName: clip.broadcaster_name,
-          thumbnailUrl: clip.thumbnail_url,
-          videoUrl,   // signed HLS m3u8 URL, played by HLS.js in clip-player
-          duration: clip.duration,
-        },
-      });
+      const payload = {
+        type: 'media',
+        kind: 'video',
+        label: 'Shoutout',
+        src: videoUrl,
+        title: clip.title,
+        credit: `@${clip.broadcaster_name}`,
+        duration: clip.duration,
+      };
+      broadcastRaw(payload);
+      setLast(payload);
     },
   });
 };

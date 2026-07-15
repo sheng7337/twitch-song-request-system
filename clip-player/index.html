@@ -14,21 +14,22 @@
     font-family: 'Segoe UI', sans-serif;
   }
 
-  /* ── Full-screen video ── */
-  #clip-video {
+  /* ── Full-screen media elements ── */
+  #clip-video,
+  #embed-frame {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
     z-index: 1;
     opacity: 0;
     transition: opacity 0.5s ease;
+    border: none;
   }
 
-  #clip-video.visible { opacity: 1; }
+  #clip-video { object-fit: cover; }
 
-  /* ── Overlay (fades in/out with the clip) ── */
+  /* ── Overlay (fades in/out with each clip) ── */
   #overlay {
     position: absolute;
     inset: 0;
@@ -116,7 +117,7 @@
     text-transform: uppercase;
   }
 
-  #broadcaster-name {
+  #credit-name {
     font-size: 80px;
     font-weight: 700;
     color: #fff;
@@ -161,6 +162,9 @@
 <body>
 
 <video id="clip-video" playsinline></video>
+<iframe id="embed-frame" frameborder="0"
+  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+  allowfullscreen></iframe>
 
 <div id="overlay">
   <div id="border"></div>
@@ -169,10 +173,10 @@
   <div id="text-block">
     <div id="so-badge">
       <div class="badge-line"></div>
-      <span class="badge-label">Shoutout</span>
+      <span class="badge-label" id="badge-label">Shoutout</span>
       <div class="badge-line"></div>
     </div>
-    <div id="broadcaster-name"></div>
+    <div id="credit-name"></div>
     <div id="clip-title"></div>
   </div>
 
@@ -182,43 +186,69 @@
 </div>
 
 <script>
-  const overlay      = document.getElementById('overlay');
-  const videoEl      = document.getElementById('clip-video');
-  const nameEl       = document.getElementById('broadcaster-name');
-  const titleEl      = document.getElementById('clip-title');
-  const fillEl       = document.getElementById('progress-fill');
+  const overlay    = document.getElementById('overlay');
+  const videoEl    = document.getElementById('clip-video');
+  const iframeEl   = document.getElementById('embed-frame');
+  const badgeEl    = document.getElementById('badge-label');
+  const creditEl   = document.getElementById('credit-name');
+  const titleEl    = document.getElementById('clip-title');
+  const fillEl     = document.getElementById('progress-fill');
+
+  const YOUTUBE_MAX_MS = 10 * 60 * 1000; // 10-min cap for YouTube (can't detect end)
 
   let dismissTimer = null;
 
-  function showClip(clip) {
+  function showMedia(msg) {
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
 
-    nameEl.textContent  = '@' + clip.broadcasterName;
-    titleEl.textContent = clip.title;
+    // Reset both media elements before loading new content
+    videoEl.onended = null;
+    videoEl.style.opacity = '0';
+    iframeEl.style.opacity = '0';
+    iframeEl.src = '';
+    videoEl.src  = '';
 
-    videoEl.src = clip.videoUrl;
-    videoEl.play().catch(() => {});
+    badgeEl.textContent  = msg.label  || 'Shoutout';
+    creditEl.textContent = msg.credit || '';
+    titleEl.textContent  = msg.title  || '';
 
-    const durationMs = (clip.duration || 30) * 1000;
+    if (msg.kind === 'youtube') {
+      // Small delay ensures src='' is processed before setting the new URL
+      setTimeout(() => {
+        iframeEl.src = msg.src;
+        iframeEl.style.opacity = '1';
+      }, 50);
+      const timeout = Math.min(YOUTUBE_MAX_MS, 90 * 60 * 1000);
+      dismissTimer = setTimeout(hideMedia, timeout);
+      startProgressBar(timeout);
+    } else {
+      videoEl.src = msg.src;
+      videoEl.play().catch(() => {});
+      videoEl.style.opacity = '1';
+      videoEl.onended = hideMedia;
+      const durationMs = (msg.duration || 30) * 1000;
+      dismissTimer = setTimeout(hideMedia, durationMs + 3000);
+      startProgressBar(durationMs);
+    }
+
+    overlay.classList.add('visible');
+  }
+
+  function startProgressBar(durationMs) {
     fillEl.style.transition = 'none';
     fillEl.style.transform  = 'scaleX(1)';
     void fillEl.offsetWidth;
     fillEl.style.transition = `transform ${durationMs}ms linear`;
     fillEl.style.transform  = 'scaleX(0)';
-
-    overlay.classList.add('visible');
-    videoEl.classList.add('visible');
-
-    videoEl.onended = hideClip;
-    dismissTimer = setTimeout(hideClip, Math.min(durationMs + 3000, 90000));
   }
 
-  function hideClip() {
+  function hideMedia() {
     overlay.classList.remove('visible');
-    videoEl.classList.remove('visible');
+    videoEl.style.opacity = '0';
+    iframeEl.style.opacity = '0';
     videoEl.onended = null;
-    setTimeout(() => { videoEl.src = ''; }, 500);
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+    setTimeout(() => { videoEl.src = ''; iframeEl.src = ''; }, 500);
   }
 
   function connect() {
@@ -226,7 +256,8 @@
     ws.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch (_) { return; }
-      if (msg.type === 'clip') showClip(msg.clip);
+      if (msg.type === 'media') showMedia(msg);
+      if (msg.type === 'media-stop') hideMedia();
     };
     ws.onclose = () => setTimeout(connect, 3000);
     ws.onerror = () => ws.close();

@@ -12,6 +12,9 @@ const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue
 const { connect: connectTwitch, setEventHandler, setChatHandler } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const registerShoutout = require('./commands/shoutout');
+const registerWatch = require('./commands/watch');
+const registerReplay = require('./commands/replay');
+const registerStop = require('./commands/stop');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
@@ -92,7 +95,9 @@ setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => 
 
 // ── Chat command registration ─────────────────────────────────────────────────
 registerShoutout(registerCommand, broadcastRaw);
-// Future commands: registerLottery(registerCommand, broadcastRaw); etc.
+registerWatch(registerCommand, broadcastRaw);
+registerReplay(registerCommand, broadcastRaw);
+registerStop(registerCommand, broadcastRaw);
 setChatHandler(handleChatEvent);
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
