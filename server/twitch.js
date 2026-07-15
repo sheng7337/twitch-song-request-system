@@ -13,7 +13,8 @@ const ENV_PATH = path.join(__dirname, '..', '.env');
 
 let ws = null;
 let sessionId = null;
-let eventHandler = null; // set by index.js
+let redemptionHandler = null; // set by index.js via setEventHandler
+let chatHandler = null;       // set by index.js via setChatHandler
 
 // ── Token management ──────────────────────────────────────────────────────────
 
@@ -76,25 +77,34 @@ async function ensureFreshToken() {
 
 // ── EventSub WebSocket ────────────────────────────────────────────────────────
 
-async function subscribeToRedemptions(sid) {
+async function subscribeToEvents(sid) {
   await ensureFreshToken();
   const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
   const clientId = process.env.TWITCH_CLIENT_ID;
   const token = process.env.TWITCH_USER_ACCESS_TOKEN;
+
+  const headers = {
+    'Client-Id': clientId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 
   await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
     type: 'channel.channel_points_custom_reward_redemption.add',
     version: '1',
     condition: { broadcaster_user_id: broadcasterId },
     transport: { method: 'websocket', session_id: sid },
-  }, {
-    headers: {
-      'Client-Id': clientId,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
-  });
+  }, { headers });
   console.log('[twitch] Subscribed to Channel Points redemptions');
+
+  await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+    type: 'channel.chat.message',
+    version: '1',
+    // Both IDs must be set; user_id is the account that owns the token (broadcaster self-sub)
+    condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId },
+    transport: { method: 'websocket', session_id: sid },
+  }, { headers });
+  console.log('[twitch] Subscribed to chat messages');
 }
 
 function connectEventSub(url) {
@@ -116,14 +126,19 @@ function connectEventSub(url) {
       sessionId = msg.payload.session.id;
       console.log(`[twitch] Session ID: ${sessionId}`);
       try {
-        await subscribeToRedemptions(sessionId);
+        await subscribeToEvents(sessionId);
       } catch (err) {
         console.error('[twitch] Failed to subscribe:', err.response?.data || err.message);
       }
     }
 
     if (type === 'notification') {
-      if (eventHandler) eventHandler(msg.payload.event);
+      const subType = msg.metadata?.subscription_type;
+      if (subType === 'channel.channel_points_custom_reward_redemption.add') {
+        if (redemptionHandler) redemptionHandler(msg.payload.event);
+      } else if (subType === 'channel.chat.message') {
+        if (chatHandler) chatHandler(msg.payload.event);
+      }
     }
 
     if (type === 'session_reconnect') {
@@ -147,7 +162,11 @@ function connectEventSub(url) {
 }
 
 function setEventHandler(fn) {
-  eventHandler = fn;
+  redemptionHandler = fn;
+}
+
+function setChatHandler(fn) {
+  chatHandler = fn;
 }
 
 async function connect() {
@@ -177,4 +196,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, setEventHandler, ensureFreshToken, setEnvValue };
+module.exports = { connect, setEventHandler, setChatHandler, ensureFreshToken, setEnvValue };

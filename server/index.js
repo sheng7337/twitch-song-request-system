@@ -8,8 +8,10 @@ const fs = require('fs');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings } = require('./queue');
-const { connect: connectTwitch, setEventHandler } = require('./twitch');
+const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
+const { connect: connectTwitch, setEventHandler, setChatHandler } = require('./twitch');
+const { registerCommand, handleChatEvent } = require('./chat-router');
+const registerShoutout = require('./commands/shoutout');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
@@ -37,6 +39,7 @@ app.use('/setup/api', setupRouter);
 app.use('/overlay', express.static(path.join(__dirname, '..', 'overlay')));
 app.use('/dashboard', express.static(path.join(__dirname, '..', 'dashboard')));
 app.use('/setup', express.static(path.join(__dirname, '..', 'setup')));
+app.use('/clip-player', express.static(path.join(__dirname, '..', 'clip-player')));
 
 // ── Setup detection: redirect to wizard if not configured ─────────────────────
 function isSetupComplete() {
@@ -86,6 +89,11 @@ async function activateServiceIfReady() {
 setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {
   console.error('Error starting services after setup:', err);
 }));
+
+// ── Chat command registration ─────────────────────────────────────────────────
+registerShoutout(registerCommand, broadcastRaw);
+// Future commands: registerLottery(registerCommand, broadcastRaw); etc.
+setChatHandler(handleChatEvent);
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
 setEventHandler(async (event) => {
@@ -212,6 +220,143 @@ app.post('/api/refresh-songs', async (req, res) => {
   const { fetchSongs } = require('./sheets');
   const songs = await fetchSongs();
   res.json({ ok: true, count: songs.length });
+});
+
+// ── HLS proxy ─────────────────────────────────────────────────────────────────
+// HLS.js fetches m3u8 playlists and .ts segments via XHR. When the page is on
+// localhost:3000 and the CDN is Twitch's servers, the browser enforces CORS and
+// blocks the requests. This proxy makes all HLS traffic go through localhost so
+// HLS.js sees only same-origin requests with no CORS issues.
+//
+// For m3u8 files: rewrites every non-comment URL (segment, key, sub-playlist)
+// to point back through this proxy so the chain works recursively.
+// For segments (.ts): streams the bytes through as-is.
+
+const axios = require('axios');
+
+function isTwitchHlsUrl(urlStr) {
+  try {
+    const { protocol, hostname } = new URL(urlStr);
+    if (protocol !== 'https:') return false;
+    return hostname.endsWith('.twitch.tv')
+      || hostname.endsWith('.twitchsvc.net')
+      || hostname.endsWith('.twitch.com')
+      || hostname.endsWith('.cloudfront.net')   // Twitch uses AWS CloudFront for clip segments
+      || hostname === 'clips.twitch.tv';
+  } catch { return false; }
+}
+
+function hlsProxyUrl(absoluteUrl) {
+  return `/api/hls?url=${encodeURIComponent(absoluteUrl)}`;
+}
+
+function rewriteM3u8(text, baseUrl) {
+  const base = new URL(baseUrl);
+  // Rewrite any non-comment, non-empty line that is a URI
+  return text.replace(/^(?!#)(\S+)$/gm, (match) => {
+    try {
+      return hlsProxyUrl(new URL(match, base).toString());
+    } catch { return match; }
+  });
+}
+
+app.get('/api/hls', async (req, res) => {
+  const { url } = req.query;
+  if (!url || !isTwitchHlsUrl(url)) {
+    console.warn('[hls-proxy] Blocked:', url?.slice(0, 120));
+    return res.status(403).end();
+  }
+  try {
+    const upstream = await axios.get(url, {
+      responseType: 'arraybuffer',
+      headers: { 'Accept': '*/*', 'User-Agent': 'Mozilla/5.0' },
+    });
+    const ct = upstream.headers['content-type'] || '';
+    const isPlaylist = ct.includes('mpegurl') || url.split('?')[0].endsWith('.m3u8');
+    console.log(`[hls-proxy] ${upstream.status} ${isPlaylist ? 'm3u8' : 'segment'} ${url.slice(0, 80)}`);
+    if (isPlaylist) {
+      const text = Buffer.from(upstream.data).toString('utf8');
+      res.set('Content-Type', 'application/vnd.apple.mpegurl');
+      res.set('Access-Control-Allow-Origin', '*');
+      res.send(rewriteM3u8(text, url));
+    } else {
+      res.set('Content-Type', ct || 'video/mp2t');
+      res.set('Access-Control-Allow-Origin', '*');
+      res.send(Buffer.from(upstream.data));
+    }
+  } catch (err) {
+    const status = err.response?.status;
+    console.error(`[hls-proxy] ${status ?? 'ERR'} ${err.message} — ${url?.slice(0, 100)}`);
+    if (!res.headersSent) res.status(502).end();
+  }
+});
+
+// GET /api/clip-stream?url=<encoded-signed-m3u8-url>
+// Downloads all HLS segments server-side and streams them as a single
+// concatenated MPEG-TS blob. The clip player uses a plain <video src> tag —
+// no HLS.js or MSE needed, works in any Chromium 106+ (OBS/Streamlabs CEF).
+app.get('/api/clip-stream', async (req, res) => {
+  const { url } = req.query;
+  if (!url || !isTwitchHlsUrl(url)) return res.status(403).end();
+
+  try {
+    const fetchOpts = { responseType: 'text', headers: { 'Accept': '*/*', 'User-Agent': 'Mozilla/5.0' } };
+
+    // Direct MP4 (newer Twitch clips) — proxy the file through as-is
+    if (url.split('?')[0].endsWith('.mp4')) {
+      const r = await axios.get(url, { responseType: 'arraybuffer', headers: { 'Accept': '*/*', 'User-Agent': 'Mozilla/5.0' } });
+      const body = Buffer.from(r.data);
+      console.log(`[clip-stream] MP4 ${(body.length / 1024 / 1024).toFixed(1)} MB`);
+      res.set('Content-Type', 'video/mp4');
+      res.set('Content-Length', body.length);
+      res.set('Access-Control-Allow-Origin', '*');
+      return res.send(body);
+    }
+
+    // HLS playlist — fetch segments and concatenate as MPEG-TS
+    let playlistText = (await axios.get(url, fetchOpts)).data;
+    let playlistBase = url;
+
+    // If variant playlist (no #EXTINF lines), follow the first quality entry
+    if (!playlistText.includes('#EXTINF')) {
+      const firstEntry = playlistText.split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'));
+      if (!firstEntry) return res.status(502).send('Empty variant playlist');
+      const subUrl = new URL(firstEntry, url).toString();
+      if (!isTwitchHlsUrl(subUrl)) return res.status(403).end();
+      playlistText = (await axios.get(subUrl, fetchOpts)).data;
+      playlistBase = subUrl;
+    }
+
+    // Parse segment URLs (non-comment, non-empty lines)
+    const segmentUrls = [];
+    for (const line of playlistText.split('\n')) {
+      const t = line.trim();
+      if (t && !t.startsWith('#')) {
+        try {
+          const abs = new URL(t, playlistBase).toString();
+          if (isTwitchHlsUrl(abs)) segmentUrls.push(abs);
+        } catch {}
+      }
+    }
+    if (!segmentUrls.length) return res.status(502).send('No segments in playlist');
+
+    // Download and concatenate all segments
+    const chunks = [];
+    for (const seg of segmentUrls) {
+      const r = await axios.get(seg, { responseType: 'arraybuffer', headers: { 'Accept': '*/*', 'User-Agent': 'Mozilla/5.0' } });
+      chunks.push(Buffer.from(r.data));
+    }
+    const body = Buffer.concat(chunks);
+    console.log(`[clip-stream] ${segmentUrls.length} segments → ${(body.length / 1024 / 1024).toFixed(1)} MB`);
+
+    res.set('Content-Type', 'video/mp2t');
+    res.set('Content-Length', body.length);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.send(body);
+  } catch (err) {
+    console.error('[clip-stream]', err.response?.status ?? 'ERR', err.message);
+    if (!res.headersSent) res.status(502).end();
+  }
 });
 
 app.get('/api/history', (req, res) => res.json(getHistory()));
