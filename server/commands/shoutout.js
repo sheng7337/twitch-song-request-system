@@ -13,6 +13,7 @@
 
 const axios = require('axios');
 const { setLast } = require('../media-history');
+const { getClipSignedUrl } = require('../twitch-clips');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -37,61 +38,6 @@ async function fetchClips(broadcasterId) {
     headers: twitchHeaders(),
   });
   return res.data.data ?? [];
-}
-
-// Returns a signed HLS playlist URL for the clip.
-// Uses inline GQL (not a persisted hash) so it doesn't break when Twitch
-// rotates their web-app's query hashes.
-// gql.twitch.tv only accepts Twitch's own first-party client IDs — we use
-// kimne78kx3ncx6brgo4mv6wki5h1ko (their web player's public ID, visible in
-// any twitch.tv page source) which is the community standard for public data.
-async function getClipSignedUrl(clipId) {
-  const res = await axios.post('https://gql.twitch.tv/gql', [{
-    operationName: 'ClipVideo',
-    query: `query ClipVideo($slug: ID!) {
-      clip(slug: $slug) {
-        playbackAccessToken(params: {
-          platform: "web"
-          playerBackend: "mediaplayer"
-          playerType: "site"
-        }) {
-          signature
-          value
-        }
-        videoQualities {
-          quality
-          frameRate
-          sourceURL
-        }
-      }
-    }`,
-    variables: { slug: clipId },
-  }], {
-    headers: {
-      'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-      'Content-Type': 'application/json',
-    },
-  });
-
-  const clip = res.data[0]?.data?.clip;
-  if (!clip) {
-    const errs = JSON.stringify(res.data[0]?.errors);
-    throw new Error(`GQL returned no clip data: ${errs}`);
-  }
-
-  const { signature, value } = clip.playbackAccessToken;
-
-  // The token JSON contains clip_uri — the exact CDN URL this sig is valid for.
-  // videoQualities[0].sourceURL may be a different resolution; CloudFront
-  // validates the URL against clip_uri in the token and returns 400 on mismatch.
-  let clipUri;
-  try { clipUri = JSON.parse(value).clip_uri; } catch {}
-  const source = clipUri || clip.videoQualities[0]?.sourceURL;
-  if (!source) throw new Error('No clip source URL found in token or qualities');
-
-  const signedUrl = `${source}?sig=${signature}&token=${encodeURIComponent(value)}`;
-  console.log(`[shoutout] Clip URL: ${new URL(source).pathname}`);
-  return `/api/clip-stream?url=${encodeURIComponent(signedUrl)}`;
 }
 
 module.exports = function register(registerCommand, broadcastRaw) {
@@ -121,7 +67,7 @@ module.exports = function register(registerCommand, broadcastRaw) {
       try {
         videoUrl = await getClipSignedUrl(clip.id);
       } catch (err) {
-        console.warn('[shoutout] Could not get signed URL:', err.message);
+        console.warn('[shoutout] Could not sign clip URL:', err.message);
         return;
       }
 
