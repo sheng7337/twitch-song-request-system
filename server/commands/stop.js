@@ -1,10 +1,11 @@
-module.exports = function register(registerCommand, broadcastRaw) {
+const mediaQueue = require('../media-queue');
+
+module.exports = function register(registerCommand) {
   registerCommand({
     prefix: '!stop',
     modsOnly: true,
     async handler() {
-      console.log('[stop] Stopping media playback');
-      broadcastRaw({ type: 'media-stop' });
+      mediaQueue.stopAll();
     },
   });
 };

@@ -14,6 +14,7 @@
 const axios = require('axios');
 const { setLast } = require('../media-history');
 const { getClipSignedUrl } = require('../twitch-clips');
+const mediaQueue = require('../media-queue');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -40,7 +41,7 @@ async function fetchClips(broadcasterId) {
   return res.data.data ?? [];
 }
 
-module.exports = function register(registerCommand, broadcastRaw) {
+module.exports = function register(registerCommand) {
   registerCommand({
     prefix: '!so ',
     modsOnly: true,
@@ -80,8 +81,8 @@ module.exports = function register(registerCommand, broadcastRaw) {
         credit: `@${clip.broadcaster_name}`,
         duration: clip.duration,
       };
-      broadcastRaw(payload);
       setLast(payload);
+      mediaQueue.enqueue(payload);
     },
   });
 };

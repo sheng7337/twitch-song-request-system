@@ -197,6 +197,11 @@
   const YOUTUBE_MAX_MS = 10 * 60 * 1000; // 10-min cap for YouTube (can't detect end)
 
   let dismissTimer = null;
+  let ws = null;
+
+  function sendToServer(msg) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  }
 
   function showMedia(msg) {
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
@@ -219,15 +224,15 @@
         iframeEl.style.opacity = '1';
       }, 50);
       const timeout = Math.min(YOUTUBE_MAX_MS, 90 * 60 * 1000);
-      dismissTimer = setTimeout(hideMedia, timeout);
+      dismissTimer = setTimeout(() => hideMedia(true), timeout);
       startProgressBar(timeout);
     } else {
       videoEl.src = msg.src;
       videoEl.play().catch(() => {});
       videoEl.style.opacity = '1';
-      videoEl.onended = hideMedia;
+      videoEl.onended = () => hideMedia(true);
       const durationMs = (msg.duration || 30) * 1000;
-      dismissTimer = setTimeout(hideMedia, durationMs + 3000);
+      dismissTimer = setTimeout(() => hideMedia(true), durationMs + 3000);
       startProgressBar(durationMs);
     }
 
@@ -242,24 +247,27 @@
     fillEl.style.transform  = 'scaleX(0)';
   }
 
-  function hideMedia() {
+  // notifyServer=true  → natural end / timeout, tell server to advance the queue
+  // notifyServer=false → !stop command cleared the queue server-side already
+  function hideMedia(notifyServer) {
     overlay.classList.remove('visible');
     videoEl.style.opacity = '0';
     iframeEl.style.opacity = '0';
     videoEl.onended = null;
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
     setTimeout(() => { videoEl.src = ''; iframeEl.src = ''; }, 500);
+    if (notifyServer) sendToServer({ type: 'media-ended' });
   }
 
   function connect() {
-    const ws = new WebSocket(`ws://${window.location.host}`);
+    ws = new WebSocket(`ws://${window.location.host}`);
     ws.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch (_) { return; }
       if (msg.type === 'media') showMedia(msg);
-      if (msg.type === 'media-stop') hideMedia();
+      if (msg.type === 'media-stop') hideMedia(false);
     };
-    ws.onclose = () => setTimeout(connect, 3000);
+    ws.onclose = () => { ws = null; setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
   }
 

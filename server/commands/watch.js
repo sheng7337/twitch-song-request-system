@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { setLast } = require('../media-history');
 const { fetchClipBySlug, getClipSignedUrl } = require('../twitch-clips');
+const mediaQueue = require('../media-queue');
 
 // ── URL resolvers ──────────────────────────────────────────────────────────────
 // Each resolver: { name, detect(rawUrl) → id|null, resolve(id, event) → payload|null }
@@ -85,7 +86,7 @@ async function resolveDirectVideo(raw, event) {
 }
 
 // ── Command ───────────────────────────────────────────────────────────────────
-module.exports = function register(registerCommand, broadcastRaw) {
+module.exports = function register(registerCommand) {
   registerCommand({
     prefix: '!watch ',
     modsOnly: true,
@@ -98,16 +99,16 @@ module.exports = function register(registerCommand, broadcastRaw) {
         if (id == null) continue;
         const payload = await resolver.resolve(id, event);
         if (!payload) return;
-        broadcastRaw(payload);
         setLast(payload);
+        mediaQueue.enqueue(payload);
         console.log(`[watch] ${resolver.name}: ${payload.title}`);
         return;
       }
 
       const payload = await resolveDirectVideo(raw, event);
       if (payload) {
-        broadcastRaw(payload);
         setLast(payload);
+        mediaQueue.enqueue(payload);
         console.log(`[watch] direct-video: ${payload.title}`);
       } else {
         console.log(`[watch] No resolver matched: ${raw}`);

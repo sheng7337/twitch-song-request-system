@@ -15,6 +15,7 @@ const registerShoutout = require('./commands/shoutout');
 const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
+const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
@@ -94,10 +95,11 @@ setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => 
 }));
 
 // ── Chat command registration ─────────────────────────────────────────────────
-registerShoutout(registerCommand, broadcastRaw);
-registerWatch(registerCommand, broadcastRaw);
-registerReplay(registerCommand, broadcastRaw);
-registerStop(registerCommand, broadcastRaw);
+mediaQueue.init(broadcastRaw);
+registerShoutout(registerCommand);
+registerWatch(registerCommand);
+registerReplay(registerCommand);
+registerStop(registerCommand);
 setChatHandler(handleChatEvent);
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
@@ -430,10 +432,16 @@ app.post('/api/settings', (req, res) => {
   res.json({ ok: true, ...updates });
 });
 
-// ── WebSocket (overlay) ───────────────────────────────────────────────────────
+// ── WebSocket (overlay + clip-player) ────────────────────────────────────────
 wss.on('connection', (ws, req) => {
-  console.log(`[ws] Overlay connected from ${req.socket.remoteAddress}`);
+  console.log(`[ws] Client connected from ${req.socket.remoteAddress}`);
   registerClient(ws);
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data.toString());
+      if (msg.type === 'media-ended') mediaQueue.onEnded();
+    } catch {}
+  });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
