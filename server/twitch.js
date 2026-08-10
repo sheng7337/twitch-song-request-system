@@ -16,6 +16,19 @@ let sessionId = null;
 let redemptionHandler = null; // set by index.js via setEventHandler
 let chatHandler = null;       // set by index.js via setChatHandler
 
+// Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
+// so the same message_id can arrive more than once after reconnects.
+const seenMessageIds = new Set();
+const SEEN_MAX = 500; // cap memory; old IDs beyond this are evicted FIFO
+const seenQueue = [];
+function isDuplicate(id) {
+  if (seenMessageIds.has(id)) return true;
+  seenMessageIds.add(id);
+  seenQueue.push(id);
+  if (seenQueue.length > SEEN_MAX) seenMessageIds.delete(seenQueue.shift());
+  return false;
+}
+
 // ── Token management ──────────────────────────────────────────────────────────
 
 function setEnvValue(key, value) {
@@ -133,6 +146,11 @@ function connectEventSub(url) {
     }
 
     if (type === 'notification') {
+      const msgId = msg.metadata?.message_id;
+      if (msgId && isDuplicate(msgId)) {
+        console.warn(`[twitch] Duplicate message dropped: ${msgId}`);
+        return;
+      }
       const subType = msg.metadata?.subscription_type;
       if (subType === 'channel.channel_points_custom_reward_redemption.add') {
         if (redemptionHandler) redemptionHandler(msg.payload.event);
@@ -144,6 +162,9 @@ function connectEventSub(url) {
     if (type === 'session_reconnect') {
       console.log('[twitch] Reconnecting to new URL...');
       const reconnectUrl = msg.payload.session.reconnect_url;
+      // Remove the close listener before closing so the auto-reconnect logic
+      // doesn't fire a second connectEventSub() alongside the intended one.
+      ws.removeAllListeners('close');
       ws.close();
       connectEventSub(reconnectUrl);
     }
