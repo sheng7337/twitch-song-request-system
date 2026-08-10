@@ -197,6 +197,7 @@
   const YOUTUBE_MAX_MS = 10 * 60 * 1000; // 10-min cap for YouTube (can't detect end)
 
   let dismissTimer = null;
+  let clearTimer = null;
   let ws = null;
 
   function sendToServer(msg) {
@@ -205,6 +206,7 @@
 
   function showMedia(msg) {
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+    if (clearTimer)   { clearTimeout(clearTimer);   clearTimer = null; }
 
     // Reset both media elements before loading new content
     videoEl.onended = null;
@@ -255,7 +257,7 @@
     iframeEl.style.opacity = '0';
     videoEl.onended = null;
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
-    setTimeout(() => { videoEl.src = ''; iframeEl.src = ''; }, 500);
+    clearTimer = setTimeout(() => { clearTimer = null; videoEl.src = ''; iframeEl.src = ''; }, 500);
     if (notifyServer) sendToServer({ type: 'media-ended' });
   }
 
