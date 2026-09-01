@@ -224,8 +224,14 @@
       setTimeout(() => {
         iframeEl.src = msg.src;
         iframeEl.style.opacity = '1';
+        // Send listening init so YouTube begins posting state events
+        iframeEl.onload = () => {
+          iframeEl.contentWindow?.postMessage('{"event":"listening"}', '*');
+          iframeEl.onload = null;
+        };
       }, 50);
-      const timeout = Math.min(YOUTUBE_MAX_MS, 90 * 60 * 1000);
+      // Fallback timeout in case YouTube never fires an ended event (live, playlist, etc.)
+      const timeout = YOUTUBE_MAX_MS;
       dismissTimer = setTimeout(() => hideMedia(true), timeout);
       startProgressBar(timeout);
     } else {
@@ -256,10 +262,22 @@
     videoEl.style.opacity = '0';
     iframeEl.style.opacity = '0';
     videoEl.onended = null;
+    iframeEl.onload = null;
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
     clearTimer = setTimeout(() => { clearTimer = null; videoEl.src = ''; iframeEl.src = ''; }, 500);
     if (notifyServer) sendToServer({ type: 'media-ended' });
   }
+
+  // YouTube IFrame API sends postMessage events when enablejsapi=1 is in the URL.
+  // state 0 = ended; dismiss immediately so the next queue item can play.
+  window.addEventListener('message', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.event === 'onStateChange' && data.info === 0) {
+        hideMedia(true);
+      }
+    } catch (_) {}
+  });
 
   function connect() {
     ws = new WebSocket(`ws://${window.location.host}`);

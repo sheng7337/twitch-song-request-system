@@ -57,7 +57,7 @@ const resolvers = [
       } catch {}
       return {
         type: 'media', kind: 'youtube', label: 'Now Watching',
-        src: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`,
+        src: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&enablejsapi=1`,
         title: title || `youtu.be/${videoId}`,
         credit: `@${event.chatter_user_login}`,
         duration: null,
