@@ -87,7 +87,7 @@ async function activateServiceIfReady() {
   // Called every time setup is complete — handles both first start and
   // re-auth after token expiry. connect() is idempotent: it no-ops when a
   // socket already exists, so this is safe to call on any config change.
-  connectTwitch();
+  await connectTwitch();
   await initHistory();
 }
 setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {

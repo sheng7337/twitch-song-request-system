@@ -142,6 +142,18 @@ function connectEventSub(url) {
         await subscribeToEvents(sessionId);
       } catch (err) {
         console.error('[twitch] Failed to subscribe:', err.response?.data || err.message);
+        if (err.response?.status === 401) {
+          // Token is invalid even though the stored expiry says it's still live
+          // (e.g. revoked by the user on Twitch). Force the expiry to zero so
+          // the next reconnect calls ensureFreshToken() properly instead of
+          // short-circuiting. If the refresh token is also bad, ensureFreshToken
+          // will clear all tokens and isSetupComplete() will route back to /setup.
+          console.warn('[twitch] Token rejected — forcing re-check on next reconnect');
+          setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '0');
+          ws.removeAllListeners('close');
+          ws.close();
+          setTimeout(() => connectEventSub(), 5000);
+        }
       }
     }
 
