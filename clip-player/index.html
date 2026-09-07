@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Clip Player</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  /* ── Full-screen media elements ── */
+  #clip-video,
+  #embed-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    border: none;
+  }
+
+  #clip-video { object-fit: cover; }
+
+  /* ── Overlay (fades in/out with each clip) ── */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+
+  #overlay.visible { opacity: 1; }
+
+  /* bottom gradient for text legibility */
+  #overlay::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 380px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.82));
+  }
+
+  /* top vignette */
+  #overlay::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 120px;
+    background: linear-gradient(rgba(0,0,0,0.35), transparent);
+  }
+
+  /* ── Neon border ── */
+  #border {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    box-shadow: inset 0 0 0 3px rgba(191,0,255,0.55),
+                inset 0 0 40px rgba(191,0,255,0.08);
+    pointer-events: none;
+  }
+
+  /* ── Scan line ── */
+  @keyframes scan {
+    0%   { transform: translateY(-2px); }
+    100% { transform: translateY(1082px); }
+  }
+
+  #scan-line {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent 5%, rgba(191,0,255,0.45) 50%, transparent 95%);
+    animation: scan 4s linear infinite;
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  /* ── Text block ── */
+  #text-block {
+    position: absolute;
+    bottom: 64px;
+    left: 80px;
+    right: 80px;
+    z-index: 5;
+  }
+
+  #so-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .badge-line {
+    width: 36px;
+    height: 1px;
+    background: #bf00ff;
+    box-shadow: 0 0 6px #bf00ff;
+  }
+
+  .badge-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: #bf00ff;
+    text-shadow: 0 0 10px #bf00ff;
+    text-transform: uppercase;
+  }
+
+  #credit-name {
+    font-size: 80px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    text-shadow:
+      0 0 20px rgba(191,0,255,0.9),
+      0 0 60px rgba(191,0,255,0.4),
+      2px 2px 0 rgba(0,0,0,0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 10px;
+  }
+
+  #clip-title {
+    font-size: 22px;
+    color: rgba(255,255,255,0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Progress bar ── */
+  #progress-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 4px;
+    background: rgba(191,0,255,0.15);
+    z-index: 6;
+  }
+
+  #progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7b00ff, #bf00ff);
+    box-shadow: 0 0 8px #bf00ff;
+    width: 100%;
+    transform-origin: left;
+    transition: transform linear;
+  }
+</style>
+</head>
+<body>
+
+<video id="clip-video" playsinline></video>
+<iframe id="embed-frame" frameborder="0"
+  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+  allowfullscreen></iframe>
+
+<div id="overlay">
+  <div id="border"></div>
+  <div id="scan-line"></div>
+
+  <div id="text-block">
+    <div id="so-badge">
+      <div class="badge-line"></div>
+      <span class="badge-label" id="badge-label">Shoutout</span>
+      <div class="badge-line"></div>
+    </div>
+    <div id="credit-name"></div>
+    <div id="clip-title"></div>
+  </div>
+
+  <div id="progress-bar">
+    <div id="progress-fill"></div>
+  </div>
+</div>
+
+<script>
+  const overlay    = document.getElementById('overlay');
+  const videoEl    = document.getElementById('clip-video');
+  const iframeEl   = document.getElementById('embed-frame');
+  const badgeEl    = document.getElementById('badge-label');
+  const creditEl   = document.getElementById('credit-name');
+  const titleEl    = document.getElementById('clip-title');
+  const fillEl     = document.getElementById('progress-fill');
+
+  const YOUTUBE_MAX_MS = 10 * 60 * 1000; // 10-min cap for YouTube (can't detect end)
+
+  let dismissTimer = null;
+  let clearTimer = null;
+  let ws = null;
+
+  function sendToServer(msg) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  }
+
+  function showMedia(msg) {
+    if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+    if (clearTimer)   { clearTimeout(clearTimer);   clearTimer = null; }
+
+    // Reset both media elements before loading new content
+    videoEl.onended = null;
+    videoEl.style.opacity = '0';
+    iframeEl.style.opacity = '0';
+    iframeEl.src = '';
+    videoEl.src  = '';
+
+    badgeEl.textContent  = msg.label  || 'Shoutout';
+    creditEl.textContent = msg.credit || '';
+    titleEl.textContent  = msg.title  || '';
+
+    if (msg.kind === 'youtube') {
+      // Small delay ensures src='' is processed before setting the new URL
+      setTimeout(() => {
+        iframeEl.src = msg.src;
+        iframeEl.style.opacity = '1';
+        // Send listening init so YouTube begins posting state events
+        iframeEl.onload = () => {
+          iframeEl.contentWindow?.postMessage('{"event":"listening"}', '*');
+          iframeEl.onload = null;
+        };
+      }, 50);
+      // Fallback timeout in case YouTube never fires an ended event (live, playlist, etc.)
+      const timeout = YOUTUBE_MAX_MS;
+      dismissTimer = setTimeout(() => hideMedia(true), timeout);
+      startProgressBar(timeout);
+    } else {
+      videoEl.src = msg.src;
+      videoEl.play().catch(() => {});
+      videoEl.style.opacity = '1';
+      videoEl.onended = () => hideMedia(true);
+      const durationMs = (msg.duration || 30) * 1000;
+      dismissTimer = setTimeout(() => hideMedia(true), durationMs + 3000);
+      startProgressBar(durationMs);
+    }
+
+    overlay.classList.add('visible');
+  }
+
+  function startProgressBar(durationMs) {
+    fillEl.style.transition = 'none';
+    fillEl.style.transform  = 'scaleX(1)';
+    void fillEl.offsetWidth;
+    fillEl.style.transition = `transform ${durationMs}ms linear`;
+    fillEl.style.transform  = 'scaleX(0)';
+  }
+
+  // notifyServer=true  → natural end / timeout, tell server to advance the queue
+  // notifyServer=false → !stop command cleared the queue server-side already
+  function hideMedia(notifyServer) {
+    overlay.classList.remove('visible');
+    videoEl.style.opacity = '0';
+    iframeEl.style.opacity = '0';
+    videoEl.onended = null;
+    iframeEl.onload = null;
+    if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+    clearTimer = setTimeout(() => { clearTimer = null; videoEl.src = ''; iframeEl.src = ''; }, 500);
+    if (notifyServer) sendToServer({ type: 'media-ended' });
+  }
+
+  // YouTube IFrame API sends postMessage events when enablejsapi=1 is in the URL.
+  // state 0 = ended; dismiss immediately so the next queue item can play.
+  window.addEventListener('message', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.event === 'onStateChange' && data.info === 0) {
+        hideMedia(true);
+      }
+    } catch (_) {}
+  });
+
+  function connect() {
+    ws = new WebSocket(`ws://${window.location.host}`);
+    ws.onmessage = (e) => {
+      let msg;
+      try { msg = JSON.parse(e.data); } catch (_) { return; }
+      if (msg.type === 'media') showMedia(msg);
+      if (msg.type === 'media-stop') hideMedia(false);
+    };
+    ws.onclose = () => { ws = null; setTimeout(connect, 3000); };
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+</script>
+</body>
+</html>

@@ -13,7 +13,21 @@ const ENV_PATH = path.join(__dirname, '..', '.env');
 
 let ws = null;
 let sessionId = null;
-let eventHandler = null; // set by index.js
+let redemptionHandler = null; // set by index.js via setEventHandler
+let chatHandler = null;       // set by index.js via setChatHandler
+
+// Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
+// so the same message_id can arrive more than once after reconnects.
+const seenMessageIds = new Set();
+const SEEN_MAX = 500; // cap memory; old IDs beyond this are evicted FIFO
+const seenQueue = [];
+function isDuplicate(id) {
+  if (seenMessageIds.has(id)) return true;
+  seenMessageIds.add(id);
+  seenQueue.push(id);
+  if (seenQueue.length > SEEN_MAX) seenMessageIds.delete(seenQueue.shift());
+  return false;
+}
 
 // ── Token management ──────────────────────────────────────────────────────────
 
@@ -76,25 +90,34 @@ async function ensureFreshToken() {
 
 // ── EventSub WebSocket ────────────────────────────────────────────────────────
 
-async function subscribeToRedemptions(sid) {
+async function subscribeToEvents(sid) {
   await ensureFreshToken();
   const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
   const clientId = process.env.TWITCH_CLIENT_ID;
   const token = process.env.TWITCH_USER_ACCESS_TOKEN;
+
+  const headers = {
+    'Client-Id': clientId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
 
   await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
     type: 'channel.channel_points_custom_reward_redemption.add',
     version: '1',
     condition: { broadcaster_user_id: broadcasterId },
     transport: { method: 'websocket', session_id: sid },
-  }, {
-    headers: {
-      'Client-Id': clientId,
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
-  });
+  }, { headers });
   console.log('[twitch] Subscribed to Channel Points redemptions');
+
+  await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+    type: 'channel.chat.message',
+    version: '1',
+    // Both IDs must be set; user_id is the account that owns the token (broadcaster self-sub)
+    condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId },
+    transport: { method: 'websocket', session_id: sid },
+  }, { headers });
+  console.log('[twitch] Subscribed to chat messages');
 }
 
 function connectEventSub(url) {
@@ -116,19 +139,44 @@ function connectEventSub(url) {
       sessionId = msg.payload.session.id;
       console.log(`[twitch] Session ID: ${sessionId}`);
       try {
-        await subscribeToRedemptions(sessionId);
+        await subscribeToEvents(sessionId);
       } catch (err) {
         console.error('[twitch] Failed to subscribe:', err.response?.data || err.message);
+        if (err.response?.status === 401) {
+          // Token is invalid even though the stored expiry says it's still live
+          // (e.g. revoked by the user on Twitch). Force the expiry to zero so
+          // the next reconnect calls ensureFreshToken() properly instead of
+          // short-circuiting. If the refresh token is also bad, ensureFreshToken
+          // will clear all tokens and isSetupComplete() will route back to /setup.
+          console.warn('[twitch] Token rejected — forcing re-check on next reconnect');
+          setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '0');
+          ws.removeAllListeners('close');
+          ws.close();
+          setTimeout(() => connectEventSub(), 5000);
+        }
       }
     }
 
     if (type === 'notification') {
-      if (eventHandler) eventHandler(msg.payload.event);
+      const msgId = msg.metadata?.message_id;
+      if (msgId && isDuplicate(msgId)) {
+        console.warn(`[twitch] Duplicate message dropped: ${msgId}`);
+        return;
+      }
+      const subType = msg.metadata?.subscription_type;
+      if (subType === 'channel.channel_points_custom_reward_redemption.add') {
+        if (redemptionHandler) redemptionHandler(msg.payload.event);
+      } else if (subType === 'channel.chat.message') {
+        if (chatHandler) chatHandler(msg.payload.event);
+      }
     }
 
     if (type === 'session_reconnect') {
       console.log('[twitch] Reconnecting to new URL...');
       const reconnectUrl = msg.payload.session.reconnect_url;
+      // Remove the close listener before closing so the auto-reconnect logic
+      // doesn't fire a second connectEventSub() alongside the intended one.
+      ws.removeAllListeners('close');
       ws.close();
       connectEventSub(reconnectUrl);
     }
@@ -147,7 +195,11 @@ function connectEventSub(url) {
 }
 
 function setEventHandler(fn) {
-  eventHandler = fn;
+  redemptionHandler = fn;
+}
+
+function setChatHandler(fn) {
+  chatHandler = fn;
 }
 
 async function connect() {
@@ -177,4 +229,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, setEventHandler, ensureFreshToken, setEnvValue };
+module.exports = { connect, setEventHandler, setChatHandler, ensureFreshToken, setEnvValue };

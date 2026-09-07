@@ -22,6 +22,13 @@ function broadcastSettings(settings) {
   }
 }
 
+function broadcastRaw(msg) {
+  const str = JSON.stringify(msg);
+  for (const client of clients) {
+    if (client.readyState === 1) client.send(str);
+  }
+}
+
 function registerClient(ws) {
   clients.add(ws);
   ws.send(JSON.stringify({ type: 'state', nowPlaying, queue, playedSongs, pending }));
@@ -208,5 +215,5 @@ function redrawSong(zone, index, newSong) {
 module.exports = {
   registerClient, addSong, addPending, acceptPending,
   skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong,
-  broadcastSettings,
+  broadcastSettings, broadcastRaw,
 };
