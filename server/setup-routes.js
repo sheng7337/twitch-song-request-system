@@ -81,9 +81,10 @@ router.get('/status', (req, res) => {
     progress,
     hasCredentials,
     serviceEmail,
+    chatMode: env.CHAT_REQUEST_ENABLED === 'true',
     configured: {
       twitch: !!(env.TWITCH_CLIENT_ID && env.TWITCH_USER_ACCESS_TOKEN && env.TWITCH_BROADCASTER_ID),
-      rewards: !!(env.TWITCH_REWARD_ID && env.TWITCH_RANDOM_REWARD_ID),
+      rewards: !!(env.TWITCH_REWARD_ID && env.TWITCH_RANDOM_REWARD_ID) || env.CHAT_REQUEST_ENABLED === 'true',
       sheets: !!(env.GOOGLE_SHEET_ID && env.SHEET_SONG_COLUMN),
       history: !!env.HISTORY_SHEET_ID,
     },
@@ -196,6 +197,16 @@ router.get('/poll-device-auth', async (req, res) => {
     if (msg === 'slow_down') return res.json({ status: 'pending' });
     res.json({ status: 'error', error: msg });
   }
+});
+
+// POST /setup/api/enable-chat-mode — skip rewards, enable !sr chat command
+router.post('/enable-chat-mode', (req, res) => {
+  const cooldown = Math.max(0, parseInt(req.body.cooldownSeconds ?? 30, 10));
+  writeEnvValues({
+    CHAT_REQUEST_ENABLED: 'true',
+    CHAT_REQUEST_COOLDOWN_SECONDS: String(cooldown),
+  });
+  res.json({ ok: true });
 });
 
 // GET /setup/api/rewards — fetch list of existing rewards

@@ -26,6 +26,7 @@ let state = {
   keyCol: null,
   activeColType: 'song', // which field a column-header click currently assigns: song | artist | key
   reauth: false,
+  chatMode: false, // true when !sr chat command mode is enabled (non-Affiliate path)
 };
 
 // ── Polling state ─────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ async function init() {
     if (status.displayName) state.displayName = status.displayName;
     if (status.serviceEmail) state.serviceEmail = status.serviceEmail;
     if (status.broadcasterId) state.broadcasterId = status.broadcasterId;
+    if (status.chatMode) state.chatMode = true;
 
     // Determine starting step based on what's already configured
     if (status.configured.twitch && status.configured.rewards && status.configured.sheets) {
@@ -307,6 +309,18 @@ async function renderRewards(el) {
       <div id="reward-random-section" style="margin-top:24px"></div>
       <div id="rewards-status" class="status-line" style="margin-top:12px"></div>
     </div>
+    <div class="info-box amber" style="margin-top:28px">
+      <div class="info-label">${t.nonAffiliateTitle}</div>
+      <div style="margin-bottom:14px">${t.nonAffiliateBody}</div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label style="font-size:12px; color:var(--text-dim); white-space:nowrap">${t.cooldownLabel}</label>
+        <input type="number" id="chat-cooldown" value="30" min="0" max="3600"
+               style="width:64px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:13px; text-align:center;">
+        <span style="font-size:12px; color:var(--text-dim)">${t.cooldownUnit}</span>
+        <button class="btn btn-ghost" onclick="enableChatMode()">${t.chatModeBtn}</button>
+      </div>
+      <div id="chat-mode-status" class="status-line" style="margin-top:8px"></div>
+    </div>
   `;
 
   // Small delay to ensure DOM is ready
@@ -447,6 +461,22 @@ async function createNewReward(type, requiresText) {
 function checkRewardsDone() {
   if (rewardsDone.song && rewardsDone.random) {
     setTimeout(goNext, 800);
+  }
+}
+
+async function enableChatMode() {
+  const t = T().rewards;
+  const cooldownInput = document.getElementById('chat-cooldown');
+  const cooldownSeconds = parseInt(cooldownInput?.value || '30', 10);
+  const statusEl = document.getElementById('chat-mode-status');
+  showStatus(statusEl, 'info', '<span class="spinner"></span>');
+  try {
+    await api('POST', '/setup/api/enable-chat-mode', { cooldownSeconds });
+    state.chatMode = true;
+    showStatus(statusEl, 'ok', t.chatModeEnabled);
+    setTimeout(goNext, 1200);
+  } catch (err) {
+    showStatus(statusEl, 'error', '✗ ' + err.message);
   }
 }
 
@@ -798,8 +828,8 @@ function renderDone(el) {
       </div>
       <div class="summary-item">
         <span class="check">✓</span>
-        <span class="label">${t.channelPointsRewards}</span>
-        <span class="value">點歌券 + 隨機點歌券</span>
+        <span class="label">${state.chatMode ? t.chatModeRewards : t.channelPointsRewards}</span>
+        <span class="value">${state.chatMode ? t.chatModeRewardsValue : '點歌券 + 隨機點歌券'}</span>
       </div>
       <div class="summary-item">
         <span class="check">✓</span>

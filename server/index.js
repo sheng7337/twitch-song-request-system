@@ -15,6 +15,7 @@ const registerShoutout = require('./commands/shoutout');
 const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
+const registerSongRequest = require('./commands/song-request');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
@@ -51,11 +52,14 @@ function isSetupComplete() {
     'TWITCH_CLIENT_ID',
     'TWITCH_BROADCASTER_ID',
     'TWITCH_USER_ACCESS_TOKEN',
-    'TWITCH_REWARD_ID',
     'GOOGLE_SHEET_ID',
     'SHEET_SONG_COLUMN',
   ];
-  return required.every(k => process.env[k] && !process.env[k].includes('your_'));
+  if (!required.every(k => process.env[k] && !process.env[k].includes('your_'))) return false;
+  // Must have at least one way to receive song requests
+  const hasReward = !!(process.env.TWITCH_REWARD_ID && !process.env.TWITCH_REWARD_ID.includes('your_'));
+  const hasChatMode = process.env.CHAT_REQUEST_ENABLED === 'true';
+  return hasReward || hasChatMode;
 }
 
 app.get('/', (req, res) => {
@@ -100,6 +104,7 @@ registerShoutout(registerCommand);
 registerWatch(registerCommand);
 registerReplay(registerCommand);
 registerStop(registerCommand);
+registerSongRequest(registerCommand);
 setChatHandler(handleChatEvent);
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────

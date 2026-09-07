@@ -97,6 +97,14 @@ const STRINGS = {
       retry: 'Retry',
       errEmptyName: 'Please enter a reward name',
       creating: '<span class="spinner"></span> Creating reward...',
+      nonAffiliateTitle: 'Not a Twitch Affiliate yet?',
+      nonAffiliateBody: 'Channel Points are only available to Affiliates and Partners. ' +
+        'If you haven\'t reached Affiliate status yet, you can use a <strong>chat command</strong> instead — ' +
+        'viewers type <code>!sr [song name]</code> in chat to request songs.',
+      cooldownLabel: 'Cooldown per viewer:',
+      cooldownUnit: 'seconds between requests (0 = no limit)',
+      chatModeBtn: 'Use !sr chat command →',
+      chatModeEnabled: '✓ Chat mode enabled — viewers can now type <code>!sr [song name]</code> to request songs',
     },
 
     googleCreds: {
@@ -204,6 +212,8 @@ const STRINGS = {
       twitchAccount: 'Twitch account',
       connectedFallback: 'Connected',
       channelPointsRewards: 'Channel Points rewards',
+      chatModeRewards: 'Song requests',
+      chatModeRewardsValue: '!sr [song name] in chat',
       songListSheet: 'Song list sheet',
       configuredFallback: 'Configured',
       everyStreamTitle: 'Every stream',
@@ -318,6 +328,14 @@ const STRINGS = {
       retry: '重試',
       errEmptyName: '請輸入兌換項目名稱',
       creating: '<span class="spinner"></span> 建立兌換項目中...',
+      nonAffiliateTitle: '還不是 Twitch 附屬主播？',
+      nonAffiliateBody: '頻道點數（Channel Points）僅限附屬主播（Affiliate）和合作夥伴（Partner）使用。' +
+        '如果你尚未取得附屬主播資格，可以改用<strong>聊天室指令</strong>代替 ——' +
+        '觀眾只要在聊天室輸入 <code>!sr 歌名</code> 就能點歌。',
+      cooldownLabel: '每位觀眾的冷卻時間：',
+      cooldownUnit: '秒（0 表示無限制）',
+      chatModeBtn: '使用 !sr 聊天室指令 →',
+      chatModeEnabled: '✓ 聊天室點歌模式已啟用 —— 觀眾現在可以在聊天室輸入 <code>!sr 歌名</code> 來點歌',
     },
 
     googleCreds: {
@@ -423,6 +441,8 @@ const STRINGS = {
       twitchAccount: 'Twitch 帳號',
       connectedFallback: '已連接',
       channelPointsRewards: '頻道點數兌換項目',
+      chatModeRewards: '點歌方式',
+      chatModeRewardsValue: '聊天室輸入 !sr 歌名',
       songListSheet: '歌曲清單試算表',
       configuredFallback: '已設定',
       everyStreamTitle: '每次開台時',
