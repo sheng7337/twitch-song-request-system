@@ -15,6 +15,7 @@ const axios = require('axios');
 const { setLast } = require('../media-history');
 const { getClipSignedUrl } = require('../twitch-clips');
 const mediaQueue = require('../media-queue');
+const { addShoutout } = require('../shoutout-history');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -25,12 +26,12 @@ function twitchHeaders() {
   };
 }
 
-async function lookupUserId(login) {
+async function lookupUser(login) {
   const res = await axios.get(`${TWITCH_API}/users`, {
     params: { login },
     headers: twitchHeaders(),
   });
-  return res.data.data[0]?.id ?? null;
+  return res.data.data[0] ?? null;
 }
 
 async function fetchClips(broadcasterId) {
@@ -49,13 +50,16 @@ module.exports = function register(registerCommand) {
       const username = args.split(/\s+/)[0].replace(/^@/, '').toLowerCase();
       if (!username) return;
 
-      const userId = await lookupUserId(username);
-      if (!userId) {
+      const user = await lookupUser(username);
+      if (!user) {
         console.log(`[shoutout] User not found: ${username}`);
         return;
       }
 
-      const clips = await fetchClips(userId);
+      // Record in history so !tk can thank them later
+      addShoutout(user.login, user.display_name, user.profile_image_url || '');
+
+      const clips = await fetchClips(user.id);
       if (!clips.length) {
         console.log(`[shoutout] No clips found for ${username}`);
         return;

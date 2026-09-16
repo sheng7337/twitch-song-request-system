@@ -157,6 +157,147 @@
     transform-origin: left;
     transition: transform linear;
   }
+
+  /* ── Sponsor roll (Japanese TV style) ── */
+  #sponsor-roll {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+  }
+
+  #sponsor-roll.active { display: block; }
+
+  #sponsor-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #0d0d1a;
+  }
+
+  /* subtle dark scrim to keep white text readable over any background */
+  #sponsor-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.30);
+  }
+
+  /* Fixed-position layer — title and cards each have their own absolute top */
+  #sponsor-content {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* 提供 pinned to a fixed Y; never moves when cards appear */
+  #sponsor-title {
+    position: absolute;
+    top: 185px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'Yu Mincho', 'YuMincho', 'MS Mincho', 'Hiragino Mincho ProN', serif;
+    font-size: 120px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.35em;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  #sponsor-rule {
+    position: absolute;
+    top: 358px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.55);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  #sponsor-cards {
+    position: absolute;
+    top: 405px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 28px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  #sponsor-cards.visible { opacity: 1; }
+
+  .sp-card {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .sp-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    flex-shrink: 0;
+  }
+
+  .sp-avatar-fallback {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Yu Mincho', 'YuMincho', 'MS Mincho', serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .sp-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 580px;
+    min-width: 0;
+  }
+
+  .sp-name {
+    font-family: 'Yu Mincho', 'YuMincho', 'MS Mincho', 'Hiragino Mincho ProN', serif;
+    font-size: 52px;
+    font-weight: 400;
+    color: #ffffff;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sp-login {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 30px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.60);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 </style>
 </head>
 <body>
@@ -182,6 +323,15 @@
 
   <div id="progress-bar">
     <div id="progress-fill"></div>
+  </div>
+</div>
+
+<div id="sponsor-roll">
+  <div id="sponsor-bg"></div>
+  <div id="sponsor-content">
+    <div id="sponsor-title">提供</div>
+    <div id="sponsor-rule"></div>
+    <div id="sponsor-cards"></div>
   </div>
 </div>
 
@@ -279,13 +429,143 @@
     } catch (_) {}
   });
 
+  // ── Sponsor roll ─────────────────────────────────────────────────────────────
+
+  const sponsorRollEl  = document.getElementById('sponsor-roll');
+  const sponsorBgEl    = document.getElementById('sponsor-bg');
+  const sponsorTitleEl = document.getElementById('sponsor-title');
+  const sponsorRuleEl  = document.getElementById('sponsor-rule');
+  const sponsorCardsEl = document.getElementById('sponsor-cards');
+
+  const CARDS_PER_PAGE  = 4;
+  const PAGE_HOLD_MS    = 5000;
+  const LAST_PAGE_HOLD  = 10000;
+  const PAGE_FADE_MS    = 500;
+
+  let sponsorGen = 0; // generation counter; incrementing cancels all pending callbacks
+
+  function showSponsorRoll(msg) {
+    const broadcasters = msg.broadcasters || [];
+    if (!broadcasters.length) { sendToServer({ type: 'media-ended' }); return; }
+
+    const gen = ++sponsorGen;
+
+    sponsorBgEl.style.backgroundImage = msg.bgUrl ? `url("${msg.bgUrl}")` : 'none';
+    sponsorTitleEl.style.opacity = '0';
+    sponsorRuleEl.style.opacity = '0';
+    sponsorCardsEl.classList.remove('visible');
+    sponsorCardsEl.innerHTML = '';
+    sponsorRollEl.classList.add('active');
+
+    // Fade in title + rule
+    setTimeout(() => {
+      if (sponsorGen !== gen) return;
+      sponsorTitleEl.style.opacity = '1';
+      sponsorRuleEl.style.opacity = '1';
+    }, 300);
+
+    // Start paging after title has faded in
+    const pages = [];
+    for (let i = 0; i < broadcasters.length; i += CARDS_PER_PAGE) {
+      pages.push(broadcasters.slice(i, i + CARDS_PER_PAGE));
+    }
+
+    function showPage(idx) {
+      if (sponsorGen !== gen) return;
+
+      if (idx >= pages.length) {
+        // All pages done — fade out title + rule, then hide
+        sponsorTitleEl.style.opacity = '0';
+        sponsorRuleEl.style.opacity = '0';
+        setTimeout(() => {
+          if (sponsorGen !== gen) return;
+          sponsorRollEl.classList.remove('active');
+          sendToServer({ type: 'media-ended' });
+        }, 600);
+        return;
+      }
+
+      sponsorCardsEl.innerHTML = '';
+      pages[idx].forEach(b => sponsorCardsEl.appendChild(makeSponsorCard(b)));
+
+      setTimeout(() => {
+        if (sponsorGen !== gen) return;
+        sponsorCardsEl.classList.add('visible');
+
+        const holdMs = (idx === pages.length - 1) ? LAST_PAGE_HOLD : PAGE_HOLD_MS;
+        setTimeout(() => {
+          if (sponsorGen !== gen) return;
+          sponsorCardsEl.classList.remove('visible');
+
+          setTimeout(() => showPage(idx + 1), PAGE_FADE_MS);
+        }, holdMs);
+      }, 50);
+    }
+
+    setTimeout(() => showPage(0), 1000); // wait for title to appear first
+  }
+
+  function makeSponsorCard(broadcaster) {
+    const card = document.createElement('div');
+    card.className = 'sp-card';
+
+    const initials = (broadcaster.displayName || broadcaster.login || '?').slice(0, 2);
+
+    if (broadcaster.avatarUrl) {
+      const img = document.createElement('img');
+      img.className = 'sp-avatar';
+      img.src = broadcaster.avatarUrl;
+      img.onerror = () => img.replaceWith(makeAvatarFallback(initials));
+      card.appendChild(img);
+    } else {
+      card.appendChild(makeAvatarFallback(initials));
+    }
+
+    const textBlock = document.createElement('div');
+    textBlock.className = 'sp-text';
+
+    const name = document.createElement('div');
+    name.className = 'sp-name';
+    name.textContent = broadcaster.displayName || broadcaster.login;
+    textBlock.appendChild(name);
+
+    const login = document.createElement('div');
+    login.className = 'sp-login';
+    login.textContent = '@' + broadcaster.login;
+    textBlock.appendChild(login);
+
+    card.appendChild(textBlock);
+
+    return card;
+  }
+
+  function makeAvatarFallback(initials) {
+    const div = document.createElement('div');
+    div.className = 'sp-avatar-fallback';
+    div.textContent = initials;
+    return div;
+  }
+
+  function hideSponsorRoll() {
+    sponsorGen++; // cancels any pending showPage callbacks
+    sponsorCardsEl.classList.remove('visible');
+    sponsorTitleEl.style.opacity = '0';
+    sponsorRuleEl.style.opacity = '0';
+    setTimeout(() => sponsorRollEl.classList.remove('active'), 600);
+  }
+
+  // ── WebSocket connection ──────────────────────────────────────────────────────
+
   function connect() {
     ws = new WebSocket(`ws://${window.location.host}`);
     ws.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch (_) { return; }
-      if (msg.type === 'media') showMedia(msg);
-      if (msg.type === 'media-stop') hideMedia(false);
+      if (msg.type === 'media') {
+        if (msg.kind === 'sponsor-card') showSponsorRoll(msg);
+        else showMedia(msg);
+      }
+      if (msg.type === 'media-stop') { hideSponsorRoll(); hideMedia(false); }
     };
     ws.onclose = () => { ws = null; setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();

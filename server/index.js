@@ -16,6 +16,7 @@ const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
 const registerSongRequest = require('./commands/song-request');
+const registerThanks = require('./commands/thanks');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
@@ -105,6 +106,7 @@ registerWatch(registerCommand);
 registerReplay(registerCommand);
 registerStop(registerCommand);
 registerSongRequest(registerCommand);
+registerThanks(registerCommand);
 setChatHandler(handleChatEvent);
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
