@@ -143,16 +143,23 @@ function connectEventSub(url) {
       } catch (err) {
         console.error('[twitch] Failed to subscribe:', err.response?.data || err.message);
         if (err.response?.status === 401) {
-          // Token is invalid even though the stored expiry says it's still live
-          // (e.g. revoked by the user on Twitch). Force the expiry to zero so
-          // the next reconnect calls ensureFreshToken() properly instead of
-          // short-circuiting. If the refresh token is also bad, ensureFreshToken
-          // will clear all tokens and isSetupComplete() will route back to /setup.
-          console.warn('[twitch] Token rejected — forcing re-check on next reconnect');
-          setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '0');
-          ws.removeAllListeners('close');
-          ws.close();
-          setTimeout(() => connectEventSub(), 5000);
+          const expiresAt = parseInt(process.env.TWITCH_USER_TOKEN_EXPIRES_AT || '0');
+          const tokenExpired = Date.now() >= expiresAt - 60000;
+          if (tokenExpired) {
+            // Token is actually expired (or the stored expiry is stale/zero).
+            // Force a refresh on the next reconnect. Safe to do: the token is
+            // already dead so rotating the refresh token costs nothing here.
+            console.warn('[twitch] Token rejected and expired — forcing refresh on next reconnect');
+            setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '0');
+            ws.removeAllListeners('close');
+            ws.close();
+            setTimeout(() => connectEventSub(), 5000);
+          } else {
+            // Token is still valid but Twitch rejected the subscription.
+            // This is a scope or permission issue — refreshing won't help and
+            // would rotate (burn) the refresh token for no benefit. Log and wait.
+            console.warn('[twitch] Subscription rejected (401) despite valid token — check app scopes or re-run setup');
+          }
         }
       }
     }
