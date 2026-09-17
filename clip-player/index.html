@@ -326,6 +326,11 @@
   </div>
 </div>
 
+<audio id="sponsor-voice" preload="auto">
+  <source src="sponsor-voice.wav" type="audio/wav">
+  <source src="sponsor-voice.mp3" type="audio/mpeg">
+</audio>
+
 <div id="sponsor-roll">
   <div id="sponsor-bg"></div>
   <div id="sponsor-content">
@@ -436,6 +441,7 @@
   const sponsorTitleEl = document.getElementById('sponsor-title');
   const sponsorRuleEl  = document.getElementById('sponsor-rule');
   const sponsorCardsEl = document.getElementById('sponsor-cards');
+  const sponsorVoiceEl = document.getElementById('sponsor-voice');
 
   const CARDS_PER_PAGE  = 4;
   const PAGE_HOLD_MS    = 5000;
@@ -456,6 +462,12 @@
     sponsorCardsEl.classList.remove('visible');
     sponsorCardsEl.innerHTML = '';
     sponsorRollEl.classList.add('active');
+
+    // Announce in Japanese
+    if (sponsorVoiceEl) {
+      sponsorVoiceEl.currentTime = 0;
+      sponsorVoiceEl.play().catch(() => {});
+    }
 
     // Fade in title + rule
     setTimeout(() => {
@@ -548,6 +560,7 @@
 
   function hideSponsorRoll() {
     sponsorGen++; // cancels any pending showPage callbacks
+    if (sponsorVoiceEl) { sponsorVoiceEl.pause(); sponsorVoiceEl.currentTime = 0; }
     sponsorCardsEl.classList.remove('visible');
     sponsorTitleEl.style.opacity = '0';
     sponsorRuleEl.style.opacity = '0';
@@ -566,6 +579,7 @@
         else showMedia(msg);
       }
       if (msg.type === 'media-stop') { hideSponsorRoll(); hideMedia(false); }
+      if (msg.type === 'preload-avatar' && msg.url) { new Image().src = msg.url; }
     };
     ws.onclose = () => { ws = null; setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();

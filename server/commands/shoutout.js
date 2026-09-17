@@ -16,6 +16,7 @@ const { setLast } = require('../media-history');
 const { getClipSignedUrl } = require('../twitch-clips');
 const mediaQueue = require('../media-queue');
 const { addShoutout } = require('../shoutout-history');
+const { broadcastRaw } = require('../queue');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -58,6 +59,10 @@ module.exports = function register(registerCommand) {
 
       // Record in history so !tk can thank them later
       addShoutout(user.login, user.display_name, user.profile_image_url || '');
+      // Pre-warm the avatar in the clip-player's browser cache
+      if (user.profile_image_url) {
+        broadcastRaw({ type: 'preload-avatar', url: user.profile_image_url });
+      }
 
       const clips = await fetchClips(user.id);
       if (!clips.length) {

@@ -17,6 +17,7 @@ const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
 const registerSongRequest = require('./commands/song-request');
 const registerThanks = require('./commands/thanks');
+const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
@@ -463,6 +464,8 @@ async function start() {
     console.log('[setup] Configuration incomplete.');
     console.log('[setup] Please open http://localhost:' + PORT + '/setup to configure.');
   }
+
+  generateSponsorVoice();
 
   server.listen(PORT, () => {
     console.log(`\n✅ Server running at http://localhost:${PORT}`);
