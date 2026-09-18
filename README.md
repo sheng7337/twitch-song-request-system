@@ -28,6 +28,17 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 
 ---
 
+## !tk 背景圖設定
+
+1. 將背景圖片放入 `clip-player/` 資料夾（例如 `clip-player/sponsor-bg.jpg`）
+2. 在 `.env` 加入：
+   ```env
+   SPONSOR_BG_URL=http://localhost:3000/clip-player/sponsor-bg.jpg
+   ```
+3. 重新啟動伺服器
+
+---
+
 ## 聊天指令（版主 / 台主限定）
 
 | 指令 | 說明 |
