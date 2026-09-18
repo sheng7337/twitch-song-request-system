@@ -67,20 +67,25 @@ OBS 顯示層透過 WebSocket 即時更新
 
 ## OBS / Streamlabs 瀏覽器來源設定
 
-將顯示層加入你的場景——只需設定一次：
+### 歌單顯示層
 
-1. 在 OBS/Streamlabs 新增來源 → **瀏覽器（Browser）**
+1. 新增來源 → **瀏覽器（Browser）**
 2. 網址：`http://localhost:3000/overlay/index.html`
-3. 寬度：`960`，高度：`1362`（顯示層會以 2 倍解析度渲染，較清晰）
-4. 在 **自訂 CSS（Custom CSS）** 欄位貼上：
+3. 寬度：`960`，高度：`1362`
+4. **自訂 CSS**：
    ```css
    body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
    ```
-5. 取消勾選 **「來源不可見時關閉（Shutdown source when not visible）」**
-6. 在場景中選取這個來源，將大小縮小至 `480 x 681`（即 50%）——
-   這一步才是讓 2 倍渲染變得清晰、而不是單純放大的關鍵
+5. 取消勾選「來源不可見時關閉」
+6. 在場景中將來源縮小至 `480 × 681`（50%）——此步驟讓顯示層以 2 倍解析度渲染，畫面更清晰
 
-伺服器啟動後顯示層會自動連線，並即時更新歌單內容。
+### Clip Player（Shoutout / Sponsor Roll）
+
+1. 新增來源 → **瀏覽器（Browser）**
+2. 網址：`http://localhost:3000/clip-player/index.html`
+3. 寬度：`1920`，高度：`1080`
+4. 放置於場景最上層，全螢幕覆蓋
+5. 平時完全透明，執行 `!so` 或 `!tk` 時自動顯示內容
 
 ---
 
@@ -114,6 +119,44 @@ OBS 顯示層透過 WebSocket 即時更新
 | `.env` | 金鑰、ID、網址 — 詳見 `.env.example` 的說明註解 |
 | `server/config.js` | 比對門檻、排除分頁、捲動速度、隨機權重等行為設定 |
 | `overlay/index.html` | 頂部 CSS 變數 — 字體大小、清單高度等外觀設定 |
+
+---
+
+## 聊天指令
+
+所有指令僅限**版主與台主**使用，觀眾無法觸發。
+
+### Shoutout 與 Sponsor Roll
+
+| 指令 | 用法 | 說明 |
+|---|---|---|
+| `!so` | `!so <帳號名稱>` | 從指定頻道隨機抓一個 Clip 播放，同時將該頻道記錄至感謝名單 |
+| `!tk` | `!tk` | 播放日式電視風格的 Sponsor Roll，列出本場所有 `!so` 過的頻道；播完後自動清空名單 |
+| `!replay` | `!replay` | 重播上一個 `!so` 或 `!watch` 的片段 |
+| `!stop` | `!stop` | 立即中止當前播放的片段或 Sponsor Roll |
+
+#### Sponsor Roll（`!tk`）細節
+
+- **背景圖片**：在 `.env` 設定 `SPONSOR_BG_URL`（預設 `clip-player/sponsor-bg.jpg`）
+- **畫面流程**：背景出現 → 「提供」字樣與橫線淡入 → 每頁最多 4 位頻道（頭像、顯示名稱、帳號）→ 一般頁停留 5 秒、最後一頁停留 10 秒後結束
+- **語音播報**：伺服器啟動時自動生成「この番組はご覧のスポンサーの提供でお送りします。」的音檔，優先使用本機 **VoiceVox**，若未啟動則從 Google TTS 下載；音檔為 `clip-player/sponsor-voice.wav` 或 `.mp3`，不需手動建立
+- **頭像預載**：每次執行 `!so` 時即將頭像預先快取至瀏覽器，確保 `!tk` 播放時畫面不會出現半載入的圖片
+
+### 影片播放
+
+| 指令 | 用法 | 說明 |
+|---|---|---|
+| `!watch` | `!watch <網址>` | 播放 Twitch Clip 網址、YouTube 網址，或直接連結的影片檔（mp4/webm） |
+
+### 點歌（聊天指令模式）
+
+僅在 `.env` 設定 `CHAT_REQUEST_ENABLED=true` 時啟用，適用於沒有聯盟主資格的頻道。
+
+| 指令 | 用法 | 說明 |
+|---|---|---|
+| `!sr` | `!sr <歌名>` | 觀眾透過聊天點歌，模糊比對歌名，信心度 ≥ 80% 自動加入歌單 |
+
+冷卻時間可在 `.env` 的 `CHAT_REQUEST_COOLDOWN_SECONDS` 調整（預設 30 秒）。
 
 ---
 
@@ -159,28 +202,40 @@ OBS 顯示層透過 WebSocket 即時更新
 
 ```
 vtuber-song-queue/
-├── setup/                    ← 瀏覽器版安裝精靈（於 /setup 提供服務）
-├── setup.ps1                 ← 選用的終端機安裝精靈
-├── start.ps1                 ← 每次直播開始時執行
+├── setup/                      ← 瀏覽器版安裝精靈（於 /setup 提供服務）
+├── setup.ps1                   ← 選用的終端機安裝精靈
+├── start.ps1                   ← 每次直播開始時執行
 ├── start_zh.bat / setup_zh.bat ← 雙擊執行用啟動檔（避免 PowerShell 執行原則問題）
-├── .env                      ← 金鑰設定（請勿上傳至 Git！）
-├── .env.example              ← 設定範本與說明
-├── google-credentials.json   ← 服務帳戶金鑰（請勿上傳至 Git！）
-├── song-cache.json           ← 自動產生的快取，可安全刪除
+├── .env                        ← 金鑰設定（請勿上傳至 Git！）
+├── .env.example                ← 設定範本與說明
+├── google-credentials.json     ← 服務帳戶金鑰（請勿上傳至 Git！）
+├── song-cache.json             ← 自動產生的快取，可安全刪除
 ├── server/
-│   ├── index.js              ← 主伺服器
-│   ├── config.js             ← 可調整的行為設定
-│   ├── sheets.js             ← 歌曲清單讀取器
-│   ├── matcher.js            ← 模糊比對（fuse.js）
-│   ├── queue.js              ← 歌單狀態 + WebSocket 廣播
-│   ├── twitch.js             ← EventSub WebSocket 用戶端 + 裝置授權權杖管理
-│   ├── setup-routes.js       ← 安裝精靈背後的 API 端點
-│   ├── history.js            ← 點歌紀錄寫入器
-│   └── random.js             ← 隨機選歌器
+│   ├── index.js                ← 主伺服器
+│   ├── config.js               ← 可調整的行為設定
+│   ├── sheets.js               ← 歌曲清單讀取器
+│   ├── matcher.js              ← 模糊比對（fuse.js）
+│   ├── queue.js                ← 歌單狀態 + WebSocket 廣播
+│   ├── twitch.js               ← EventSub WebSocket 用戶端 + 裝置授權權杖管理
+│   ├── setup-routes.js         ← 安裝精靈背後的 API 端點
+│   ├── history.js              ← 點歌紀錄寫入器
+│   ├── random.js               ← 隨機選歌器
+│   ├── shoutout-history.js     ← !so 感謝名單（記憶體，供 !tk 使用）
+│   ├── sponsor-voice.js        ← 自動生成日語語音音檔
+│   └── commands/
+│       ├── shoutout.js         ← !so 指令
+│       ├── thanks.js           ← !tk 指令
+│       ├── watch.js            ← !watch 指令
+│       ├── replay.js           ← !replay 指令
+│       ├── stop.js             ← !stop 指令
+│       └── song-request.js     ← !sr 指令
+├── clip-player/
+│   ├── index.html              ← OBS Clip Player（Shoutout / Sponsor Roll）
+│   └── sponsor-bg.jpg          ← !tk 背景圖（自行替換）
 ├── overlay/
-│   └── index.html            ← OBS 瀏覽器來源（顯示層）
+│   └── index.html              ← OBS 歌單顯示層
 └── dashboard/
-    └── index.html            ← 主播控制台
+    └── index.html              ← 主播控制台
 ```
 
 ---
