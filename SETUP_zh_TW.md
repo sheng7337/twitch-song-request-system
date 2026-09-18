@@ -137,10 +137,18 @@ OBS 顯示層透過 WebSocket 即時更新
 
 #### 感謝名單（`!tk`）細節
 
-- **背景圖片**：在 `.env` 設定 `SPONSOR_BG_URL`（預設 `clip-player/sponsor-bg.jpg`）
 - **畫面流程**：背景出現 → 「提供」字樣與橫線淡入 → 每頁最多 4 位頻道（頭像、顯示名稱、帳號）→ 一般頁停留 5 秒、最後一頁停留 10 秒後結束
 - **語音播報**：伺服器啟動時自動生成「この番組はご覧のスポンサーの提供でお送りします。」的音檔，優先使用本機 **VoiceVox**，若未啟動則從 Google TTS 下載；音檔為 `clip-player/sponsor-voice.wav` 或 `.mp3`，不需手動建立
 - **頭像預載**：每次執行 `!so` 時即將頭像預先快取至瀏覽器，確保 `!tk` 播放時畫面不會出現半載入的圖片
+
+#### !tk 背景圖設定
+
+1. 將背景圖片放入 `clip-player/` 資料夾（例如 `clip-player/sponsor-bg.jpg`）
+2. 在 `.env` 加入：
+   ```env
+   SPONSOR_BG_URL=http://localhost:3000/clip-player/sponsor-bg.jpg
+   ```
+3. 重新啟動伺服器
 
 ### 影片播放
 
