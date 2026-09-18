@@ -79,7 +79,7 @@ OBS 顯示層透過 WebSocket 即時更新
 5. 取消勾選「來源不可見時關閉」
 6. 在場景中將來源縮小至 `480 × 681`（50%）——此步驟讓顯示層以 2 倍解析度渲染，畫面更清晰
 
-### Clip Player（Shoutout / Sponsor Roll）
+### Clip Player（Shoutout / 感謝名單）
 
 1. 新增來源 → **瀏覽器（Browser）**
 2. 網址：`http://localhost:3000/clip-player/index.html`
@@ -126,16 +126,16 @@ OBS 顯示層透過 WebSocket 即時更新
 
 所有指令僅限**版主與台主**使用，觀眾無法觸發。
 
-### Shoutout 與 Sponsor Roll
+### Shoutout 與感謝名單
 
 | 指令 | 用法 | 說明 |
 |---|---|---|
 | `!so` | `!so <帳號名稱>` | 從指定頻道隨機抓一個 Clip 播放，同時將該頻道記錄至感謝名單 |
-| `!tk` | `!tk` | 播放日式電視風格的 Sponsor Roll，列出本場所有 `!so` 過的頻道；播完後自動清空名單 |
+| `!tk` | `!tk` | 播放日式電視風格的感謝名單，列出本場所有 `!so` 過的頻道；播完後自動清空名單 |
 | `!replay` | `!replay` | 重播上一個 `!so` 或 `!watch` 的片段 |
-| `!stop` | `!stop` | 立即中止當前播放的片段或 Sponsor Roll |
+| `!stop` | `!stop` | 立即中止當前播放的片段或感謝名單 |
 
-#### Sponsor Roll（`!tk`）細節
+#### 感謝名單（`!tk`）細節
 
 - **背景圖片**：在 `.env` 設定 `SPONSOR_BG_URL`（預設 `clip-player/sponsor-bg.jpg`）
 - **畫面流程**：背景出現 → 「提供」字樣與橫線淡入 → 每頁最多 4 位頻道（頭像、顯示名稱、帳號）→ 一般頁停留 5 秒、最後一頁停留 10 秒後結束
@@ -230,7 +230,7 @@ vtuber-song-queue/
 │       ├── stop.js             ← !stop 指令
 │       └── song-request.js     ← !sr 指令
 ├── clip-player/
-│   ├── index.html              ← OBS Clip Player（Shoutout / Sponsor Roll）
+│   ├── index.html              ← OBS Clip Player（Shoutout / 感謝名單）
 │   └── sponsor-bg.jpg          ← !tk 背景圖（自行替換）
 ├── overlay/
 │   └── index.html              ← OBS 歌單顯示層
