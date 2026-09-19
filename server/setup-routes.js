@@ -423,6 +423,62 @@ router.post('/save-columns', (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /setup/api/sheet-tabs — return distinct tab names from song cache
+router.get('/sheet-tabs', (req, res) => {
+  try {
+    const cachePath = path.join(__dirname, '..', 'song-cache.json');
+    if (!fs.existsSync(cachePath)) return res.json({ tabs: [] });
+    const songs = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+    const tabs = [...new Set(songs.map(s => s.tab).filter(Boolean))];
+    res.json({ tabs });
+  } catch (_) {
+    res.json({ tabs: [] });
+  }
+});
+
+// POST /setup/api/save-random-rewards — create/record per-tab random rewards
+// Body: { rewards: [{ name, cost, tabs[], id? }] }
+// Entries with an id already exist on Twitch; entries without are created.
+router.post('/save-random-rewards', async (req, res) => {
+  const { rewards } = req.body;
+  if (!Array.isArray(rewards)) return res.status(400).json({ error: 'rewards array required' });
+
+  const env = readEnv();
+  const clientId = env.TWITCH_CLIENT_ID;
+  const token = env.TWITCH_USER_ACCESS_TOKEN;
+  const broadcasterId = env.TWITCH_BROADCASTER_ID;
+  if (!clientId || !token || !broadcasterId) {
+    return res.status(400).json({ error: 'Twitch not configured' });
+  }
+
+  const headers = {
+    'Client-Id': clientId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  const results = [];
+  for (const reward of rewards) {
+    if (reward.id) {
+      results.push({ id: reward.id, name: reward.name, tabs: reward.tabs || [] });
+    } else {
+      try {
+        const r = await axios.post(
+          `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
+          { title: reward.name, cost: reward.cost || 300, is_user_input_required: false },
+          { headers }
+        );
+        results.push({ id: r.data.data[0].id, name: r.data.data[0].title, tabs: reward.tabs || [] });
+      } catch (err) {
+        return res.status(500).json({ error: err.response?.data?.message || err.message });
+      }
+    }
+  }
+
+  writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify(results) });
+  res.json({ ok: true, rewards: results });
+});
+
 // POST /setup/api/save-history — save history sheet ID
 router.post('/save-history', (req, res) => {
   const { sheetId } = req.body;

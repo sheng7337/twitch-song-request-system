@@ -7,6 +7,7 @@ const STEPS = [
   'rewards',
   'google-creds',
   'song-sheet',
+  'random-rewards',
   'history-sheet',
   'obs',
   'done',
@@ -27,6 +28,8 @@ let state = {
   activeColType: 'song', // which field a column-header click currently assigns: song | artist | key
   reauth: false,
   chatMode: false, // true when !sr chat command mode is enabled (non-Affiliate path)
+  sheetTabs: [],         // tab names from song-cache, used in random-rewards step
+  randomRewards: [],     // [{name, cost, tabs[], id?}] built in random-rewards step
 };
 
 // ── Polling state ─────────────────────────────────────────────────────────────
@@ -128,15 +131,16 @@ function renderStep() {
   const body = document.getElementById('wizard-body');
 
   const renderers = {
-    'welcome':       renderWelcome,
-    'twitch-app':    renderTwitchApp,
-    'twitch-auth':   renderTwitchAuth,
-    'rewards':       renderRewards,
-    'google-creds':  renderGoogleCreds,
-    'song-sheet':    renderSongSheet,
-    'history-sheet': renderHistorySheet,
-    'obs':           renderOBS,
-    'done':          renderDone,
+    'welcome':        renderWelcome,
+    'twitch-app':     renderTwitchApp,
+    'twitch-auth':    renderTwitchAuth,
+    'rewards':        renderRewards,
+    'google-creds':   renderGoogleCreds,
+    'song-sheet':     renderSongSheet,
+    'random-rewards': renderRandomRewards,
+    'history-sheet':  renderHistorySheet,
+    'obs':            renderOBS,
+    'done':           renderDone,
   };
 
   body.innerHTML = '';
@@ -717,7 +721,144 @@ async function saveColumns() {
   }
 }
 
-// ── Step 7: History Sheet ─────────────────────────────────────────────────────
+// ── Step 7: Random Rewards ────────────────────────────────────────────────────
+async function renderRandomRewards(el) {
+  const t = T().randomRewards;
+  state.randomRewards = [];
+  el.innerHTML = `
+    <div class="step-title">${t.title}</div>
+    <div class="step-subtitle">${t.subtitle}</div>
+    <div id="rr-loading" class="status-line info">${t.loading}</div>
+    <div id="rr-body" style="display:none">
+      <div id="rr-list" style="margin-bottom:12px"></div>
+      <button class="btn btn-ghost" id="rr-add-btn" onclick="showAddRewardForm()">${t.addBtn}</button>
+      <div id="rr-add-form" style="display:none; margin-top:16px; background:var(--surface-2); padding:16px; border-radius:8px; border:1px solid var(--border)">
+        <div class="field" style="margin-bottom:10px">
+          <label>${t.nameLabel}</label>
+          <input type="text" id="rr-name" placeholder="${t.namePlaceholder}" />
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>${t.costLabel}</label>
+          <input type="number" id="rr-cost" value="300" min="1" />
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>${t.tabsLabel}</label>
+          <div id="rr-tabs-checkboxes" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:6px"></div>
+          <div class="hint">${t.tabsHint}</div>
+        </div>
+        <div id="rr-add-status" class="status-line"></div>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button class="btn btn-primary" style="font-size:11px; padding:6px 14px" onclick="addRandomReward()">${t.confirmAddBtn}</button>
+          <button class="btn btn-ghost" onclick="hideAddRewardForm()">${t.cancelBtn}</button>
+        </div>
+      </div>
+    </div>
+    <div id="rr-status" class="status-line" style="margin-top:12px"></div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px">
+      <button class="btn btn-primary" onclick="saveRandomRewards()">${t.saveBtn}</button>
+      <button class="btn btn-ghost" onclick="skipRandomRewards()">${t.skipBtn}</button>
+    </div>
+  `;
+
+  try {
+    const res = await api('GET', '/setup/api/sheet-tabs');
+    state.sheetTabs = res.tabs || [];
+    document.getElementById('rr-loading').style.display = 'none';
+    document.getElementById('rr-body').style.display = 'block';
+    renderRandomRewardsList();
+  } catch (err) {
+    const el2 = document.getElementById('rr-loading');
+    if (el2) { el2.className = 'status-line error'; el2.textContent = err.message; }
+  }
+}
+
+function renderTabCheckboxes() {
+  const t = T().randomRewards;
+  const container = document.getElementById('rr-tabs-checkboxes');
+  if (!container) return;
+  if (state.sheetTabs.length === 0) {
+    container.innerHTML = `<span style="color:var(--text-dim); font-size:12px">${t.noTabsFound}</span>`;
+    return;
+  }
+  container.innerHTML = state.sheetTabs.map(tab => `
+    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:4px 10px; font-size:12px">
+      <input type="checkbox" value="${esc(tab)}" class="rr-tab-check"> ${esc(tab)}
+    </label>
+  `).join('');
+}
+
+function renderRandomRewardsList() {
+  const t = T().randomRewards;
+  const list = document.getElementById('rr-list');
+  if (!list) return;
+  if (state.randomRewards.length === 0) {
+    list.innerHTML = `<div style="color:var(--text-dim); font-size:13px; padding:8px 0">${t.emptyList}</div>`;
+    return;
+  }
+  list.innerHTML = state.randomRewards.map((r, i) => `
+    <div style="display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:8px">
+      <div style="flex:1">
+        <div style="font-weight:600; font-size:14px">${esc(r.name)}</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px">
+          ${r.cost} pts &middot; ${r.tabs.length > 0 ? r.tabs.map(esc).join(', ') : t.allTabs}
+        </div>
+      </div>
+      <button class="btn btn-ghost" style="padding:4px 10px; font-size:11px" onclick="removeRandomReward(${i})">${t.removeBtn}</button>
+    </div>
+  `).join('');
+}
+
+function showAddRewardForm() {
+  document.getElementById('rr-add-form').style.display = 'block';
+  document.getElementById('rr-add-btn').style.display = 'none';
+  document.getElementById('rr-name').value = '';
+  document.getElementById('rr-cost').value = '300';
+  renderTabCheckboxes();
+}
+
+function hideAddRewardForm() {
+  document.getElementById('rr-add-form').style.display = 'none';
+  document.getElementById('rr-add-btn').style.display = 'block';
+  const s = document.getElementById('rr-add-status');
+  s.innerHTML = ''; s.className = 'status-line';
+}
+
+function addRandomReward() {
+  const t = T().randomRewards;
+  const name = document.getElementById('rr-name').value.trim();
+  const cost = parseInt(document.getElementById('rr-cost').value) || 300;
+  const tabs = [...document.querySelectorAll('.rr-tab-check:checked')].map(c => c.value);
+  const status = document.getElementById('rr-add-status');
+  if (!name) { showStatus(status, 'error', t.errEmptyName); return; }
+  state.randomRewards.push({ name, cost, tabs });
+  hideAddRewardForm();
+  renderRandomRewardsList();
+}
+
+function removeRandomReward(idx) {
+  state.randomRewards.splice(idx, 1);
+  renderRandomRewardsList();
+}
+
+async function saveRandomRewards() {
+  const t = T().randomRewards;
+  const status = document.getElementById('rr-status');
+  if (state.randomRewards.length === 0) { skipRandomRewards(); return; }
+  showStatus(status, 'info', '<span class="spinner"></span> ' + t.saving);
+  try {
+    await api('POST', '/setup/api/save-random-rewards', { rewards: state.randomRewards });
+    showStatus(status, 'ok', t.saved);
+    setTimeout(goNext, 800);
+  } catch (err) {
+    showStatus(status, 'error', '✗ ' + err.message);
+  }
+}
+
+function skipRandomRewards() {
+  goNext();
+}
+
+// ── Step 8: History Sheet ─────────────────────────────────────────────────────
 function renderHistorySheet(el) {
   const t = T().historySheet;
   el.innerHTML = `
