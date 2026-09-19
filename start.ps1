@@ -45,13 +45,23 @@ Write-Host ""
 
 Set-Location $PSScriptRoot
 
-# Open browser after short delay so server has time to start. The server
-# itself decides whether configuration is actually complete (isSetupComplete()
-# checks every required field, not just one) and redirects to /setup or
-# /dashboard accordingly -- so we always open the root URL and let it route
-# correctly either way.
+# Poll until the server is ready, then open the browser.
+# The server itself decides the correct page (setup wizard or dashboard)
+# and redirects accordingly -- so we always open the root URL.
 $openUrl = "http://localhost:3000/"
-Write-Host "  Opening browser... $openUrl" -ForegroundColor DarkGray
-Start-Job -ScriptBlock { param($u) Start-Sleep 3; Start-Process $u } -ArgumentList $openUrl | Out-Null
+Write-Host "  Waiting for server, then opening browser..." -ForegroundColor DarkGray
+Start-Job -ScriptBlock {
+    param($u)
+    $ready = $false
+    for ($i = 0; $i -lt 60; $i++) {
+        Start-Sleep 1
+        try {
+            Invoke-WebRequest -Uri "http://localhost:3000/" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop | Out-Null
+            $ready = $true
+            break
+        } catch {}
+    }
+    if ($ready) { Start-Process $u }
+} -ArgumentList $openUrl | Out-Null
 
 npm start
