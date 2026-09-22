@@ -43,9 +43,9 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 
 ## !tk 背景圖設定
 
-1. 將背景圖片放入 `clip-player/` 資料夾（例如 `clip-player/sponsor-bg.jpg`）
-2. 在 `.env` 加入：
-   ```env
-   SPONSOR_BG_URL=http://localhost:3000/clip-player/sponsor-bg.jpg
-   ```
-3. 重新啟動伺服器
+每次呼叫 `!tk` 時，系統會從資料夾中隨機選取一張背景圖片。
+
+1. 將背景圖片（jpg / png / gif / webp）放入 `clip-player/sponsor-bgs/` 資料夾，可放多張
+2. 重新啟動伺服器
+
+> 若資料夾內沒有圖片，背景顯示為深色。

@@ -147,7 +147,7 @@ OBS 顯示層透過 WebSocket 即時更新
 
 1. 建立資料夾 `clip-player/sponsor-bgs/`
 2. 將背景圖片（jpg / png / gif / webp）放入該資料夾，可放多張
-3. 重新啟動伺服器（無需修改 `.env`）
+3. 重新啟動伺服器
 
 > 若資料夾內沒有圖片，背景顯示為深色。
 
