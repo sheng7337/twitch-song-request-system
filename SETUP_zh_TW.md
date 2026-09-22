@@ -143,12 +143,13 @@ OBS 顯示層透過 WebSocket 即時更新
 
 #### !tk 背景圖設定
 
-1. 將背景圖片放入 `clip-player/` 資料夾（例如 `clip-player/sponsor-bg.jpg`）
-2. 在 `.env` 加入：
-   ```env
-   SPONSOR_BG_URL=http://localhost:3000/clip-player/sponsor-bg.jpg
-   ```
-3. 重新啟動伺服器
+每次呼叫 `!tk` 時，系統會從資料夾中隨機選取一張背景圖片。
+
+1. 建立資料夾 `clip-player/sponsor-bgs/`
+2. 將背景圖片（jpg / png / gif / webp）放入該資料夾，可放多張
+3. 重新啟動伺服器（無需修改 `.env`）
+
+> 若資料夾內沒有圖片，背景顯示為深色。
 
 ### 影片播放
 
@@ -239,7 +240,7 @@ vtuber-song-queue/
 │       └── song-request.js     ← !sr 指令
 ├── clip-player/
 │   ├── index.html              ← OBS Clip Player（Shoutout / 感謝名單）
-│   └── sponsor-bg.jpg          ← !tk 背景圖（自行替換）
+│   └── sponsor-bgs/            ← !tk 背景圖資料夾（放入多張圖片，每次隨機選取）
 ├── overlay/
 │   └── index.html              ← OBS 歌單顯示層
 └── dashboard/
