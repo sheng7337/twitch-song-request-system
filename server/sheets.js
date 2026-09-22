@@ -81,6 +81,7 @@ async function fetchSongs() {
         continue;
       }
 
+      const tabName = valueRange.range.split('!')[0];
       const songs = rows.slice(1)
         .filter(row => row[titleIdx]?.trim())
         .map(row => {
@@ -91,6 +92,7 @@ async function fetchSongs() {
             title: row[titleIdx].trim(),
             artist: artistIdx !== -1 ? (row[artistIdx] || '').trim() : '',
             key,
+            tab: tabName,
           };
         });
 

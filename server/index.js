@@ -110,6 +110,24 @@ registerSongRequest(registerCommand);
 registerThanks(registerCommand);
 setChatHandler(handleChatEvent);
 
+// Returns the matching random-reward config object if the given rewardId is
+// a configured random reward, or null if it isn't.
+// Supports the new TWITCH_RANDOM_REWARDS JSON array (multiple rewards, each
+// with optional tab filters) and the legacy TWITCH_RANDOM_REWARD_ID single ID.
+function parseRandomReward(rewardId) {
+  if (!rewardId) return null;
+  const multi = process.env.TWITCH_RANDOM_REWARDS;
+  if (multi) {
+    try {
+      const rewards = JSON.parse(multi);
+      return rewards.find(r => r.id === rewardId) || null;
+    } catch (_) {}
+  }
+  const single = process.env.TWITCH_RANDOM_REWARD_ID;
+  if (single && single === rewardId) return { id: single, tabs: [] };
+  return null;
+}
+
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
 setEventHandler(async (event) => {
   const requestText = event?.user_input?.trim();
@@ -118,19 +136,23 @@ setEventHandler(async (event) => {
 
   console.log(`[event] Redemption from @${requester}: "${requestText}" (reward: ${rewardId})`);
 
-  // Random song reward
-  const randomRewardId = process.env.TWITCH_RANDOM_REWARD_ID;
-  if (randomRewardId && rewardId === randomRewardId) {
+  // Random song reward(s) — supports multiple rewards each with optional tab filters.
+  // TWITCH_RANDOM_REWARDS (JSON array) takes priority; falls back to legacy
+  // TWITCH_RANDOM_REWARD_ID (treated as one all-tabs reward) for backwards compat.
+  const matchedRandom = parseRandomReward(rewardId);
+  if (matchedRandom) {
     const { queue, nowPlaying, playedSongs } = getState();
     const excludeTitles = [
       ...(nowPlaying ? [nowPlaying.title] : []),
       ...queue.map(s => s.title),
       ...playedSongs.map(s => s.title),
     ];
-    const picked = pickRandom(excludeTitles);
+    const allowedTabs = matchedRandom.tabs || [];
+    const picked = pickRandom(excludeTitles, allowedTabs);
     if (picked) {
       addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true });
-      console.log(`[random] Added "${picked.title}" for @${requester}`);
+      const tabInfo = allowedTabs.length > 0 ? ` [${allowedTabs.join('/')}]` : '';
+      console.log(`[random] Added "${picked.title}" for @${requester}${tabInfo}`);
     }
     return;
   }

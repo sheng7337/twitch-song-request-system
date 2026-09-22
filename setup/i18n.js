@@ -164,8 +164,33 @@ const STRINGS = {
       saved: '✓ Columns saved!',
     },
 
+    randomRewards: {
+      title: 'Step 6 — Tab-Specific Random Rewards',
+      subtitle: 'Optional: create additional random rewards that only pick from specific sheet tabs. ' +
+                'For example, a "Random Japanese Song" reward that only pulls from your Japanese tab. ' +
+                'Skip this if you only need one all-tabs random reward.',
+      loading: '<span class="spinner"></span> Loading sheet tabs...',
+      emptyList: 'No tab-specific rewards added yet.',
+      addBtn: '+ Add tab-specific reward',
+      nameLabel: 'Reward name (shown to viewers)',
+      namePlaceholder: 'e.g. Random Japanese Song',
+      costLabel: 'Point cost',
+      tabsLabel: 'Allowed tabs (leave all unchecked = all tabs)',
+      tabsHint: 'Only songs from the checked tabs will be eligible for this reward.',
+      noTabsFound: 'Tab names not available yet — make sure your song sheet is configured.',
+      confirmAddBtn: 'Add reward',
+      cancelBtn: 'Cancel',
+      removeBtn: 'Remove',
+      allTabs: 'all tabs',
+      errEmptyName: 'Please enter a reward name.',
+      saving: 'Creating rewards on Twitch...',
+      saved: '✓ Rewards saved!',
+      saveBtn: 'Save & Continue →',
+      skipBtn: 'Skip this step',
+    },
+
     historySheet: {
-      title: 'Step 6 — Request History <span style="color:var(--text-dim);font-size:13px">(optional)</span>',
+      title: 'Step 7 — Request History <span style="color:var(--text-dim);font-size:13px">(optional)</span>',
       subtitle: 'We can track how many times each song gets requested and who requested it — across all your streams. ' +
                 'This is completely optional.',
       setupTitle: 'To set this up',
@@ -184,7 +209,7 @@ const STRINGS = {
     },
 
     obs: {
-      title: 'Step 7 — Add to OBS',
+      title: 'Step 8 — Add to OBS',
       subtitle: 'Add the song queue overlay to your streaming software. ' +
                 'It will update automatically whenever a song is requested.',
       obsTab: 'OBS Studio',
@@ -395,8 +420,33 @@ const STRINGS = {
       saved: '✓ 欄位已儲存！',
     },
 
+    randomRewards: {
+      title: '步驟 6 — 分頁限定隨機點歌',
+      subtitle: '選填：建立額外的隨機點歌獎勵，每個獎勵只從指定的試算表分頁選歌。' +
+                '例如建立一個「隨機日文點歌」獎勵，只從日語分頁抽取歌曲。' +
+                '如果你只需要一個「全分頁隨機」就好，可以略過這個步驟。',
+      loading: '<span class="spinner"></span> 讀取試算表分頁中...',
+      emptyList: '尚未新增任何分頁限定隨機獎勵。',
+      addBtn: '+ 新增分頁限定獎勵',
+      nameLabel: '獎勵名稱（觀眾看得到）',
+      namePlaceholder: '例如 隨機日文點歌',
+      costLabel: '點數花費',
+      tabsLabel: '允許的分頁（全不勾選 = 所有分頁）',
+      tabsHint: '只有勾選分頁中的歌曲才會被列入這個獎勵的抽取範圍。',
+      noTabsFound: '目前無法取得分頁名稱，請確認歌曲試算表已設定完成。',
+      confirmAddBtn: '新增獎勵',
+      cancelBtn: '取消',
+      removeBtn: '移除',
+      allTabs: '所有分頁',
+      errEmptyName: '請輸入獎勵名稱。',
+      saving: '正在 Twitch 建立獎勵...',
+      saved: '✓ 獎勵已儲存！',
+      saveBtn: '儲存並繼續 →',
+      skipBtn: '略過此步驟',
+    },
+
     historySheet: {
-      title: '步驟 6 — 點歌歷史紀錄 <span style="color:var(--text-dim);font-size:13px">（選填）</span>',
+      title: '步驟 7 — 點歌歷史紀錄 <span style="color:var(--text-dim);font-size:13px">（選填）</span>',
       subtitle: '我們可以追蹤每首歌被點過幾次、是誰點的——橫跨你所有的實況。這項功能完全是選填的。',
       setupTitle: '設定方式',
       step1: '前往 <a href="https://sheets.new" target="_blank">sheets.new</a> 建立一份空白試算表',
@@ -414,7 +464,7 @@ const STRINGS = {
     },
 
     obs: {
-      title: '步驟 7 — 加入 OBS',
+      title: '步驟 8 — 加入 OBS',
       subtitle: '把點歌清單顯示層加入你的實況軟體。每當有人點歌時，它就會自動更新顯示。',
       obsTab: 'OBS Studio',
       streamlabsTab: 'Streamlabs',
