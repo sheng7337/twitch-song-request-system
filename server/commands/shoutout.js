@@ -14,6 +14,7 @@
 const axios = require('axios');
 const { setLast } = require('../media-history');
 const { getClipSignedUrl } = require('../twitch-clips');
+const { ensureFreshToken } = require('../twitch');
 const mediaQueue = require('../media-queue');
 const { addShoutout } = require('../shoutout-history');
 const { broadcastRaw } = require('../queue');
@@ -51,6 +52,7 @@ module.exports = function register(registerCommand) {
       const username = args.split(/\s+/)[0].replace(/^@/, '').toLowerCase();
       if (!username) return;
 
+      await ensureFreshToken();
       const user = await lookupUser(username);
       if (!user) {
         console.log(`[shoutout] User not found: ${username}`);

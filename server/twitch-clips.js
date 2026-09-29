@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { ensureFreshToken } = require('./twitch');
 
 function twitchHeaders() {
   return {
@@ -8,6 +9,7 @@ function twitchHeaders() {
 }
 
 async function fetchClipBySlug(slug) {
+  await ensureFreshToken();
   const res = await axios.get('https://api.twitch.tv/helix/clips', {
     params: { id: slug },
     headers: twitchHeaders(),
@@ -16,6 +18,7 @@ async function fetchClipBySlug(slug) {
 }
 
 async function getClipSignedUrl(slug) {
+  await ensureFreshToken();
   const res = await axios.post('https://gql.twitch.tv/gql', [{
     operationName: 'ClipVideo',
     query: `query ClipVideo($slug: ID!) {

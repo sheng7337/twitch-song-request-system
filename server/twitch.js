@@ -44,48 +44,61 @@ function setEnvValue(key, value) {
   process.env[key] = value;
 }
 
+let refreshPromise = null; // serialises concurrent refresh calls
+
 async function ensureFreshToken() {
   const expiresAt = parseInt(process.env.TWITCH_USER_TOKEN_EXPIRES_AT || '0');
   if (Date.now() < expiresAt - 60000) return; // still valid with 1min buffer
 
-  const refreshToken = process.env.TWITCH_USER_REFRESH_TOKEN;
-  if (!refreshToken) throw new Error('No refresh token — please re-run setup');
+  // If a refresh is already in flight, wait for it instead of starting another.
+  // Two parallel refreshes would rotate the refresh token on the first response
+  // and invalidate the second, potentially wiping stored tokens permanently.
+  if (refreshPromise) return refreshPromise;
 
-  console.log('[twitch] Refreshing access token...');
-  try {
-    const res = await axios.post('https://id.twitch.tv/oauth2/token', null, {
-      params: {
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: process.env.TWITCH_CLIENT_ID,
+  refreshPromise = (async () => {
+    const refreshToken = process.env.TWITCH_USER_REFRESH_TOKEN;
+    if (!refreshToken) throw new Error('No refresh token — please re-run setup');
+
+    console.log('[twitch] Refreshing access token...');
+    try {
+      const res = await axios.post('https://id.twitch.tv/oauth2/token', null, {
+        params: {
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: process.env.TWITCH_CLIENT_ID,
+        }
+      });
+
+      const newExpiry = String(Date.now() + res.data.expires_in * 1000);
+      setEnvValue('TWITCH_USER_ACCESS_TOKEN', res.data.access_token);
+      setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', newExpiry);
+      if (res.data.refresh_token) {
+        setEnvValue('TWITCH_USER_REFRESH_TOKEN', res.data.refresh_token);
       }
-    });
+      console.log('[twitch] Token refreshed');
+    } catch (err) {
+      if (err.response?.status === 400) {
+        // Refresh token was rejected (rotated/revoked, or expired from
+        // inactivity). Log the actual reason Twitch gave so a recurring
+        // failure can be diagnosed instead of just disappearing into a
+        // generic "expired" message.
+        console.error('[twitch] Refresh token rejected:', JSON.stringify(err.response.data));
+        // Clear the stale tokens so isSetupComplete() goes false and the user
+        // is routed back to /setup to reauthorize. TWITCH_CLIENT_ID and
+        // TWITCH_BROADCASTER_ID are left intact so the wizard can skip
+        // straight to the device-auth step instead of starting over.
+        setEnvValue('TWITCH_USER_ACCESS_TOKEN', '');
+        setEnvValue('TWITCH_USER_REFRESH_TOKEN', '');
+        setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '');
+        throw new Error('Twitch authorization expired — please re-run setup to reconnect');
+      }
+      throw err;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
 
-    const newExpiry = String(Date.now() + res.data.expires_in * 1000);
-    setEnvValue('TWITCH_USER_ACCESS_TOKEN', res.data.access_token);
-    setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', newExpiry);
-    if (res.data.refresh_token) {
-      setEnvValue('TWITCH_USER_REFRESH_TOKEN', res.data.refresh_token);
-    }
-    console.log('[twitch] Token refreshed');
-  } catch (err) {
-    if (err.response?.status === 400) {
-      // Refresh token was rejected (rotated/revoked, or expired from
-      // inactivity). Log the actual reason Twitch gave so a recurring
-      // failure can be diagnosed instead of just disappearing into a
-      // generic "expired" message.
-      console.error('[twitch] Refresh token rejected:', JSON.stringify(err.response.data));
-      // Clear the stale tokens so isSetupComplete() goes false and the user
-      // is routed back to /setup to reauthorize. TWITCH_CLIENT_ID and
-      // TWITCH_BROADCASTER_ID are left intact so the wizard can skip
-      // straight to the device-auth step instead of starting over.
-      setEnvValue('TWITCH_USER_ACCESS_TOKEN', '');
-      setEnvValue('TWITCH_USER_REFRESH_TOKEN', '');
-      setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', '');
-      throw new Error('Twitch authorization expired — please re-run setup to reconnect');
-    }
-    throw err;
-  }
+  return refreshPromise;
 }
 
 // ── EventSub WebSocket ────────────────────────────────────────────────────────
