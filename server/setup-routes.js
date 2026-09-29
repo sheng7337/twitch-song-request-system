@@ -84,7 +84,7 @@ router.get('/status', (req, res) => {
     chatMode: env.CHAT_REQUEST_ENABLED === 'true',
     configured: {
       twitch: !!(env.TWITCH_CLIENT_ID && env.TWITCH_USER_ACCESS_TOKEN && env.TWITCH_BROADCASTER_ID),
-      rewards: !!(env.TWITCH_REWARD_ID && env.TWITCH_RANDOM_REWARD_ID) || env.CHAT_REQUEST_ENABLED === 'true',
+      rewards: !!(env.TWITCH_REWARD_ID && env.TWITCH_RANDOM_REWARDS) || env.CHAT_REQUEST_ENABLED === 'true',
       sheets: !!(env.GOOGLE_SHEET_ID && env.SHEET_SONG_COLUMN),
       history: !!env.HISTORY_SHEET_ID,
     },
@@ -252,13 +252,15 @@ router.post('/create-rewards', async (req, res) => {
 
   // Single reward pick or create
   if (mode === 'pick' && rewardId && rewardType) {
-    const envKey = rewardType === 'song' ? 'TWITCH_REWARD_ID' : 'TWITCH_RANDOM_REWARD_ID';
-    writeEnvValues({ [envKey]: rewardId });
+    if (rewardType === 'song') {
+      writeEnvValues({ TWITCH_REWARD_ID: rewardId });
+    } else {
+      writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: rewardId, name: title || '隨機點歌券', tabs: [] }]) });
+    }
     return res.json({ ok: true });
   }
 
   if (mode === 'create' && title && rewardType) {
-    const envKey = rewardType === 'song' ? 'TWITCH_REWARD_ID' : 'TWITCH_RANDOM_REWARD_ID';
     const requireText = rewardType === 'song';
     try {
       const r = await axios.post(
@@ -266,9 +268,13 @@ router.post('/create-rewards', async (req, res) => {
         { title, cost: parseInt(cost) || 500, is_user_input_required: requireText },
         { headers }
       );
-      const newId = r.data.data[0].id;
-      writeEnvValues({ [envKey]: newId });
-      return res.json({ ok: true, id: newId, title: r.data.data[0].title });
+      const reward = r.data.data[0];
+      if (rewardType === 'song') {
+        writeEnvValues({ TWITCH_REWARD_ID: reward.id });
+      } else {
+        writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: reward.id, name: reward.title, tabs: [] }]) });
+      }
+      return res.json({ ok: true, id: reward.id, title: reward.title });
     } catch (err) {
       return res.status(500).json({ error: err.response?.data?.message || err.message });
     }
@@ -309,7 +315,7 @@ router.post('/create-rewards', async (req, res) => {
   // Random Song reward
   const existingRandom = existing.find(r => r.title.includes('隨機') || r.title.includes('Random'));
   if (existingRandom) {
-    writeEnvValues({ TWITCH_RANDOM_REWARD_ID: existingRandom.id });
+    writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: existingRandom.id, name: existingRandom.title, tabs: [] }]) });
     results.randomSong = { id: existingRandom.id, title: existingRandom.title, existing: true };
   } else {
     try {
@@ -319,7 +325,7 @@ router.post('/create-rewards', async (req, res) => {
         { headers }
       );
       const reward = r.data.data[0];
-      writeEnvValues({ TWITCH_RANDOM_REWARD_ID: reward.id });
+      writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: reward.id, name: reward.title, tabs: [] }]) });
       results.randomSong = { id: reward.id, title: reward.title, existing: false };
     } catch (err) {
       results.randomSong = { error: err.response?.data?.message || err.message };
@@ -473,6 +479,15 @@ router.post('/save-random-rewards', async (req, res) => {
         return res.status(500).json({ error: err.response?.data?.message || err.message });
       }
     }
+  }
+
+  // Preserve the basic all-tabs reward created in the rewards step (tabs:[])
+  // unless the user already added their own all-tabs entry in this step.
+  const hasAllTabs = results.some(r => !r.tabs || r.tabs.length === 0);
+  if (!hasAllTabs) {
+    const existing = JSON.parse(env.TWITCH_RANDOM_REWARDS || '[]');
+    const allTabsEntry = existing.find(r => !r.tabs || r.tabs.length === 0);
+    if (allTabsEntry) results.push(allTabsEntry);
   }
 
   writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify(results) });

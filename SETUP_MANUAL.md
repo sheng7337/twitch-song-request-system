@@ -178,7 +178,7 @@ curl.exe "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_
   -H "Authorization: Bearer YOUR_USER_TOKEN"
 ```
 
-Copy the `id` field for each reward into `.env` as `TWITCH_REWARD_ID` and `TWITCH_RANDOM_REWARD_ID`.
+Copy the `id` of the song request reward into `.env` as `TWITCH_REWARD_ID`. For random rewards, use `TWITCH_RANDOM_REWARDS` (see `.env.example` for the JSON format).
 
 ---
 

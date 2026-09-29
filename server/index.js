@@ -112,20 +112,17 @@ setChatHandler(handleChatEvent);
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
-// Supports the new TWITCH_RANDOM_REWARDS JSON array (multiple rewards, each
-// with optional tab filters) and the legacy TWITCH_RANDOM_REWARD_ID single ID.
 function parseRandomReward(rewardId) {
   if (!rewardId) return null;
   const multi = process.env.TWITCH_RANDOM_REWARDS;
-  if (multi) {
-    try {
-      const rewards = JSON.parse(multi);
-      return rewards.find(r => r.id === rewardId) || null;
-    } catch (_) {}
+  if (!multi) return null;
+  try {
+    const rewards = JSON.parse(multi);
+    return rewards.find(r => r.id === rewardId) || null;
+  } catch (_) {
+    console.error('[event] TWITCH_RANDOM_REWARDS is not valid JSON — re-run setup to fix it');
+    return null;
   }
-  const single = process.env.TWITCH_RANDOM_REWARD_ID;
-  if (single && single === rewardId) return { id: single, tabs: [] };
-  return null;
 }
 
 // ── Twitch event handler (called by twitch.js on redemption) ──────────────────
@@ -136,9 +133,7 @@ setEventHandler(async (event) => {
 
   console.log(`[event] Redemption from @${requester}: "${requestText}" (reward: ${rewardId})`);
 
-  // Random song reward(s) — supports multiple rewards each with optional tab filters.
-  // TWITCH_RANDOM_REWARDS (JSON array) takes priority; falls back to legacy
-  // TWITCH_RANDOM_REWARD_ID (treated as one all-tabs reward) for backwards compat.
+  // Random song reward(s) — each entry in TWITCH_RANDOM_REWARDS can restrict to specific sheet tabs.
   const matchedRandom = parseRandomReward(rewardId);
   if (matchedRandom) {
     const { queue, nowPlaying, playedSongs } = getState();
@@ -158,7 +153,10 @@ setEventHandler(async (event) => {
   }
 
   // Regular song request
-  if (!requestText) return;
+  if (!requestText) {
+    console.log(`[event] Ignored — reward ${rewardId} is not configured as a random reward and has no text input`);
+    return;
+  }
 
   const result = matchSong(requestText);
 

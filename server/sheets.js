@@ -81,7 +81,10 @@ async function fetchSongs() {
         continue;
       }
 
-      const tabName = valueRange.range.split('!')[0];
+      // Google Sheets wraps tab names containing spaces/CJK in single quotes
+      // in the range string (e.g. "'台語'!A:Z"). Strip them so the stored
+      // tab name matches what the Sheets API returns via spreadsheets.get().
+      const tabName = valueRange.range.split('!')[0].replace(/^'(.*)'$/, '$1');
       const songs = rows.slice(1)
         .filter(row => row[titleIdx]?.trim())
         .map(row => {

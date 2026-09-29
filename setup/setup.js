@@ -733,13 +733,27 @@ async function renderRandomRewards(el) {
       <div id="rr-list" style="margin-bottom:12px"></div>
       <button class="btn btn-ghost" id="rr-add-btn" onclick="showAddRewardForm()">${t.addBtn}</button>
       <div id="rr-add-form" style="display:none; margin-top:16px; background:var(--surface-2); padding:16px; border-radius:8px; border:1px solid var(--border)">
-        <div class="field" style="margin-bottom:10px">
-          <label>${t.nameLabel}</label>
-          <input type="text" id="rr-name" placeholder="${t.namePlaceholder}" />
+        <div style="display:flex; gap:8px; margin-bottom:14px">
+          <button class="btn btn-primary" id="rr-mode-new" style="font-size:11px; padding:5px 12px" onclick="setAddRewardMode('new')">${t.modeNew}</button>
+          <button class="btn btn-ghost" id="rr-mode-existing" style="font-size:11px; padding:5px 12px" onclick="setAddRewardMode('existing')">${t.modeExisting}</button>
         </div>
-        <div class="field" style="margin-bottom:10px">
-          <label>${t.costLabel}</label>
-          <input type="number" id="rr-cost" value="300" min="1" />
+        <div id="rr-new-fields">
+          <div class="field" style="margin-bottom:10px">
+            <label>${t.nameLabel}</label>
+            <input type="text" id="rr-name" placeholder="${t.namePlaceholder}" />
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>${t.costLabel}</label>
+            <input type="number" id="rr-cost" value="300" min="1" />
+          </div>
+        </div>
+        <div id="rr-existing-fields" style="display:none">
+          <div class="field" style="margin-bottom:10px">
+            <label>${t.existingLabel}</label>
+            <select id="rr-existing-select" style="width:100%; margin-top:4px">
+              <option value="">${t.existingLoading}</option>
+            </select>
+          </div>
         </div>
         <div class="field" style="margin-bottom:10px">
           <label>${t.tabsLabel}</label>
@@ -808,12 +822,39 @@ function renderRandomRewardsList() {
   `).join('');
 }
 
-function showAddRewardForm() {
+async function showAddRewardForm() {
   document.getElementById('rr-add-form').style.display = 'block';
   document.getElementById('rr-add-btn').style.display = 'none';
   document.getElementById('rr-name').value = '';
   document.getElementById('rr-cost').value = '300';
   renderTabCheckboxes();
+  setAddRewardMode('new');
+  // Pre-load existing rewards for the picker
+  const sel = document.getElementById('rr-existing-select');
+  const t = T().randomRewards;
+  sel.innerHTML = `<option value="">${t.existingLoading}</option>`;
+  try {
+    const res = await api('GET', '/setup/api/rewards');
+    const rewards = res.rewards || [];
+    if (rewards.length === 0) {
+      sel.innerHTML = `<option value="">${t.existingNone}</option>`;
+    } else {
+      sel.innerHTML = rewards.map(r =>
+        `<option value="${esc(r.id)}" data-name="${esc(r.title)}" data-cost="${r.cost}">${esc(r.title)} (${r.cost} pts)</option>`
+      ).join('');
+    }
+  } catch (_) {
+    sel.innerHTML = `<option value="">${t.existingNone}</option>`;
+  }
+}
+
+function setAddRewardMode(mode) {
+  document.getElementById('rr-new-fields').style.display = mode === 'new' ? 'block' : 'none';
+  document.getElementById('rr-existing-fields').style.display = mode === 'existing' ? 'block' : 'none';
+  document.getElementById('rr-mode-new').className = mode === 'new' ? 'btn btn-primary' : 'btn btn-ghost';
+  document.getElementById('rr-mode-existing').className = mode === 'existing' ? 'btn btn-primary' : 'btn btn-ghost';
+  document.getElementById('rr-mode-new').style.cssText = 'font-size:11px; padding:5px 12px';
+  document.getElementById('rr-mode-existing').style.cssText = 'font-size:11px; padding:5px 12px';
 }
 
 function hideAddRewardForm() {
@@ -825,12 +866,25 @@ function hideAddRewardForm() {
 
 function addRandomReward() {
   const t = T().randomRewards;
-  const name = document.getElementById('rr-name').value.trim();
-  const cost = parseInt(document.getElementById('rr-cost').value) || 300;
-  const tabs = [...document.querySelectorAll('.rr-tab-check:checked')].map(c => c.value);
   const status = document.getElementById('rr-add-status');
-  if (!name) { showStatus(status, 'error', t.errEmptyName); return; }
-  state.randomRewards.push({ name, cost, tabs });
+  const tabs = [...document.querySelectorAll('.rr-tab-check:checked')].map(c => c.value);
+  const isExisting = document.getElementById('rr-existing-fields').style.display !== 'none';
+
+  if (isExisting) {
+    const sel = document.getElementById('rr-existing-select');
+    const id = sel.value;
+    if (!id) { showStatus(status, 'error', t.errNoSelection); return; }
+    const opt = sel.selectedOptions[0];
+    const name = opt.dataset.name || opt.text;
+    const cost = parseInt(opt.dataset.cost) || 300;
+    state.randomRewards.push({ id, name, cost, tabs });
+  } else {
+    const name = document.getElementById('rr-name').value.trim();
+    const cost = parseInt(document.getElementById('rr-cost').value) || 300;
+    if (!name) { showStatus(status, 'error', t.errEmptyName); return; }
+    state.randomRewards.push({ name, cost, tabs });
+  }
+
   hideAddRewardForm();
   renderRandomRewardsList();
 }
