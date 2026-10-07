@@ -37,7 +37,6 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 | `!watch <網址>` | 播放 Twitch Clip、YouTube 或影片連結 |
 | `!replay` | 重播上一個片段 |
 | `!stop` | 立即停止當前播放 |
-| `!sr <歌名>` | 觀眾點歌（需在 `.env` 設定 `CHAT_REQUEST_ENABLED=true`） |
 
 ---
 

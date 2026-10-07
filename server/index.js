@@ -15,7 +15,6 @@ const registerShoutout = require('./commands/shoutout');
 const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
-const registerSongRequest = require('./commands/song-request');
 const registerThanks = require('./commands/thanks');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
@@ -58,10 +57,7 @@ function isSetupComplete() {
     'SHEET_SONG_COLUMN',
   ];
   if (!required.every(k => process.env[k] && !process.env[k].includes('your_'))) return false;
-  // Must have at least one way to receive song requests
-  const hasReward = !!(process.env.TWITCH_REWARD_ID && !process.env.TWITCH_REWARD_ID.includes('your_'));
-  const hasChatMode = process.env.CHAT_REQUEST_ENABLED === 'true';
-  return hasReward || hasChatMode;
+  return !!(process.env.TWITCH_REWARD_ID && !process.env.TWITCH_REWARD_ID.includes('your_'));
 }
 
 app.get('/', (req, res) => {
@@ -106,7 +102,6 @@ registerShoutout(registerCommand);
 registerWatch(registerCommand);
 registerReplay(registerCommand);
 registerStop(registerCommand);
-registerSongRequest(registerCommand);
 registerThanks(registerCommand);
 setChatHandler(handleChatEvent);
 
@@ -152,9 +147,14 @@ setEventHandler(async (event) => {
     return;
   }
 
-  // Regular song request
+  // Regular song request — only process if this matches the configured reward ID
+  const songRewardId = process.env.TWITCH_REWARD_ID;
+  if (!songRewardId || rewardId !== songRewardId) {
+    console.log(`[event] Ignored — reward ${rewardId} is not the song request reward (TWITCH_REWARD_ID)`);
+    return;
+  }
   if (!requestText) {
-    console.log(`[event] Ignored — reward ${rewardId} is not configured as a random reward and has no text input`);
+    console.log(`[event] Ignored — song request reward has no text input`);
     return;
   }
 

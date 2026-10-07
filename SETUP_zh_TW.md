@@ -157,16 +157,6 @@ OBS 顯示層透過 WebSocket 即時更新
 |---|---|---|
 | `!watch` | `!watch <網址>` | 播放 Twitch Clip 網址、YouTube 網址，或直接連結的影片檔（mp4/webm） |
 
-### 點歌（聊天指令模式）
-
-僅在 `.env` 設定 `CHAT_REQUEST_ENABLED=true` 時啟用，適用於沒有聯盟主資格的頻道。
-
-| 指令 | 用法 | 說明 |
-|---|---|---|
-| `!sr` | `!sr <歌名>` | 觀眾透過聊天點歌，模糊比對歌名，信心度 ≥ 80% 自動加入歌單 |
-
-冷卻時間可在 `.env` 的 `CHAT_REQUEST_COOLDOWN_SECONDS` 調整（預設 30 秒）。
-
 ---
 
 ## 控制台（Dashboard）
@@ -236,8 +226,7 @@ vtuber-song-queue/
 │       ├── thanks.js           ← !tk 指令
 │       ├── watch.js            ← !watch 指令
 │       ├── replay.js           ← !replay 指令
-│       ├── stop.js             ← !stop 指令
-│       └── song-request.js     ← !sr 指令
+│       └── stop.js             ← !stop 指令
 ├── clip-player/
 │   ├── index.html              ← OBS Clip Player（Shoutout / 感謝名單）
 │   └── sponsor-bgs/            ← !tk 背景圖資料夾（放入多張圖片，每次隨機選取）
