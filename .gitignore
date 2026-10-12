@@ -3,6 +3,7 @@ node_modules/
 google-credentials.json
 song-cache.json
 setup-progress.json
+queue-state.json
 package-lock.json
 clip-player/sponsor-voice.wav
 clip-player/sponsor-voice.mp3

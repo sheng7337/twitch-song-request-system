@@ -1,5 +1,14 @@
 // server/queue.js
-// In-memory song queue. Broadcasts state to all connected overlay WebSocket clients.
+// Song queue state. Broadcasts to all connected overlay WebSocket clients and
+// mirrors to queue-state.json so a crash or restart mid-stream loses nothing.
+
+const fs = require('fs');
+const path = require('path');
+
+const STATE_PATH = path.join(__dirname, '..', 'queue-state.json');
+// Only recent state is restored: a mid-stream restart picks up where it left
+// off, but yesterday's leftover queue doesn't reappear at the next stream.
+const RESTORE_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 let queue = [];
 let nowPlaying = null;
@@ -7,7 +16,28 @@ let playedSongs = [];
 let pending = [];
 let clients = new Set();
 
+function restoreState() {
+  let saved;
+  try { saved = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')); } catch (_) { return; }
+  if (!(Date.now() - saved.savedAt < RESTORE_WINDOW_MS)) return;
+  nowPlaying = saved.nowPlaying || null;
+  queue = saved.queue || [];
+  playedSongs = saved.playedSongs || [];
+  pending = saved.pending || [];
+  console.log(`[queue] Restored from before restart: ${queue.length + (nowPlaying ? 1 : 0)} queued, ${pending.length} pending, ${playedSongs.length} played`);
+}
+restoreState();
+
+function saveState() {
+  try {
+    fs.writeFileSync(STATE_PATH, JSON.stringify({ savedAt: Date.now(), nowPlaying, queue, playedSongs, pending }));
+  } catch (err) {
+    console.error('[queue] Could not save queue-state.json:', err.message);
+  }
+}
+
 function broadcastState() {
+  saveState();
   const state = JSON.stringify({ type: 'state', nowPlaying, queue, playedSongs, pending });
   for (const client of clients) {
     if (client.readyState === 1) client.send(state);
