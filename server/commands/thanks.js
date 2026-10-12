@@ -19,9 +19,9 @@ function pickBgUrl() {
   if (files.length === 0) return '';
 
   const chosen = files[Math.floor(Math.random() * files.length)];
-  const baseUrl = (process.env.PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
   console.log(`[thanks] Background: ${chosen} (pool: ${files.length})`);
-  return `${baseUrl}/clip-player/sponsor-bgs/${chosen}`;
+  // Relative: the clip player is served by this same server, on whatever PORT.
+  return `/clip-player/sponsor-bgs/${encodeURIComponent(chosen)}`;
 }
 
 module.exports = function register(registerCommand) {
