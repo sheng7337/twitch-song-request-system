@@ -405,7 +405,7 @@ async function pickReward(type, idx) {
   document.getElementById(`reward-opt-${type}-${idx}`).classList.add('selected');
 
   try {
-    await api('POST', '/setup/api/create-rewards', { mode: 'pick', rewardType: type, rewardId: reward.id });
+    await api('POST', '/setup/api/create-rewards', { mode: 'pick', rewardType: type, rewardId: reward.id, title: reward.title });
     document.getElementById(`reward-list-${type}`).style.display = 'none';
     const doneEl = document.getElementById(`reward-done-${type}`);
     doneEl.style.display = 'block';

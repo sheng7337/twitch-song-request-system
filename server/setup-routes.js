@@ -224,12 +224,26 @@ router.get('/rewards', async (req, res) => {
   }
 });
 
+// Stores the reward picked in the rewards step as the all-tabs random reward.
+// Per-tab rewards from the random-rewards step are kept, so re-running the
+// rewards step doesn't wipe them.
+function saveRewardForType(rewardType, id, name) {
+  if (rewardType === 'song') {
+    writeEnvValues({ TWITCH_REWARD_ID: id });
+    return;
+  }
+  let rewards = [];
+  try { rewards = JSON.parse(readEnv().TWITCH_RANDOM_REWARDS || '[]'); } catch (_) {}
+  const perTab = rewards.filter(r => r.tabs?.length > 0 && r.id !== id);
+  writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id, name, tabs: [] }, ...perTab]) });
+}
+
 // POST /setup/api/create-rewards
 // Body options:
-//   { mode: 'pick', rewardType: 'song'|'random', rewardId } — assign existing reward
+//   { mode: 'pick', rewardType: 'song'|'random', rewardId, title } — assign existing reward
 //   { mode: 'create', rewardType: 'song'|'random', title, cost } — create new reward
 router.post('/create-rewards', async (req, res) => {
-  const { mode, rewardType, rewardId, title, cost, songRequestCost = 500, randomSongCost = 300 } = req.body;
+  const { mode, rewardType, rewardId, title, cost } = req.body;
   const env = readEnv();
   const clientId = env.TWITCH_CLIENT_ID;
   const token = env.TWITCH_USER_ACCESS_TOKEN;
@@ -245,13 +259,8 @@ router.post('/create-rewards', async (req, res) => {
     'Content-Type': 'application/json',
   };
 
-  // Single reward pick or create
   if (mode === 'pick' && rewardId && rewardType) {
-    if (rewardType === 'song') {
-      writeEnvValues({ TWITCH_REWARD_ID: rewardId });
-    } else {
-      writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: rewardId, name: title || '隨機點歌券', tabs: [] }]) });
-    }
+    saveRewardForType(rewardType, rewardId, title || '隨機點歌券');
     return res.json({ ok: true });
   }
 
@@ -264,70 +273,14 @@ router.post('/create-rewards', async (req, res) => {
         { headers }
       );
       const reward = r.data.data[0];
-      if (rewardType === 'song') {
-        writeEnvValues({ TWITCH_REWARD_ID: reward.id });
-      } else {
-        writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: reward.id, name: reward.title, tabs: [] }]) });
-      }
+      saveRewardForType(rewardType, reward.id, reward.title);
       return res.json({ ok: true, id: reward.id, title: reward.title });
     } catch (err) {
       return res.status(500).json({ error: err.response?.data?.message || err.message });
     }
   }
 
-  // Check existing rewards
-  let existing = [];
-  try {
-    const r = await axios.get(
-      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
-      { headers }
-    );
-    existing = r.data.data || [];
-  } catch (_) {}
-
-  const results = {};
-
-  // Song Request reward
-  const existingSong = existing.find(r => r.title.includes('點歌') || r.title.includes('Song Request'));
-  if (existingSong) {
-    writeEnvValues({ TWITCH_REWARD_ID: existingSong.id });
-    results.songRequest = { id: existingSong.id, title: existingSong.title, existing: true };
-  } else {
-    try {
-      const r = await axios.post(
-        `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
-        { title: '點歌券', cost: songRequestCost, is_user_input_required: true, prompt: '輸入想點的歌名' },
-        { headers }
-      );
-      const reward = r.data.data[0];
-      writeEnvValues({ TWITCH_REWARD_ID: reward.id });
-      results.songRequest = { id: reward.id, title: reward.title, existing: false };
-    } catch (err) {
-      results.songRequest = { error: err.response?.data?.message || err.message };
-    }
-  }
-
-  // Random Song reward
-  const existingRandom = existing.find(r => r.title.includes('隨機') || r.title.includes('Random'));
-  if (existingRandom) {
-    writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: existingRandom.id, name: existingRandom.title, tabs: [] }]) });
-    results.randomSong = { id: existingRandom.id, title: existingRandom.title, existing: true };
-  } else {
-    try {
-      const r = await axios.post(
-        `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
-        { title: '隨機點歌券', cost: randomSongCost, is_user_input_required: false },
-        { headers }
-      );
-      const reward = r.data.data[0];
-      writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify([{ id: reward.id, name: reward.title, tabs: [] }]) });
-      results.randomSong = { id: reward.id, title: reward.title, existing: false };
-    } catch (err) {
-      results.randomSong = { error: err.response?.data?.message || err.message };
-    }
-  }
-
-  res.json({ ok: true, results });
+  res.status(400).json({ error: 'mode must be "pick" or "create"' });
 });
 
 // GET /setup/api/upload-credentials — show helpful error if accessed directly
