@@ -41,12 +41,7 @@ module.exports = {
   // Maximum weight for songs based on days since last request
   RANDOM_MAX_DAYS_WEIGHT: 180,
 
-
-  // ── Overlay ────────────────────────────────────────────────────────────────
-  // Note: overlay/index.html also has CSS variables (font sizes, list height)
-  // that can be edited directly in the <style> block at the top of that file.
-
-  // How fast the Up Next / Played lists auto-scroll when they overflow (px/sec)
-  OVERLAY_SCROLL_PX_PER_SEC: 28,
+  // Overlay look and scroll speed are set in overlay/index.html
+  // (CSS variables in <style>, SCROLL_PX_PER_SEC in <script>).
 
 };
