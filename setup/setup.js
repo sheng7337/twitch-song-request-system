@@ -199,7 +199,7 @@ async function validateClientId() {
     showStatus(status, 'ok', t.verified);
     setTimeout(goNext, 800);
   } catch (err) {
-    showStatus(status, 'error', '✗ ' + (err.message || t.errInvalid));
+    showStatus(status, 'error', err.message === 'invalid_client' ? t.errInvalid : '✗ ' + err.message);
   }
 }
 

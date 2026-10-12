@@ -104,24 +104,20 @@ router.get('/status', (req, res) => {
 
 // POST /setup/api/validate-client-id
 router.post('/validate-client-id', async (req, res) => {
-  const { clientId } = req.body;
+  const clientId = String(req.body.clientId || '').trim();
   if (!clientId) return res.status(400).json({ error: 'clientId required' });
   try {
-    // Try a simple API call to verify the client ID is valid
-    await axios.get('https://id.twitch.tv/oauth2/validate', {
-      headers: { 'Client-Id': clientId }
+    // Requesting a device code is the cheapest call that rejects an unknown
+    // Client ID ("invalid client"); the code itself is thrown away.
+    await axios.post('https://id.twitch.tv/oauth2/device', null, {
+      params: { client_id: clientId, scopes: 'user:read:chat' },
     });
-    writeEnvValues({ TWITCH_CLIENT_ID: clientId });
-    res.json({ ok: true });
   } catch (err) {
-    // 401 is expected (no token), but 400 means bad client ID
-    if (err.response?.status === 400) {
-      return res.status(400).json({ error: 'Invalid Client ID' });
-    }
-    // Any other response means the client ID format is accepted
-    writeEnvValues({ TWITCH_CLIENT_ID: clientId });
-    res.json({ ok: true });
+    if (err.response?.status === 400) return res.status(400).json({ error: 'invalid_client' });
+    return res.status(502).json({ error: `Could not reach Twitch: ${err.message}` });
   }
+  writeEnvValues({ TWITCH_CLIENT_ID: clientId });
+  res.json({ ok: true });
 });
 
 // POST /setup/api/start-device-auth

@@ -45,7 +45,7 @@ const STRINGS = {
       errEmpty: 'Please enter your Client ID',
       verifying: '<span class="spinner"></span> Verifying...',
       verified: '✓ Client ID verified!',
-      errInvalid: '✗ Invalid Client ID',
+      errInvalid: '✗ Twitch doesn\'t recognise this Client ID — copy it again from your app\'s Manage page',
     },
 
     twitchAuth: {
@@ -297,7 +297,7 @@ const STRINGS = {
       errEmpty: '請輸入你的 Client ID',
       verifying: '<span class="spinner"></span> 驗證中...',
       verified: '✓ Client ID 驗證成功！',
-      errInvalid: '✗ Client ID 無效',
+      errInvalid: '✗ Twitch 找不到這個 Client ID —— 請回到應用程式的「管理」頁面重新複製',
     },
 
     twitchAuth: {
