@@ -33,6 +33,7 @@ async function fetchSongs() {
   const sheetId = process.env.GOOGLE_SHEET_ID;
   const songCol = process.env.SHEET_SONG_COLUMN || 'title';
   const artistCol = process.env.SHEET_ARTIST_COLUMN || 'artist';
+  const keyCol = process.env.SHEET_KEY_COLUMN || 'key';
   console.log(`[sheets] Looking for columns: song="${songCol}", artist="${artistCol}"`);
 
   if (!sheetId) {
@@ -68,7 +69,7 @@ async function fetchSongs() {
       const headers = rows[0].map(h => h.toLowerCase().trim());
       const titleIdx = headers.indexOf(songCol.toLowerCase());
       const artistIdx = headers.indexOf(artistCol.toLowerCase());
-      const keyIdx = headers.indexOf('key');
+      const keyIdx = headers.indexOf(keyCol.toLowerCase().trim());
 
       console.log(`[sheets] Tab headers: ${headers.join(', ')}`);
       console.log(`[sheets] keyIdx: ${keyIdx}`);

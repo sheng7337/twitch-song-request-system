@@ -300,7 +300,8 @@ if (-not $artistCol -or $artistCol -eq "artist") {
     Set-EnvValue "SHEET_ARTIST_COLUMN" $colVal
 }
 Write-OK "Artist column: $(Get-EnvValue 'SHEET_ARTIST_COLUMN')"
-Write-Host "  Note: the key (transposition) column must be named exactly 'key' in your sheet." -ForegroundColor DarkGray
+Write-Host "  Note: the key (transposition) column is read from a column named 'key'." -ForegroundColor DarkGray
+Write-Host "  To use a different header, set SHEET_KEY_COLUMN in .env." -ForegroundColor DarkGray
 
 $historyId = Get-EnvValue "HISTORY_SHEET_ID"
 if (-not $historyId -or $historyId -eq "") {

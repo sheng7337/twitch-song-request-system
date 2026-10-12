@@ -372,6 +372,7 @@ router.post('/save-columns', (req, res) => {
     GOOGLE_SHEET_ID: sheetId,
     SHEET_SONG_COLUMN: songColumn,
     SHEET_ARTIST_COLUMN: artistColumn,
+    SHEET_KEY_COLUMN: keyColumn || 'key',
   };
   writeEnvValues(values);
   res.json({ ok: true });
