@@ -33,14 +33,6 @@ function registerClient(ws) {
   clients.add(ws);
   ws.send(JSON.stringify({ type: 'state', nowPlaying, queue, playedSongs, pending }));
   ws.on('close', () => clients.delete(ws));
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw);
-      if (msg.cmd === 'skip') skipSong();
-      if (msg.cmd === 'clear') clearQueue();
-      if (msg.cmd === 'refresh') broadcastState();
-    } catch (_) {}
-  });
 }
 
 function addSong({ title, artist, key, requester, isRandom }) {

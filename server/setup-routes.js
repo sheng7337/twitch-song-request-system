@@ -32,9 +32,15 @@ function writeEnvValues(values) {
     : '';
   if (content.charCodeAt(0) === 0xFEFF) content = content.slice(1);
 
+  // A line break in a value would smuggle extra lines into .env.
+  for (const [key, value] of Object.entries(values)) {
+    if (/[\r\n]/.test(String(value))) throw new Error(`Invalid value for ${key}: line breaks are not allowed`);
+  }
+
   for (const [key, value] of Object.entries(values)) {
     if (new RegExp(`^${key}=`, 'm').test(content)) {
-      content = content.replace(new RegExp(`^${key}=.*$`, 'm'), `${key}=${value}`);
+      // Function replacer: a "$" in the value must not be read as a regex back-reference.
+      content = content.replace(new RegExp(`^${key}=.*$`, 'm'), () => `${key}=${value}`);
     } else {
       content += (content.endsWith('\n') ? '' : '\n') + `${key}=${value}\n`;
     }
