@@ -95,7 +95,7 @@ Write-Step "Requesting authorization code..."
 
 $deviceRes = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
     client_id = $clientId
-    scopes    = "channel:read:redemptions channel:manage:redemptions"
+    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat"
 }
 $deviceCode   = $deviceRes.device_code
 $userCode     = $deviceRes.user_code
@@ -168,9 +168,19 @@ try {
     Write-Warn "Could not fetch existing rewards (channel may not be Affiliate yet)"
 }
 
+# TWITCH_RANDOM_REWARDS is a JSON array; an entry with empty tabs draws from all tabs.
+function Save-Reward($envKey, $id, $name) {
+    if ($envKey -eq "TWITCH_RANDOM_REWARDS") {
+        $entry = [ordered]@{ id = $id; name = $name; tabs = @() }
+        Set-EnvValue $envKey (ConvertTo-Json -InputObject @($entry) -Compress)
+    } else {
+        Set-EnvValue $envKey $id
+    }
+}
+
 function Pick-Reward($label, $envKey, $requireTextInput) {
     $current = Get-EnvValue $envKey
-    if ($current -and $current -ne "") {
+    if ($current -and $current -ne "" -and $current -ne "[]") {
         Write-OK "$label already set: $current"
         return $current
     }
@@ -197,7 +207,7 @@ function Pick-Reward($label, $envKey, $requireTextInput) {
         $idx = [int]$choice - 1
         if ($idx -ge 0 -and $idx -lt $existingRewards.Count) {
             $selected = $existingRewards[$idx]
-            Set-EnvValue $envKey $selected.id
+            Save-Reward $envKey $selected.id $selected.title
             Write-OK "Selected: $($selected.title)"
             return $selected.id
         } else {
@@ -217,20 +227,20 @@ function Pick-Reward($label, $envKey, $requireTextInput) {
             -Uri "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=$broadcasterId" `
             -Headers $rewardHeaders -Body $bodyBytes
         $newId = $r.data[0].id
-        Set-EnvValue $envKey $newId
+        Save-Reward $envKey $newId $title
         Write-OK "Created: $title ($cost pts)"
         return $newId
     } catch {
         Write-Warn "Could not create -- please create manually in Twitch Dashboard"
         Write-Host "  Go to https://dashboard.twitch.tv -> Viewer Rewards -> Channel Points -> +" -ForegroundColor DarkGray
         $manualId = Ask "Paste reward ID (or press Enter to skip)"
-        if ($manualId) { Set-EnvValue $envKey $manualId }
+        if ($manualId) { Save-Reward $envKey $manualId $label }
         return $manualId
     }
 }
 
 $rewardId       = Pick-Reward "Song Request (viewer types a song title)" "TWITCH_REWARD_ID" $true
-$randomRewardId = Pick-Reward "Random Song (auto-picks a song)" "TWITCH_RANDOM_REWARD_ID" $false
+$randomRewardId = Pick-Reward "Random Song (auto-picks a song)" "TWITCH_RANDOM_REWARDS" $false
 
 
 # ── Step 6: Google Sheets ──────────────────────────────────────────────────────

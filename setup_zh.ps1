@@ -96,7 +96,7 @@ Write-Step "請求授權代碼..."
 
 $deviceRes = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
     client_id = $clientId
-    scopes    = "channel:read:redemptions channel:manage:redemptions"
+    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat"
 }
 $deviceCode   = $deviceRes.device_code
 $userCode     = $deviceRes.user_code
@@ -169,9 +169,19 @@ try {
     Write-Warn "無法取得現有兌換項目（頻道可能尚未成為聯盟主播）"
 }
 
+# TWITCH_RANDOM_REWARDS is a JSON array; an entry with empty tabs draws from all tabs.
+function Save-Reward($envKey, $id, $name) {
+    if ($envKey -eq "TWITCH_RANDOM_REWARDS") {
+        $entry = [ordered]@{ id = $id; name = $name; tabs = @() }
+        Set-EnvValue $envKey (ConvertTo-Json -InputObject @($entry) -Compress)
+    } else {
+        Set-EnvValue $envKey $id
+    }
+}
+
 function Pick-Reward($label, $envKey, $requireTextInput) {
     $current = Get-EnvValue $envKey
-    if ($current -and $current -ne "") {
+    if ($current -and $current -ne "" -and $current -ne "[]") {
         Write-OK "$label 已設定：$current"
         return $current
     }
@@ -198,7 +208,7 @@ function Pick-Reward($label, $envKey, $requireTextInput) {
         $idx = [int]$choice - 1
         if ($idx -ge 0 -and $idx -lt $existingRewards.Count) {
             $selected = $existingRewards[$idx]
-            Set-EnvValue $envKey $selected.id
+            Save-Reward $envKey $selected.id $selected.title
             Write-OK "已選擇：$($selected.title)"
             return $selected.id
         } else {
@@ -218,20 +228,20 @@ function Pick-Reward($label, $envKey, $requireTextInput) {
             -Uri "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=$broadcasterId" `
             -Headers $rewardHeaders -Body $bodyBytes
         $newId = $r.data[0].id
-        Set-EnvValue $envKey $newId
+        Save-Reward $envKey $newId $title
         Write-OK "已建立：$title（$cost 點）"
         return $newId
     } catch {
         Write-Warn "無法建立，請手動在 Twitch 後台建立後輸入 ID"
         Write-Host "  前往 https://dashboard.twitch.tv -> 觀眾獎勵 -> 頻道點數 -> +" -ForegroundColor DarkGray
         $manualId = Ask "貼上兌換項目 ID（可按 Enter 略過）"
-        if ($manualId) { Set-EnvValue $envKey $manualId }
+        if ($manualId) { Save-Reward $envKey $manualId $label }
         return $manualId
     }
 }
 
 $rewardId       = Pick-Reward "點歌券（觀眾輸入歌名）" "TWITCH_REWARD_ID" $true
-$randomRewardId = Pick-Reward "隨機點歌券（自動選歌）" "TWITCH_RANDOM_REWARD_ID" $false
+$randomRewardId = Pick-Reward "隨機點歌券（自動選歌）" "TWITCH_RANDOM_REWARDS" $false
 
 
 # ── 步驟 6：Google 試算表 ───────────────────────────────────────────────────────
