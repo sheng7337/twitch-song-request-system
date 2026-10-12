@@ -167,7 +167,7 @@ setEventHandler(async (event) => {
     const allowedTabs = matchedRandom.tabs || [];
     const picked = pickRandom(excludeTitles, allowedTabs);
     if (picked) {
-      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true });
+      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true, tabs: allowedTabs });
       const tabInfo = allowedTabs.length > 0 ? ` [${allowedTabs.join('/')}]` : '';
       console.log(`[random] Added "${picked.title}" for @${requester}${tabInfo}`);
     }
@@ -268,10 +268,11 @@ app.post('/api/redraw', (req, res) => {
     ...state.playedSongs.map(s => s.title),
   ];
 
-  const picked = pickRandom(excludeTitles);
+  const tabs = currentSong.tabs || [];
+  const picked = pickRandom(excludeTitles, tabs);
   if (!picked) return res.status(400).json({ error: 'no songs available to redraw' });
 
-  const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester });
+  const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester, tabs });
   if (!ok) return res.status(400).json({ error: 'redraw failed' });
 
   console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);

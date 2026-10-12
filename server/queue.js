@@ -35,9 +35,11 @@ function registerClient(ws) {
   ws.on('close', () => clients.delete(ws));
 }
 
-function addSong({ title, artist, key, requester, isRandom }) {
+// `tabs` is the random reward's tab filter, kept so a redraw stays within it.
+function addSong({ title, artist, key, requester, isRandom, tabs }) {
   const entry = { title, artist, key: key != null ? String(key) : '', requester, addedAt: Date.now() };
   if (isRandom) entry.isRandom = true;
+  if (isRandom && tabs?.length) entry.tabs = tabs;
   if (!nowPlaying) { nowPlaying = entry; }
   else { queue.push(entry); }
   broadcastState();
@@ -191,6 +193,7 @@ function redrawSong(zone, index, newSong) {
     addedAt: Date.now(),
     isRandom: true,
   };
+  if (newSong.tabs?.length) entry.tabs = newSong.tabs;
   if (zone === 'nowPlaying') {
     if (!nowPlaying) return false;
     nowPlaying = entry;
