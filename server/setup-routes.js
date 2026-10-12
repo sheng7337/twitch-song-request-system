@@ -7,6 +7,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const { ensureFreshToken } = require('./twitch');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
 const PROGRESS_PATH = path.join(__dirname, '..', 'setup-progress.json');
@@ -200,19 +201,31 @@ router.get('/poll-device-auth', async (req, res) => {
   }
 });
 
+// Returns the broadcaster ID and Helix headers, or null if Twitch isn't
+// connected yet. Refreshes the token first: the wizard is often re-run long
+// after the token was issued, and an expired one gives confusing 401s.
+async function helixAuth() {
+  const { TWITCH_CLIENT_ID: clientId, TWITCH_USER_ACCESS_TOKEN: token, TWITCH_BROADCASTER_ID: broadcasterId } = process.env;
+  if (!clientId || !token || !broadcasterId) return null;
+  await ensureFreshToken();
+  return {
+    broadcasterId,
+    headers: {
+      'Client-Id': clientId,
+      'Authorization': `Bearer ${process.env.TWITCH_USER_ACCESS_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+  };
+}
+
 // GET /setup/api/rewards — fetch list of existing rewards
 router.get('/rewards', async (req, res) => {
-  const env = readEnv();
-  const clientId = env.TWITCH_CLIENT_ID || process.env.TWITCH_CLIENT_ID;
-  const token = env.TWITCH_USER_ACCESS_TOKEN || process.env.TWITCH_USER_ACCESS_TOKEN;
-  const broadcasterId = env.TWITCH_BROADCASTER_ID || process.env.TWITCH_BROADCASTER_ID;
-  if (!clientId || !token || !broadcasterId) {
-    return res.status(400).json({ error: 'Twitch not configured yet — please complete Step 2 first' });
-  }
   try {
+    const auth = await helixAuth();
+    if (!auth) return res.status(400).json({ error: 'Twitch not configured yet — please complete Step 2 first' });
     const r = await axios.get(
-      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
-      { headers: { 'Client-Id': clientId, 'Authorization': `Bearer ${token}` } }
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
+      { headers: auth.headers }
     );
     res.json({ rewards: r.data.data || [] });
   } catch (err) {
@@ -240,20 +253,6 @@ function saveRewardForType(rewardType, id, name) {
 //   { mode: 'create', rewardType: 'song'|'random', title, cost } — create new reward
 router.post('/create-rewards', async (req, res) => {
   const { mode, rewardType, rewardId, title, cost } = req.body;
-  const env = readEnv();
-  const clientId = env.TWITCH_CLIENT_ID;
-  const token = env.TWITCH_USER_ACCESS_TOKEN;
-  const broadcasterId = env.TWITCH_BROADCASTER_ID;
-
-  if (!clientId || !token || !broadcasterId) {
-    return res.status(400).json({ error: 'Twitch not configured yet' });
-  }
-
-  const headers = {
-    'Client-Id': clientId,
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
 
   if (mode === 'pick' && rewardId && rewardType) {
     saveRewardForType(rewardType, rewardId, title || '隨機點歌券');
@@ -263,10 +262,12 @@ router.post('/create-rewards', async (req, res) => {
   if (mode === 'create' && title && rewardType) {
     const requireText = rewardType === 'song';
     try {
+      const auth = await helixAuth();
+      if (!auth) return res.status(400).json({ error: 'Twitch not configured yet' });
       const r = await axios.post(
-        `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
+        `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
         { title, cost: parseInt(cost) || 500, is_user_input_required: requireText },
-        { headers }
+        { headers: auth.headers }
       );
       const reward = r.data.data[0];
       saveRewardForType(rewardType, reward.id, reward.title);
@@ -394,19 +395,15 @@ router.post('/save-random-rewards', async (req, res) => {
   const { rewards } = req.body;
   if (!Array.isArray(rewards)) return res.status(400).json({ error: 'rewards array required' });
 
-  const env = readEnv();
-  const clientId = env.TWITCH_CLIENT_ID;
-  const token = env.TWITCH_USER_ACCESS_TOKEN;
-  const broadcasterId = env.TWITCH_BROADCASTER_ID;
-  if (!clientId || !token || !broadcasterId) {
-    return res.status(400).json({ error: 'Twitch not configured' });
+  let auth = null;
+  if (rewards.some(r => !r.id)) {
+    try {
+      auth = await helixAuth();
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!auth) return res.status(400).json({ error: 'Twitch not configured' });
   }
-
-  const headers = {
-    'Client-Id': clientId,
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
 
   const results = [];
   for (const reward of rewards) {
@@ -415,9 +412,9 @@ router.post('/save-random-rewards', async (req, res) => {
     } else {
       try {
         const r = await axios.post(
-          `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${broadcasterId}`,
+          `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
           { title: reward.name, cost: reward.cost || 300, is_user_input_required: false },
-          { headers }
+          { headers: auth.headers }
         );
         results.push({ id: r.data.data[0].id, name: r.data.data[0].title, tabs: reward.tabs || [] });
       } catch (err) {
@@ -430,7 +427,8 @@ router.post('/save-random-rewards', async (req, res) => {
   // unless the user already added their own all-tabs entry in this step.
   const hasAllTabs = results.some(r => !r.tabs || r.tabs.length === 0);
   if (!hasAllTabs) {
-    const existing = JSON.parse(env.TWITCH_RANDOM_REWARDS || '[]');
+    let existing = [];
+    try { existing = JSON.parse(process.env.TWITCH_RANDOM_REWARDS || '[]'); } catch (_) {}
     const allTabsEntry = existing.find(r => !r.tabs || r.tabs.length === 0);
     if (allTabsEntry) results.push(allTabsEntry);
   }
