@@ -13,21 +13,18 @@ CORRECT:  /helix/channel_points/custom_rewards
 WRONG:    /helix/channel-points/custom-rewards
 ```
 
-### Two types of tokens — use the right one
-- **App token** (`client_credentials`) — for EventSub registration, reading public data
-- **User token** (`authorization_code` / implicit) — for Channel Points CRUD (create/read rewards)
-- Getting user token via implicit flow: open auth URL in browser → copy from redirect URL fragment
+### Tokens
+- **App token** (`client_credentials`) — public data only; it **cannot** subscribe to EventSub over WebSocket
+- **User token** — needed for EventSub WebSocket, Channel Points CRUD and chat. This project
+  gets one with the Device Authorization Flow (see below), so no client secret is needed
 
-### EventSub webhook verification
-- Twitch sends `twitch-eventsub-message-signature: sha256=<hmac>`
-- HMAC = `HMAC-SHA256(secret, messageId + timestamp + rawBody)`
-- Must capture raw body bytes before JSON parsing — can't re-serialize
-- Always delete and re-register subscriptions on startup to keep secret in sync
-- Register without `reward_id` filter to catch ALL Channel Points redemptions, then route by `rewardId` in handler
+### Routing redemptions
+- Subscribe without a `reward_id` filter to catch ALL Channel Points redemptions, then route by
+  reward ID — and ignore unknown IDs: other rewards may take text input too
 
-### Channel Points API requires Affiliate/Partner
-- Returns 404 if channel not affiliated yet
-- Creating rewards requires user token with `channel:manage:redemptions` scope
+### Channel Points
+- Since May 2026, Channel Points are available to all streamers (no Affiliate/Partner needed)
+- Creating rewards requires a user token with `channel:manage:redemptions` scope
 
 ---
 
@@ -56,8 +53,10 @@ WRONG:    /helix/channel-points/custom-rewards
 ### Pattern used
 - Server sends full state on every change (not diffs)
 - Overlay re-renders completely from state
-- Reconnects automatically with exponential backoff
-- Multiple clients supported (overlay + dashboard both connect)
+- Clients reconnect after a fixed delay (3s) when the socket closes
+- Multiple clients supported (overlay, dashboard and clip player all connect)
+- WebSockets have no same-origin protection: any web page can open `ws://localhost:3000`.
+  Check the `Origin` header on upgrade (see `server/request-guard.js`)
 
 ### Message types
 ```js
@@ -110,10 +109,8 @@ WRONG:    /helix/channel-points/custom-rewards
   Set-EnvValue "KEY" $result
   ```
 
-### ngrok for local webhooks
-- Start ngrok → read URL from `http://localhost:4040/api/tunnels` (local API)
-- Free plan: URL changes every restart → update `PUBLIC_URL` in `.env` each session
-- Static domains available free (one per account) at dashboard.ngrok.com/domains
+- PS 5.1 strips double quotes from arguments passed to native programs, so JSON passed to
+  `node -e` arrives broken — write it to a file instead
 
 ---
 
@@ -198,23 +195,14 @@ function scheduleWrite(key, data) {
 - Check existing `.env` values first — only ask if missing/default
 - Verify writes by reading back and comparing
 - Use `.NET WriteAllText` with explicit UTF-8 no-BOM
-- Generate secrets using explicit char array not `[char]` casting:
-  ```powershell
-  $chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-  $secret = -join (1..32 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
-  ```
 - Call Twitch API with hashtable body (avoids `&` encoding issues):
   ```powershell
-  Invoke-RestMethod -Method Post -Uri $url -Body @{ client_id=$id; client_secret=$secret; grant_type="client_credentials" }
+  Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{ client_id=$id; scopes="user:read:chat" }
   ```
-
-### Auto-reading ngrok URL
-```powershell
-Start-Process -FilePath $ngrokPath -ArgumentList "http 3000" -WindowStyle Minimized
-# Wait for ngrok local API
-$tunnels = Invoke-RestMethod -Uri "http://localhost:4040/api/tunnels"
-$url = ($tunnels.tunnels | Where-Object { $_.proto -eq "https" })[0].public_url
-```
+- Write JSON values (like `TWITCH_RANDOM_REWARDS`) with `ConvertTo-Json -InputObject @($items) -Compress`
+  so a single item still becomes an array
+- Keep the terminal scripts writing exactly the same `.env` keys as the web wizard — when the
+  server stops reading a key, update both
 
 ---
 
@@ -271,9 +259,8 @@ function connectEventSub() {
       handleEvent(msg.payload.event);
     }
     if (type === 'session_reconnect') {
-      ws.close();
-      ws = new WebSocket(msg.payload.session.reconnect_url);
-      // re-attach handlers, re-subscribe with new session ID
+      // Connect to reconnect_url; subscriptions carry over to the new session, so do NOT
+      // re-subscribe on its session_welcome. Close the old socket once the new one is welcomed.
     }
     // 'session_keepalive' — no action needed
   });
@@ -298,9 +285,10 @@ async function subscribeToRedemptions(sessionId) {
 
 ### Key differences from Webhook
 - No signature verification — auth is handled by the token
-- Subscriptions are tied to the WebSocket session — must re-subscribe after reconnect
+- Subscriptions are tied to the WebSocket session: after the socket **drops**, connect fresh and
+  subscribe again; after a **`session_reconnect`**, they carry over
 - Use **user access token** (not app token) with `channel:read:redemptions` scope
-- No `TWITCH_WEBHOOK_SECRET` or `PUBLIC_URL` needed
+- Twitch delivers at-least-once — dedupe notifications by `metadata.message_id`
 
 ---
 
@@ -317,7 +305,7 @@ async function subscribeToRedemptions(sessionId) {
 const res = await axios.post('https://id.twitch.tv/oauth2/device', null, {
   params: {
     client_id: clientId,
-    scopes: 'channel:read:redemptions channel:manage:redemptions',
+    scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat',
   }
 });
 const { device_code, user_code, interval, expires_in } = res.data;
@@ -351,27 +339,39 @@ setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', String(Date.now() + tokens.expires_i
 
 ### Token refresh
 ```js
+let refreshPromise = null;
+
 async function ensureFreshToken() {
   const expiresAt = parseInt(process.env.TWITCH_USER_TOKEN_EXPIRES_AT || '0');
   if (Date.now() < expiresAt - 60000) return; // still valid with 1min buffer
+  // Twitch rotates the refresh token on every refresh: two refreshes in parallel would
+  // invalidate each other, so concurrent callers share one in-flight refresh.
+  if (refreshPromise) return refreshPromise;
 
-  const res = await axios.post('https://id.twitch.tv/oauth2/token', null, {
-    params: {
-      grant_type: 'refresh_token',
-      refresh_token: process.env.TWITCH_USER_REFRESH_TOKEN,
-      client_id: process.env.TWITCH_CLIENT_ID,
-    }
-  });
-  process.env.TWITCH_USER_ACCESS_TOKEN = res.data.access_token;
-  process.env.TWITCH_USER_TOKEN_EXPIRES_AT = String(Date.now() + res.data.expires_in * 1000);
-  // Persist so it survives restarts
-  setEnvValue('TWITCH_USER_ACCESS_TOKEN', res.data.access_token);
-  setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', String(Date.now() + res.data.expires_in * 1000));
+  refreshPromise = (async () => {
+    const res = await axios.post('https://id.twitch.tv/oauth2/token', null, {
+      params: {
+        grant_type: 'refresh_token',
+        refresh_token: process.env.TWITCH_USER_REFRESH_TOKEN,
+        client_id: process.env.TWITCH_CLIENT_ID,
+      }
+    });
+    // setEnvValue updates process.env and persists to .env so it survives restarts
+    setEnvValue('TWITCH_USER_ACCESS_TOKEN', res.data.access_token);
+    setEnvValue('TWITCH_USER_TOKEN_EXPIRES_AT', String(Date.now() + res.data.expires_in * 1000));
+    if (res.data.refresh_token) setEnvValue('TWITCH_USER_REFRESH_TOKEN', res.data.refresh_token);
+  })().finally(() => { refreshPromise = null; });
+
+  return refreshPromise;
 }
 ```
 
 ### Notes
 - Device codes expire in ~30 min — if user doesn't activate, restart the flow
 - `client_secret` not required for public clients (Device flow supports both)
-- Call `ensureFreshToken()` before any API call that uses the user token
+- Call `ensureFreshToken()` before **every** API call that uses the user token — including
+  chat commands and setup-wizard calls, which run hours after startup
 - Store `expires_at` as a Unix timestamp in milliseconds
+- Once the server has refreshed, never restore `.env` from an older backup: its refresh token is dead
+- To validate a Client ID without a token, request a device code — Twitch answers
+  `400 invalid client` for an unknown ID (`/oauth2/validate` always says 401 without a token)
