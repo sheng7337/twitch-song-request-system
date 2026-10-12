@@ -495,7 +495,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString());
-      if (msg.type === 'media-ended') mediaQueue.onEnded();
+      if (msg.type === 'media-ended') mediaQueue.onEnded(msg.mediaId);
     } catch {}
   });
 });
