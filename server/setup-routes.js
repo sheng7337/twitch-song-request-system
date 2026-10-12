@@ -324,38 +324,42 @@ router.post('/validate-sheet', async (req, res) => {
   try {
     const auth = new google.auth.GoogleAuth({
       keyFile: CREDS_PATH,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      scopes: [historyMode
+        ? 'https://www.googleapis.com/auth/spreadsheets'
+        : 'https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
     const authClient = await auth.getClient();
     const sheets = google.sheets({ version: 'v4', auth: authClient });
+
+    if (historyMode) {
+      // The history sheet needs Editor access. Prove it with a write that
+      // changes nothing (A1 written back as-is, formulas included), so a
+      // Viewer-only share fails here instead of silently losing history later.
+      const a1 = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId, range: 'A1', valueRenderOption: 'FORMULA',
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId, range: 'A1', valueInputOption: 'USER_ENTERED',
+        requestBody: { values: a1.data.values || [['']] },
+      });
+      writeEnvValues({ HISTORY_SHEET_ID: sheetId });
+      return res.json({ ok: true, sheetId });
+    }
 
     const r = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: 'A1:Z5', // headers + first 4 data rows
     });
-
     const rows = r.data.values || [];
-
-    if (historyMode) {
-      // For history sheet — just confirm access. A brand-new sheet is
-      // expected to be empty (the server writes headers on first run).
-      writeEnvValues({ HISTORY_SHEET_ID: sheetId });
-      res.json({ ok: true, sheetId });
-    } else {
-      // For song list — return headers and preview for column selection
-      if (rows.length === 0) return res.status(400).json({ error: 'Sheet appears to be empty' });
-      res.json({
-        ok: true,
-        sheetId,
-        headers: rows[0],
-        preview: rows.slice(1, 5),
-      });
-    }
+    if (rows.length === 0) return res.status(400).json({ error: 'Sheet appears to be empty' });
+    res.json({ ok: true, sheetId, headers: rows[0], preview: rows.slice(1, 5) });
   } catch (err) {
     const msg = err.message || '';
     if (msg.includes('403') || msg.includes('permission')) {
       return res.status(400).json({
-        error: 'Access denied. Make sure you shared the sheet with the service account email shown above.',
+        error: historyMode
+          ? 'Access denied. Share the sheet with the service account email shown above as an Editor (not Viewer).'
+          : 'Access denied. Make sure you shared the sheet with the service account email shown above.',
       });
     }
     res.status(400).json({ error: err.message });
