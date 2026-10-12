@@ -52,13 +52,16 @@ async function fetchSongs() {
     // Step 2: fetch all tabs in one batchGet call
     const batchRes = await sheets.spreadsheets.values.batchGet({
       spreadsheetId: sheetId,
-      ranges: tabs.map(tab => `${tab}!A:Z`),
+      // A1 notation: quote the tab name and double any apostrophe inside it.
+      ranges: tabs.map(tab => `'${tab.replace(/'/g, "''")}'!A:Z`),
     });
 
     const allSongs = [];
     const rejectedKeys = [];
 
-    for (const valueRange of batchRes.data.valueRanges) {
+    // valueRanges come back in the same order as the requested tabs.
+    for (const [i, valueRange] of batchRes.data.valueRanges.entries()) {
+      const tabName = tabs[i];
       const rows = valueRange.values;
       if (!rows || rows.length < 2) continue;
 
@@ -69,16 +72,12 @@ async function fetchSongs() {
 
       if (titleIdx === -1) {
         console.warn(
-          `[sheets] Tab "${valueRange.range}" has no "${songCol}" column — skipping. ` +
+          `[sheets] Tab "${tabName}" has no "${songCol}" column — skipping. ` +
           `Found headers: ${headers.join(', ')}`
         );
         continue;
       }
 
-      // Google Sheets wraps tab names containing spaces/CJK in single quotes
-      // in the range string (e.g. "'台語'!A:Z"). Strip them so the stored
-      // tab name matches what the Sheets API returns via spreadsheets.get().
-      const tabName = valueRange.range.split('!')[0].replace(/^'(.*)'$/, '$1');
       const songs = rows.slice(1)
         .filter(row => row[titleIdx]?.trim())
         .map(row => {
