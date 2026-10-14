@@ -377,6 +377,17 @@
   }
   .finish-btn:hover { background: rgba(74,255,154,0.18); border-color: var(--green); }
 
+  /* Opens the song in Leihu Singsing's practice window (shown by paintBadges) */
+  .sing-btn {
+    margin: 4px 0 0 4px; padding: 2px 8px; vertical-align: top;
+    background: rgba(255,184,74,0.08); border: 1px solid var(--border-amber);
+    border-radius: 4px; color: var(--amber); font-size: 10px; letter-spacing: 1px;
+    font-family: 'Share Tech Mono', monospace; cursor: pointer;
+    transition: all .15s; white-space: nowrap;
+  }
+  .sing-btn:hover { background: rgba(255,184,74,0.18); border-color: var(--amber); }
+  .sing-btn[hidden] { display: none; }
+
   .key-badge {
     width: 36px; height: 36px; min-width: 36px; min-height: 36px;
     border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
@@ -603,6 +614,7 @@ function render() {
           ${nowPlaying.artist ? `<div class="song-artist" style="font-size:13px;color:var(--text-dim);margin-top:2px;">${esc(nowPlaying.artist)}</div>` : ''}
           ${historyHtml(nowPlaying.title)}
           <span class="bt-badge" data-zone="nowPlaying" data-index="0"></span>
+          <button class="sing-btn" hidden onclick="singInLeihu()" title="Open this song in Leihu Singsing at its key">🎤 Sing</button>
         </div>
         ${nowPlaying.key != null && nowPlaying.key !== '' ? `<span class="key-badge">${nowPlaying.key >= 0 ? '+' : ''}${esc(nowPlaying.key)}</span>` : ''}
         <button class="copy-btn" onclick="copyTitle('${esc(nowPlaying.title)}')" title="Copy title">⧉</button>
@@ -1115,6 +1127,28 @@ function paintBadges() {
     el.textContent = s ? BT_LABEL[s] : '';
     el.title = s ? BT_HINT[s] + (st.leihuTitle ? `\nLeihu: ${st.leihuTitle}` : '') + (st.manual ? '\n(manual link — click to change)' : '') : '';
     el.onclick = clickable ? () => onBadgeClick(entry, st) : null;
+  }
+  // Sing needs Leihu's remote-open support and a ready backing track
+  const np = state.nowPlaying;
+  const npSt = np && leihuStatus.songs[songKey(np.title, np.artist)];
+  for (const btn of document.querySelectorAll('.sing-btn')) {
+    btn.hidden = !(leihuStatus.canOpen && npSt && npSt.state === 'ready');
+  }
+}
+
+async function singInLeihu() {
+  const np = state.nowPlaying;
+  if (!np) return;
+  try {
+    const res = await fetch('/api/leihu/open', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: np.title, artist: np.artist, key: np.key }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'open failed');
+    showToast(`opening "${np.title}" in Leihu (key ${data.key > 0 ? '+' : ''}${data.key})`);
+  } catch (err) {
+    showToast(`Leihu: ${err.message}`, true);
   }
 }
 

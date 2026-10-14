@@ -22,6 +22,7 @@ const OFFLINE_POLL_MS = 30000;
 
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
+let canOpen = false;         // Leihu has the remote-open patch (/api/status reports `remote`)
 const requested = new Map(); // import/key-render tag → 'sent' | 'failed', for this run
 let links = loadLinks();
 
@@ -84,6 +85,7 @@ async function refresh() {
       videoId: videoId(m.source_url),
       complete: !!(m.steps && m.steps.import && m.steps.separate && m.steps.pitch && m.steps.lyrics),
     }));
+    canOpen = 'remote' in statusRes.data;
     activeJobs = new Set((statusRes.data.jobs || [])
       .filter(j => j.status === 'queued' || j.status === 'running')
       .map(j => j.song));
@@ -91,6 +93,7 @@ async function refresh() {
   } catch (err) {
     library = null;
     activeJobs = new Set();
+    canOpen = false;
     if (wasOnline) console.log(`[leihu] Leihu Singsing not reachable (${err.message})`);
   }
 }
@@ -186,11 +189,23 @@ function getStatus() {
   for (const entry of [nowPlaying, ...queue]) {
     if (entry && entry.title) songs[songKey(entry.title, entry.artist)] = statusFor(entry.title, entry.artist);
   }
-  return { online: !!library, autoPrepare: autoPrepareEnabled(), songs };
+  return { online: !!library, canOpen, autoPrepare: autoPrepareEnabled(), songs };
 }
 
 function getLibrary() {
   return (library || []).map(s => ({ id: s.id, title: s.title, state: songState(s) }));
 }
 
-module.exports = { start, getStatus, getLibrary, setLink, prepare, refresh, videoId, transpose, songKey };
+// Ask Leihu's practice window to open a ready song at its sheet key (0 if the key
+// can't be used). Needs Leihu's remote-open patch. Returns the key used.
+async function open(entry) {
+  if (!canOpen) throw new Error('Leihu Singsing does not support remote open');
+  const status = statusFor(entry.title, entry.artist);
+  if (status.state !== 'ready') throw new Error(`song is not ready in Leihu (${status.state})`);
+  const key = transpose(entry.key) ?? 0;
+  await axios.post(`${baseUrl()}/api/remote/open`, { id: status.id, key }, { timeout: 5000 });
+  console.log(`[leihu] Opening "${entry.title}" at key ${key > 0 ? '+' : ''}${key}`);
+  return key;
+}
+
+module.exports = { start, getStatus, getLibrary, setLink, prepare, open, refresh, videoId, transpose, songKey };

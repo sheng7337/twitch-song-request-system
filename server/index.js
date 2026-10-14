@@ -425,6 +425,17 @@ app.post('/api/leihu/prepare', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Open a ready song in Leihu's practice window at its sheet key.
+app.post('/api/leihu/open', async (req, res) => {
+  const { title, artist, key } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    res.json({ ok: true, key: await leihu.open({ title, artist, key }) });
+  } catch (err) {
+    res.status(400).json({ error: err.response?.data?.error || err.message });
+  }
+});
+
 app.get('/api/history', (req, res) => res.json(getHistory()));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');

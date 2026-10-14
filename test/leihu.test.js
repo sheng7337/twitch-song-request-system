@@ -3,13 +3,13 @@ const assert = require('node:assert');
 const { stubModule } = require('./helpers');
 
 // Fake Leihu Singsing API: GET returns `leihu`, POSTs are recorded.
-const leihu = { up: true, songs: [], jobs: [] };
+const leihu = { up: true, songs: [], jobs: [], remote: false };
 const posts = [];
 const axiosStub = {
   get: async (url) => {
     if (!leihu.up) throw new Error('connect ECONNREFUSED');
     if (url.endsWith('/api/songs')) return { data: leihu.songs };
-    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs } };
+    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}) } };
     throw new Error('unexpected GET ' + url);
   },
   post: async (url, body) => { posts.push({ url, body }); return { data: {} }; },
@@ -97,4 +97,23 @@ test('everything shows offline while Leihu is not running', async () => {
   assert.strictEqual(st.online, false);
   assert.ok(Object.values(st.songs).every(s => s.state === 'offline'));
   leihu.up = true;
+});
+
+test('Sing opens a ready song at its sheet key, only when Leihu supports it', async () => {
+  leihu.songs = [{ id: 'aaaaaaaaaa', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done }];
+  leihu.jobs = [];
+  leihu.remote = false;
+  await L.refresh();
+  assert.strictEqual(L.getStatus().canOpen, false);
+  await assert.rejects(L.open(entry(sheet[0])), /does not support/);
+
+  leihu.remote = true;
+  await L.refresh();
+  assert.strictEqual(L.getStatus().canOpen, true);
+  posts.length = 0;
+  assert.strictEqual(await L.open(entry(sheet[0])), -2);
+  assert.strictEqual(await L.open({ ...entry(sheet[0]), key: '1.5' }), 0);
+  assert.deepStrictEqual(posts.map(p => p.body), [{ id: 'aaaaaaaaaa', key: -2 }, { id: 'aaaaaaaaaa', key: 0 }]);
+  assert.ok(posts.every(p => p.url === 'http://127.0.0.1:8765/api/remote/open'));
+  await assert.rejects(L.open(entry(sheet[2])), /not ready/);
 });
