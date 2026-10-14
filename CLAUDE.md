@@ -55,6 +55,7 @@ vtuber-song-queue/
 │   ├── matcher.js         Fuse.js fuzzy matching with AUTO_ACCEPT_THRESHOLD
 │   ├── queue.js           Queue state, broadcast to clients, persisted to queue-state.json
 │   ├── random.js          Weighted/pure random picker with tab filter and cooldown
+│   ├── leihu.js           Optional link to Leihu Singsing (backing tracks + lyrics), song-links.json
 │   ├── history.js         Request history sheet (debounced 1.5s), startup snapshot
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
 │   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
@@ -79,7 +80,7 @@ vtuber-song-queue/
 ```
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
-`setup-progress.json`, `queue-state.json`, `package-lock.json`, `.env` backups.
+`setup-progress.json`, `queue-state.json`, `song-links.json`, `package-lock.json`, `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -160,6 +161,24 @@ vtuber-song-queue/
 - Watchdog: if no end signal arrives within the expected length + 15s (e.g. no clip player
   open), the queue moves on by itself
 
+### Leihu Singsing integration (leihu.js) — optional
+- Leihu Singsing (雷虎練唱台, github.com/LeihuTW/Leihu-singsing) is a separate local app that
+  splits songs into backing tracks, transposes them and runs an OBS lyrics overlay. It's
+  third-party: we only call its existing API at `LEIHU_URL` (default `http://127.0.0.1:8765`)
+  and keep changes to it minimal
+- Polls its `/api/songs` + `/api/status` every 5s (30s while unreachable). Offline = no badges,
+  the queue works as before
+- A queue entry links to a Leihu song by **YouTube video ID** (sheet column `SHEET_URL_COLUMN`
+  vs Leihu's `source_url`), or by a manual link picked on the dashboard and saved in
+  `song-links.json` (key `title|artist` lowercased → Leihu song ID), for audio-file imports
+- Dashboard badge per queued song: ready / preparing / failed / prepare (not in Leihu) /
+  link broken / link
+- `LEIHU_AUTO_PREPARE=1` (dashboard toggle): imports missing queued songs via Leihu's
+  `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
+  request is sent once per server run. Keys outside whole semitones ±6 are skipped
+- Leihu's import returns an error for duplicates only after the download step — never send
+  the same video twice; the `requested` map in leihu.js prevents it
+
 ---
 
 ## Chat commands (mods and broadcaster only)
@@ -212,6 +231,10 @@ register it in index.js.
 | GET | `/api/history` | Request history snapshot (startup state) |
 | GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness |
 | GET | `/api/hls`, `/api/clip-stream` | Proxies for Twitch clip playback (Twitch hosts only) |
+| GET | `/api/leihu/status` | Leihu state of nowPlaying + queue, keyed by title + artist |
+| GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
+| POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
+| POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
 
 Setup wizard (`/setup/api/*`): `status`, `validate-client-id`, `start-device-auth`,
 `poll-device-auth`, `rewards`, `create-rewards`, `upload-credentials`, `validate-sheet`,
@@ -229,10 +252,13 @@ See `.env.example` for full descriptions.
 - `TWITCH_RANDOM_REWARDS` — JSON array of random song rewards; each entry has `id`, `name`, and `tabs` (empty array = all tabs)
 - `GOOGLE_SHEET_ID` — song list sheet
 - `SHEET_SONG_COLUMN` / `SHEET_ARTIST_COLUMN` / `SHEET_KEY_COLUMN` — column headers (e.g. `曲名`, `歌手名`, `key`)
+- `SHEET_URL_COLUMN` — optional YouTube link column, links songs to Leihu Singsing
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
 - `PORT` — default 3000
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
 - `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS` — also adjustable from the dashboard
+- `LEIHU_URL` — Leihu Singsing address (default `http://127.0.0.1:8765`)
+- `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
 
 ---
 

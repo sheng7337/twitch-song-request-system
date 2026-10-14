@@ -411,6 +411,42 @@
   .h-days { font-size: 9px; color: var(--text-muted); }
   .h-req  { font-size: 9px; color: var(--blue); opacity: 0.6; }
 
+  /* Leihu Singsing backing-track badge (filled in by paintBadges) */
+  .bt-badge {
+    display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 3px;
+    font-family: 'Share Tech Mono', monospace; font-size: 10px; white-space: nowrap;
+    border: 1px solid var(--border); color: var(--text-dim); background: transparent;
+  }
+  .bt-badge:empty { display: none; }
+  .bt-badge.click { cursor: pointer; }
+  .bt-badge.click:hover { background: rgba(176,106,255,0.12); }
+  .bt-badge.ready      { color: var(--green); border-color: var(--border-green); }
+  .bt-badge.processing { color: var(--amber); border-color: var(--border-amber); }
+  .bt-badge.missing    { color: var(--blue);  border-color: rgba(90,154,255,0.3); }
+  .bt-badge.failed, .bt-badge.broken { color: var(--red); border-color: rgba(255,90,90,0.3); }
+
+  .picker-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .picker {
+    width: min(520px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column; gap: 8px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px;
+  }
+  .picker-title { font-size: 12px; color: var(--purple); }
+  .picker input {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 6px 8px; font-size: 12px;
+  }
+  .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .picker-item {
+    padding: 6px 8px; border-radius: 3px; cursor: pointer; font-size: 12px; color: var(--text);
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .picker-item:hover, .picker-item.cur { background: var(--bg-hover); }
+  .picker-item .st { color: var(--text-dim); font-size: 10px; white-space: nowrap; }
+  .picker-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
   .toast {
     font-size: 10px; padding: 4px 10px; border-radius: 3px;
     opacity: 0; transition: opacity .3s;
@@ -449,6 +485,10 @@
            oninput="document.getElementById('brightness-value').textContent = this.value" />
     <span class="opacity-value" id="brightness-value">1</span>
     <button class="btn" onclick="saveBrightness()">Save</button>
+  </span>
+  <span class="cooldown-group" title="Leihu Singsing (backing tracks + lyrics). Auto-prepare imports queued songs from the sheet's YouTube link and renders their key ahead of time — this uses the GPU during stream.">
+    🎤 <span id="leihu-state">Leihu offline</span>
+    <label><input type="checkbox" id="leihu-auto" onchange="saveLeihuAuto()" /> auto-prepare</label>
   </span>
   <button class="btn skip" onclick="api('skip')">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm('Clear entire queue?')) api('clear')">✕ Clear All</button>
@@ -534,7 +574,7 @@ function connect() {
   ws = new WebSocket(WS_URL);
   ws.onopen  = () => { document.getElementById('dot').classList.remove('off'); clearTimeout(reconnectTimer); };
   ws.onclose = () => { document.getElementById('dot').classList.add('off'); reconnectTimer = setTimeout(connect, 3000); };
-  ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'state') { state = m; render(); } } catch(_){} };
+  ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'state') { state = m; render(); pollLeihu(); } } catch(_){} };
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
@@ -562,6 +602,7 @@ function render() {
           </div>
           ${nowPlaying.artist ? `<div class="song-artist" style="font-size:13px;color:var(--text-dim);margin-top:2px;">${esc(nowPlaying.artist)}</div>` : ''}
           ${historyHtml(nowPlaying.title)}
+          <span class="bt-badge" data-zone="nowPlaying" data-index="0"></span>
         </div>
         ${nowPlaying.key != null && nowPlaying.key !== '' ? `<span class="key-badge">${nowPlaying.key >= 0 ? '+' : ''}${esc(nowPlaying.key)}</span>` : ''}
         <button class="copy-btn" onclick="copyTitle('${esc(nowPlaying.title)}')" title="Copy title">⧉</button>
@@ -592,6 +633,7 @@ function render() {
         </div>
         ${item.artist ? `<div class="song-artist" style="font-size:11px;color:var(--text-dim);margin-top:2px;">${esc(item.artist)}</div>` : ''}
         ${historyHtml(item.title)}
+        <span class="bt-badge" data-zone="queue" data-index="${i}"></span>
       </div>
       ${item.key != null && item.key !== '' ? `<span class="key-badge">${item.key >= 0 ? '+' : ''}${esc(item.key)}</span>` : ''}
       <button class="copy-btn" onclick="copyTitle('${esc(item.title)}')" title="Copy title">⧉</button>
@@ -680,6 +722,8 @@ function render() {
       </div>
     </div>`;
   }).join('');
+
+  paintBadges();
 }
 
 // ── Drag & Drop ────────────────────────────────────────────────────────────────
@@ -811,6 +855,7 @@ async function loadSettings() {
     document.getElementById('opacity-value').textContent = settings.panelBgAlpha;
     document.getElementById('brightness-input').value = settings.textBrightness;
     document.getElementById('brightness-value').textContent = settings.textBrightness;
+    document.getElementById('leihu-auto').checked = settings.leihuAutoPrepare;
   } catch(_) {}
 }
 
@@ -1033,6 +1078,132 @@ async function api(endpoint, body = {}) {
   }
 }
 
+// ── Leihu Singsing badges ─────────────────────────────────────────────────────
+// Server reports each queued song's state in Leihu, keyed by "title|artist".
+// Badges are patched in place (not via render()) so polling never interrupts a drag.
+let leihuStatus = { online: false, songs: {} };
+
+const BT_LABEL = {
+  ready: '♫ ready', processing: '♫ preparing…', failed: '♫ failed · retry',
+  missing: '♫ prepare', broken: '♫ link broken', unlinked: '♫ link',
+};
+const BT_HINT = {
+  ready: 'Backing track and lyrics are ready in Leihu Singsing',
+  processing: 'Leihu Singsing is preparing this song',
+  failed: 'Leihu Singsing could not finish this song — click to try again',
+  missing: "Not in Leihu Singsing yet — click to import it from the sheet's YouTube link",
+  broken: 'The linked Leihu Singsing song no longer exists — click to pick another',
+  unlinked: 'No YouTube link in the sheet — click to pick the matching Leihu Singsing song',
+};
+
+function songKey(title, artist) {
+  return `${(title || '').trim().toLowerCase()}|${(artist || '').trim().toLowerCase()}`;
+}
+
+function entryAt(zone, index) {
+  return zone === 'nowPlaying' ? state.nowPlaying : (state.queue || [])[index];
+}
+
+function paintBadges() {
+  document.getElementById('leihu-state').textContent = leihuStatus.online ? 'Leihu' : 'Leihu offline';
+  for (const el of document.querySelectorAll('.bt-badge')) {
+    const entry = entryAt(el.dataset.zone, Number(el.dataset.index));
+    const st = entry && leihuStatus.songs[songKey(entry.title, entry.artist)];
+    const s = st && st.state !== 'offline' ? st.state : null;
+    const clickable = s && ((s !== 'ready' && s !== 'processing') || st.manual);
+    el.className = 'bt-badge' + (s ? ' ' + s : '') + (clickable ? ' click' : '');
+    el.textContent = s ? BT_LABEL[s] : '';
+    el.title = s ? BT_HINT[s] + (st.leihuTitle ? `\nLeihu: ${st.leihuTitle}` : '') + (st.manual ? '\n(manual link — click to change)' : '') : '';
+    el.onclick = clickable ? () => onBadgeClick(entry, st) : null;
+  }
+}
+
+async function pollLeihu() {
+  try {
+    const res = await fetch('/api/leihu/status');
+    leihuStatus = await res.json();
+  } catch(_) {
+    leihuStatus = { online: false, songs: {} };
+  }
+  paintBadges();
+}
+
+async function onBadgeClick(entry, st) {
+  if (st.state === 'missing' || (st.state === 'failed' && !st.manual)) {
+    await fetch('/api/leihu/prepare', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: entry.title, artist: entry.artist, key: entry.key }),
+    });
+    showToast(`preparing "${entry.title}" in Leihu`);
+    pollLeihu();
+  } else {
+    openPicker(entry, st);
+  }
+}
+
+async function saveLeihuAuto() {
+  const on = document.getElementById('leihu-auto').checked;
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leihuAutoPrepare: on }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(on ? 'Leihu auto-prepare on' : 'Leihu auto-prepare off');
+  } catch(_) {
+    showToast('failed to save auto-prepare', true);
+  }
+}
+
+// One-time manual link for songs imported into Leihu as audio files
+async function openPicker(entry, st) {
+  let library = [];
+  try { library = await (await fetch('/api/leihu/library')).json(); } catch(_) {}
+  const back = document.createElement('div');
+  back.className = 'picker-backdrop';
+  back.innerHTML = `
+    <div class="picker">
+      <div class="picker-title">Link "${esc(entry.title)}" to a Leihu Singsing song</div>
+      <input type="text" placeholder="filter..." />
+      <div class="picker-list"></div>
+      <div class="picker-actions">
+        ${st.manual ? '<button class="btn danger" data-act="unlink">Unlink</button>' : ''}
+        <button class="btn" data-act="close">Cancel</button>
+      </div>
+    </div>`;
+  const input = back.querySelector('input');
+  const list = back.querySelector('.picker-list');
+  const close = () => back.remove();
+  const link = async (id) => {
+    await fetch('/api/leihu/link', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: entry.title, artist: entry.artist, id }),
+    });
+    close();
+    showToast(id ? `linked "${entry.title}"` : `unlinked "${entry.title}"`);
+    pollLeihu();
+  };
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    const items = library.filter(s => !q || s.title.toLowerCase().includes(q));
+    list.innerHTML = items.length
+      ? items.map(s => `<div class="picker-item${s.id === st.id ? ' cur' : ''}" data-id="${esc(s.id)}"><span>${esc(s.title)}</span><span class="st">${esc(s.state)}</span></div>`).join('')
+      : '<div class="picker-item"><span class="st">no songs</span></div>';
+  };
+  list.onclick = (e) => { const item = e.target.closest('[data-id]'); if (item) link(item.dataset.id); };
+  back.onclick = (e) => {
+    if (e.target === back || e.target.dataset.act === 'close') close();
+    if (e.target.dataset.act === 'unlink') link(null);
+  };
+  input.oninput = draw;
+  // Start filtered by the song title; fall back to the full list if nothing matches
+  input.value = entry.title;
+  draw();
+  if (!list.querySelector('[data-id]')) { input.value = ''; draw(); }
+  document.body.appendChild(back);
+  input.focus();
+}
+
 function esc(s) {
   return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1041,6 +1212,8 @@ connect();
 loadSongList();
 loadHistory();
 loadSettings();
+pollLeihu();
+setInterval(pollLeihu, 5000);
 </script>
 </body>
 </html>

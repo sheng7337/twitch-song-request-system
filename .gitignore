@@ -10,6 +10,7 @@ google-credentials.json
 song-cache.json
 setup-progress.json
 queue-state.json
+song-links.json
 package-lock.json
 clip-player/sponsor-voice.wav
 clip-player/sponsor-voice.mp3

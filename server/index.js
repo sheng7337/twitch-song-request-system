@@ -22,6 +22,7 @@ const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
+const leihu = require('./leihu');
 
 const app = express();
 const server = http.createServer(app);
@@ -402,6 +403,28 @@ app.get('/api/clip-stream', async (req, res) => {
   }
 });
 
+// ── Leihu Singsing (backing tracks + lyrics, optional) ───────────────────────
+app.get('/api/leihu/status', (req, res) => res.json(leihu.getStatus()));
+app.get('/api/leihu/library', (req, res) => res.json(leihu.getLibrary()));
+
+// Manual link for a song imported into Leihu as an audio file. id: null unlinks.
+app.post('/api/leihu/link', async (req, res) => {
+  const { title, artist, id } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  if (id != null && !/^[a-z0-9]{6,16}$/.test(id)) return res.status(400).json({ error: 'invalid id' });
+  leihu.setLink(title, artist, id || null);
+  res.json({ ok: true });
+});
+
+// Import / render the key of one song now, whether or not auto-prepare is on.
+app.post('/api/leihu/prepare', async (req, res) => {
+  const { title, artist, key } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  await leihu.prepare({ title, artist, key }, { retry: true });
+  await leihu.refresh();
+  res.json({ ok: true });
+});
+
 app.get('/api/history', (req, res) => res.json(getHistory()));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');
@@ -430,6 +453,7 @@ app.get('/api/settings', (req, res) => {
     randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS,
     panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
     textBrightness: Number.isFinite(brightness) && brightness >= TEXT_BRIGHTNESS_MIN && brightness <= TEXT_BRIGHTNESS_MAX ? brightness : TEXT_BRIGHTNESS_DEFAULT,
+    leihuAutoPrepare: process.env.LEIHU_AUTO_PREPARE === '1',
   });
 });
 
@@ -465,6 +489,11 @@ app.post('/api/settings', (req, res) => {
     broadcastSettings({ textBrightness: brightness });
   }
 
+  if (req.body.leihuAutoPrepare !== undefined) {
+    updates.leihuAutoPrepare = !!req.body.leihuAutoPrepare;
+    setupRouter.writeEnvValues({ LEIHU_AUTO_PREPARE: updates.leihuAutoPrepare ? '1' : '0' });
+  }
+
   res.json({ ok: true, ...updates });
 });
 
@@ -494,6 +523,7 @@ async function start() {
   }
 
   generateSponsorVoice();
+  leihu.start();
 
   server.listen(PORT, () => {
     console.log(`\n✅ Server running at http://localhost:${PORT}`);

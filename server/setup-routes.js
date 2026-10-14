@@ -368,12 +368,13 @@ router.post('/validate-sheet', async (req, res) => {
 
 // POST /setup/api/save-columns — save chosen column names
 router.post('/save-columns', (req, res) => {
-  const { sheetId, songColumn, artistColumn, keyColumn } = req.body;
+  const { sheetId, songColumn, artistColumn, keyColumn, urlColumn } = req.body;
   const values = {
     GOOGLE_SHEET_ID: sheetId,
     SHEET_SONG_COLUMN: songColumn,
     SHEET_ARTIST_COLUMN: artistColumn,
     SHEET_KEY_COLUMN: keyColumn || 'key',
+    SHEET_URL_COLUMN: urlColumn || '',
   };
   writeEnvValues(values);
   res.json({ ok: true });
