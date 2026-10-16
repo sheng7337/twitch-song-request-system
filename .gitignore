@@ -11,6 +11,7 @@ song-cache.json
 setup-progress.json
 queue-state.json
 song-links.json
+link-search.json
 package-lock.json
 clip-player/sponsor-voice.wav
 clip-player/sponsor-voice.mp3

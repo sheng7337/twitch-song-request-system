@@ -219,6 +219,12 @@ function getLibrary() {
   return (library || []).map(s => ({ id: s.id, title: s.title, state: songState(s) }));
 }
 
+// Leihu song (id + state) imported from this YouTube video, or null. Null also while offline.
+function findByVideo(vid) {
+  const song = (library || []).find(s => s.videoId === vid);
+  return song ? { id: song.id, state: songState(song) } : null;
+}
+
 // Ask Leihu's practice window to open a ready song at its sheet key (0 if the key
 // can't be used). Needs Leihu's remote-open patch. Returns the key used.
 async function open(entry) {
@@ -232,6 +238,6 @@ async function open(entry) {
 }
 
 module.exports = {
-  start, getStatus, getLibrary, setLink, prepare, open, refresh, importVideo, tabLanguage,
+  start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, tabLanguage,
   baseUrl, videoId, transpose, songKey,
 };

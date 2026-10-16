@@ -23,6 +23,7 @@ const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
 const leihu = require('./leihu');
+const linkFinder = require('./link-finder');
 
 const app = express();
 const server = http.createServer(app);
@@ -433,6 +434,44 @@ app.post('/api/leihu/open', async (req, res) => {
     res.json({ ok: true, key: await leihu.open({ title, artist, key }) });
   } catch (err) {
     res.status(400).json({ error: err.response?.data?.error || err.message });
+  }
+});
+
+// ── YouTube link finder (fills SHEET_URL_COLUMN, see link-finder.js) ─────────
+app.get('/api/links', (req, res) => res.json(linkFinder.getView()));
+app.post('/api/links/start', async (req, res) => res.json(await linkFinder.start({ limit: Number(req.body.limit) || 0 })));
+app.post('/api/links/stop', (req, res) => res.json(linkFinder.stop()));
+app.post('/api/links/accept-confident', (req, res) => res.json({ ok: true, accepted: linkFinder.acceptConfident() }));
+
+// decision: 'accepted' (with videoId: an ID or any YouTube link), 'skipped', or null to undo
+app.post('/api/links/decide', (req, res) => {
+  const { key, decision, videoId } = req.body;
+  if (![null, 'accepted', 'skipped'].includes(decision ?? null)) return res.status(400).json({ error: 'invalid decision' });
+  try {
+    linkFinder.decide(key, decision ?? null, videoId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/links/save', async (req, res) => {
+  try {
+    const result = await linkFinder.save();
+    if (result.written) require('./sheets').fetchSongs().catch(() => {});
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/links/check', async (req, res) => {
+  const { key, videoId } = req.body;
+  try {
+    await linkFinder.check(key, videoId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

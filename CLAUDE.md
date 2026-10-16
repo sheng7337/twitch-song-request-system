@@ -56,6 +56,8 @@ vtuber-song-queue/
 │   ├── queue.js           Queue state, broadcast to clients, persisted to queue-state.json
 │   ├── random.js          Weighted/pure random picker with tab filter and cooldown
 │   ├── leihu.js           Optional link to Leihu Singsing (backing tracks + lyrics), song-links.json
+│   ├── link-finder.js     Finds YouTube links for the sheet (search job, review, writes the sheet)
+│   ├── link-score.js      Scores YouTube candidates against the lyric version (pure functions)
 │   ├── history.js         Request history sheet (debounced 1.5s), startup snapshot
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
 │   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
@@ -66,11 +68,13 @@ vtuber-song-queue/
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
 ├── dashboard/index.html   Streamer control panel — 4 columns, drag/drop, history, manual add, settings
+├── dashboard/links.html   YouTube link finder review page
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)
 │   ├── hls.min.js
 │   └── sponsor-bgs/       !tk background images (one picked at random each time)
 ├── test/                  node:test suite (`npm test`), stubs Google Sheets
+├── tools/find-videos.py   Lyric-site + YouTube search, run with Leihu Singsing's bundled Python
 ├── setup.ps1 / setup_zh.ps1   Terminal setup wizard (alternative to the web wizard)
 ├── start.ps1 / start_zh.ps1   Every-stream startup: starts server, opens browser when ready
 ├── *.bat                  Double-click launchers (avoid PowerShell execution-policy issues)
@@ -80,7 +84,8 @@ vtuber-song-queue/
 ```
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
-`setup-progress.json`, `queue-state.json`, `song-links.json`, `package-lock.json`, `.env` backups.
+`setup-progress.json`, `queue-state.json`, `song-links.json`, `link-search.json`, `package-lock.json`,
+`.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -185,6 +190,28 @@ vtuber-song-queue/
 - Leihu's import returns an error for duplicates only after the download step — never send
   the same video twice; the `requested` map in leihu.js prevents it
 
+### YouTube link finder (link-finder.js, link-score.js, tools/find-videos.py)
+- Fills `SHEET_URL_COLUMN` for songs without a link. Review page: `/dashboard/links.html`
+- Search: `tools/find-videos.py` runs with **Leihu's bundled Python** (`<root>/python/python.exe`,
+  root from Leihu's `/api/status`, so Leihu must be running) and calls Leihu's own
+  `search_lrclib/netease/kugou`, `_norm`, `to_simplified` and yt-dlp (`ytsearch10`, metadata
+  only). Zero changes to Leihu; the helper refuses to run if those functions are missing.
+  JSON lines in/out. ~7.5 s per song (LRCLIB often errors from here; NetEase/Kugou carry 中文)
+- Scoring (link-score.js): reference length = the lyric-result length (exact title, artist
+  preferred) with the most support from other lyric results and videos. Tiers match Leihu:
+  ≤3 s exact (timed lyrics used as-is), ≤25 s and 0.8–1.25 ratio workable (Leihu re-times),
+  else off. Bonuses: "- Topic" channels, official/label channels, artist spelled as on the lyric
+  sites. Penalties: live, TV show, cover, instrumental/伴奏, remix, compilation, fan edit,
+  karaoke, other-language version (allowed when it is the tab's language)
+- Groups: confident (exact, clean, official, artist matches) / needs a look / nothing found
+- State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
+  is recomputed from the raw results, so scoring changes need no new search
+- Saving: proves Editor access with a no-op write of A1, re-reads the sheet, finds each row
+  again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW)
+- "Check with Leihu": imports the video into Leihu (language from the tab), waits for
+  processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
+  is unreliable (usual for 台語). Adds the song to Leihu's library
+
 ---
 
 ## Chat commands (mods and broadcaster only)
@@ -242,6 +269,13 @@ register it in index.js.
 | POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
+| GET | `/api/links` | Link finder: job progress + scored songs for review |
+| POST | `/api/links/start` | Search songs without a link `{limit?}` (resumes) |
+| POST | `/api/links/stop` | Stop the search |
+| POST | `/api/links/decide` | `{key, decision: 'accepted' \| 'skipped' \| null, videoId}` (videoId: ID or any YouTube link) |
+| POST | `/api/links/accept-confident` | Accept every confident pick |
+| POST | `/api/links/save` | Write accepted links into empty sheet cells |
+| POST | `/api/links/check` | Verify a candidate with Leihu `{key, videoId}` (imports it) |
 
 Setup wizard (`/setup/api/*`): `status`, `validate-client-id`, `start-device-auth`,
 `poll-device-auth`, `rewards`, `create-rewards`, `upload-credentials`, `validate-sheet`,
