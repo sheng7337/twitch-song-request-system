@@ -41,6 +41,14 @@ module.exports = {
   // Maximum weight for songs based on days since last request
   RANDOM_MAX_DAYS_WEIGHT: 180,
 
+
+  // ── Leihu Singsing ─────────────────────────────────────────────────────────
+
+  // Lyrics recognition language Leihu uses for songs imported from each sheet tab
+  // (zh, ja, en, ko, yue). Tabs not listed use Leihu's automatic detection —
+  // e.g. 台語, which no recognition language fits. Needs Leihu 1.4.7+.
+  LEIHU_TAB_LANGUAGES: { '國語': 'zh', '日語': 'ja' },
+
   // Overlay look and scroll speed are set in overlay/index.html
   // (CSS variables in <style>, SCROLL_PX_PER_SEC in <script>).
 

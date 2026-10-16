@@ -432,7 +432,7 @@
   .bt-badge.click { cursor: pointer; }
   .bt-badge.click:hover { background: rgba(176,106,255,0.12); }
   .bt-badge.ready      { color: var(--green); border-color: var(--border-green); }
-  .bt-badge.processing { color: var(--amber); border-color: var(--border-amber); }
+  .bt-badge.processing, .bt-badge.nolyrics { color: var(--amber); border-color: var(--border-amber); }
   .bt-badge.missing    { color: var(--blue);  border-color: rgba(90,154,255,0.3); }
   .bt-badge.failed, .bt-badge.broken { color: var(--red); border-color: rgba(255,90,90,0.3); }
 
@@ -1096,11 +1096,12 @@ async function api(endpoint, body = {}) {
 let leihuStatus = { online: false, songs: {} };
 
 const BT_LABEL = {
-  ready: '♫ ready', processing: '♫ preparing…', failed: '♫ failed · retry',
+  ready: '♫ ready', nolyrics: '♫ no lyrics', processing: '♫ preparing…', failed: '♫ failed · retry',
   missing: '♫ prepare', broken: '♫ link broken', unlinked: '♫ link',
 };
 const BT_HINT = {
   ready: 'Backing track and lyrics are ready in Leihu Singsing',
+  nolyrics: 'Backing track is ready, but Leihu Singsing could not recognize the lyrics — pick online lyrics in Leihu',
   processing: 'Leihu Singsing is preparing this song',
   failed: 'Leihu Singsing could not finish this song — click to try again',
   missing: "Not in Leihu Singsing yet — click to import it from the sheet's YouTube link",
@@ -1122,7 +1123,8 @@ function paintBadges() {
     const entry = entryAt(el.dataset.zone, Number(el.dataset.index));
     const st = entry && leihuStatus.songs[songKey(entry.title, entry.artist)];
     const s = st && st.state !== 'offline' ? st.state : null;
-    const clickable = s && ((s !== 'ready' && s !== 'processing') || st.manual);
+    const linked = s === 'ready' || s === 'nolyrics' || s === 'processing';
+    const clickable = s && (!linked || st.manual);
     el.className = 'bt-badge' + (s ? ' ' + s : '') + (clickable ? ' click' : '');
     el.textContent = s ? BT_LABEL[s] : '';
     el.title = s ? BT_HINT[s] + (st.leihuTitle ? `\nLeihu: ${st.leihuTitle}` : '') + (st.manual ? '\n(manual link — click to change)' : '') : '';
@@ -1132,7 +1134,7 @@ function paintBadges() {
   const np = state.nowPlaying;
   const npSt = np && leihuStatus.songs[songKey(np.title, np.artist)];
   for (const btn of document.querySelectorAll('.sing-btn')) {
-    btn.hidden = !(leihuStatus.canOpen && npSt && npSt.state === 'ready');
+    btn.hidden = !(leihuStatus.canOpen && npSt && (npSt.state === 'ready' || npSt.state === 'nolyrics'));
   }
 }
 

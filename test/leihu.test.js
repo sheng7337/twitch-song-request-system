@@ -12,15 +12,16 @@ const axiosStub = {
     if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}) } };
     throw new Error('unexpected GET ' + url);
   },
-  post: async (url, body) => { posts.push({ url, body }); return { data: {} }; },
+  post: async (url, body) => { posts.push({ url, body }); return { data: url.endsWith('/api/youtube') ? { id: 'newsong001' } : {} }; },
+  patch: async (url, body) => { posts.push({ url, body, method: 'PATCH' }); return { data: {} }; },
 };
 const axiosPath = require.resolve('axios');
 require.cache[axiosPath] = { id: axiosPath, filename: axiosPath, loaded: true, exports: axiosStub };
 
 const sheet = [
-  { title: '很愛很愛你', artist: '劉若英', key: '-2', url: 'https://youtu.be/3znMCsScCxo?t=30' },
-  { title: '空色デイズ', artist: '中川翔子', key: '', url: 'https://www.youtube.com/watch?v=vVGa8I0Atcg&list=PL1' },
-  { title: 'No Link', artist: 'x', key: '', url: '' },
+  { title: '很愛很愛你', artist: '劉若英', key: '-2', url: 'https://youtu.be/3znMCsScCxo?t=30', tab: '國語' },
+  { title: '空色デイズ', artist: '中川翔子', key: '', url: 'https://www.youtube.com/watch?v=vVGa8I0Atcg&list=PL1', tab: '日語' },
+  { title: 'No Link', artist: 'x', key: '', url: '', tab: '台語' },
 ];
 const queueState = { nowPlaying: null, queue: [] };
 stubModule('sheets.js', { getSongs: () => sheet });
@@ -29,6 +30,7 @@ console.log = console.error = () => {};
 const L = require('../server/leihu');
 
 const done = { import: true, separate: true, pitch: true, lyrics: true };
+const LYR = 'la la la';
 const entry = (s) => ({ title: s.title, artist: s.artist, key: s.key });
 const statusOf = (s) => L.getStatus().songs[L.songKey(s.title, s.artist)];
 
@@ -54,7 +56,7 @@ test('only whole-semitone keys within ±6 are sent to Leihu', () => {
 
 test('songs match by video ID and report their Leihu state', async () => {
   leihu.songs = [
-    { id: 'aaaaaaaaaa', title: 'YouTube title 1', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done },
+    { id: 'aaaaaaaaaa', title: 'YouTube title 1', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done, lyrics_text: LYR },
     { id: 'bbbbbbbbbb', title: 'YouTube title 2', source_url: 'https://www.youtube.com/watch?v=vVGa8I0Atcg', steps: { ...done, lyrics: false } },
   ];
   leihu.jobs = [{ song: 'bbbbbbbbbb', status: 'running' }];
@@ -79,10 +81,13 @@ test('a missing song is imported once, then its key is rendered once', async () 
   posts.length = 0;
   await L.prepare(entry(sheet[0]));
   await L.prepare(entry(sheet[0]));
-  assert.deepStrictEqual(posts, [{ url: 'http://127.0.0.1:8765/api/youtube', body: { url: 'https://www.youtube.com/watch?v=3znMCsScCxo' } }]);
+  assert.deepStrictEqual(posts, [
+    { url: 'http://127.0.0.1:8765/api/youtube', body: { url: 'https://www.youtube.com/watch?v=3znMCsScCxo' } },
+    { url: 'http://127.0.0.1:8765/api/songs/newsong001', body: { lyrics_language: 'zh' }, method: 'PATCH' },
+  ]);
   assert.strictEqual(statusOf(sheet[0]).state, 'processing');
 
-  leihu.songs = [{ id: 'cccccccccc', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done }];
+  leihu.songs = [{ id: 'cccccccccc', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done, lyrics_text: LYR }];
   await L.refresh();
   posts.length = 0;
   await L.prepare(entry(sheet[0]));
@@ -100,7 +105,7 @@ test('everything shows offline while Leihu is not running', async () => {
 });
 
 test('Sing opens a ready song at its sheet key, only when Leihu supports it', async () => {
-  leihu.songs = [{ id: 'aaaaaaaaaa', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done }];
+  leihu.songs = [{ id: 'aaaaaaaaaa', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done, lyrics_text: LYR }];
   leihu.jobs = [];
   leihu.remote = false;
   await L.refresh();
@@ -116,4 +121,23 @@ test('Sing opens a ready song at its sheet key, only when Leihu supports it', as
   assert.deepStrictEqual(posts.map(p => p.body), [{ id: 'aaaaaaaaaa', key: -2 }, { id: 'aaaaaaaaaa', key: 0 }]);
   assert.ok(posts.every(p => p.url === 'http://127.0.0.1:8765/api/remote/open'));
   await assert.rejects(L.open(entry(sheet[2])), /not ready/);
+});
+
+test('a processed song with blank lyrics shows as no lyrics, but can still be sung', async () => {
+  leihu.songs = [{ id: 'aaaaaaaaaa', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done, lyrics_text: '' }];
+  leihu.jobs = [];
+  leihu.remote = true;
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'nolyrics');
+  posts.length = 0;
+  assert.strictEqual(await L.open(entry(sheet[0])), -2);
+});
+
+test('the recognition language comes from the sheet tab; unlisted tabs stay automatic', async () => {
+  assert.strictEqual(L.tabLanguage('國語'), 'zh');
+  assert.strictEqual(L.tabLanguage('日語'), 'ja');
+  assert.strictEqual(L.tabLanguage('台語'), null);
+  posts.length = 0;
+  await L.importVideo('dQw4w9WgXcQ', '台語');
+  assert.deepStrictEqual(posts.map(p => p.url), ['http://127.0.0.1:8765/api/youtube']);
 });

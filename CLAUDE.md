@@ -171,8 +171,14 @@ vtuber-song-queue/
 - A queue entry links to a Leihu song by **YouTube video ID** (sheet column `SHEET_URL_COLUMN`
   vs Leihu's `source_url`), or by a manual link picked on the dashboard and saved in
   `song-links.json` (key `title|artist` lowercased → Leihu song ID), for audio-file imports
-- Dashboard badge per queued song: ready / preparing / failed / prepare (not in Leihu) /
-  link broken / link
+- Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
+  Leihu) / link broken / link. "No lyrics": Leihu 1.4.7+ finishes processing with blank lyrics
+  when its recognition is unreliable — the streamer picks online lyrics in Leihu
+- Imports set Leihu's per-song recognition language from the sheet tab
+  (`LEIHU_TAB_LANGUAGES` in config.js; 台語 stays automatic). Needs Leihu 1.4.7+
+- Sing button (Now Playing): asks Leihu's practice window to open the song at the sheet key.
+  Needs the remote-open patch (`/api/remote/open`, local branch `remote-open` in the Leihu
+  repo, not upstream yet); shown only when Leihu's `/api/status` has a `remote` field
 - `LEIHU_AUTO_PREPARE=1` (dashboard toggle): imports missing queued songs via Leihu's
   `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
   request is sent once per server run. Keys outside whole semitones ±6 are skipped
@@ -235,6 +241,7 @@ register it in index.js.
 | GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
 | POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
+| POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
 
 Setup wizard (`/setup/api/*`): `status`, `validate-client-id`, `start-device-auth`,
 `poll-device-auth`, `rewards`, `create-rewards`, `upload-credentials`, `validate-sheet`,
@@ -271,6 +278,7 @@ See `.env.example` for full descriptions.
 - `MATCH_TITLE_WEIGHT` / `MATCH_ARTIST_WEIGHT` — matching weights
 - `RANDOM_NEVER_REQUESTED_WEIGHT` — weight for songs never requested (default 365)
 - `RANDOM_MAX_DAYS_WEIGHT` — weight cap for old songs (default 180)
+- `LEIHU_TAB_LANGUAGES` — Leihu recognition language per sheet tab
 
 ---
 

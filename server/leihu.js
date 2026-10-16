@@ -15,6 +15,7 @@ const path = require('path');
 const axios = require('axios');
 const { getSongs } = require('./sheets');
 const { getState } = require('./queue');
+const config = require('./config');
 
 const LINKS_PATH = path.join(__dirname, '..', 'song-links.json');
 const POLL_MS = 5000;
@@ -84,6 +85,8 @@ async function refresh() {
       title: m.title,
       videoId: videoId(m.source_url),
       complete: !!(m.steps && m.steps.import && m.steps.separate && m.steps.pitch && m.steps.lyrics),
+      // Leihu 1.4.7+ finishes the lyrics step with blank lyrics when its recognition is unreliable
+      hasLyrics: !!(m.lyrics_text && m.lyrics_text.trim()),
     }));
     canOpen = 'remote' in statusRes.data;
     activeJobs = new Set((statusRes.data.jobs || [])
@@ -105,12 +108,32 @@ function sheetSong(title, artist) {
 
 function songState(song) {
   if (activeJobs.has(song.id)) return 'processing';
-  return song.complete ? 'ready' : 'failed';
+  if (!song.complete) return 'failed';
+  return song.hasLyrics ? 'ready' : 'nolyrics';
+}
+
+// Leihu's recognition language for a sheet tab (config.LEIHU_TAB_LANGUAGES), or null = automatic.
+function tabLanguage(tab) {
+  return (config.LEIHU_TAB_LANGUAGES || {})[tab] || null;
+}
+
+// Import a YouTube video into Leihu and set its recognition language from the sheet tab.
+// Returns Leihu's new song ID. Setting the language needs Leihu 1.4.7+ (older versions ignore it).
+async function importVideo(vid, tab) {
+  const res = await axios.post(`${baseUrl()}/api/youtube`, { url: `https://www.youtube.com/watch?v=${vid}` }, { timeout: 10000 });
+  const id = res.data && res.data.id;
+  const lang = tabLanguage(tab);
+  if (id && lang) {
+    await axios.patch(`${baseUrl()}/api/songs/${id}`, { lyrics_language: lang }, { timeout: 5000 })
+      .catch(err => console.error(`[leihu] Could not set language for ${id}:`, err.message));
+  }
+  return id;
 }
 
 // Where a queue entry stands in Leihu:
 //   offline     — Leihu isn't running
 //   ready       — linked and fully processed
+//   nolyrics    — processed, but Leihu left the lyrics blank (pick them in Leihu)
 //   processing  — linked, Leihu is working on it
 //   failed      — linked, but processing stopped before finishing
 //   missing     — sheet has a YouTube link that isn't in Leihu yet (can import)
@@ -146,13 +169,13 @@ async function prepare(entry, { retry = false } = {}) {
     if (requested.has(tag)) return;
     requested.set(tag, 'sent');
     try {
-      await axios.post(`${baseUrl()}/api/youtube`, { url: `https://www.youtube.com/watch?v=${vid}` }, { timeout: 10000 });
+      await importVideo(vid, sheetSong(entry.title, entry.artist)?.tab);
       console.log(`[leihu] Importing "${entry.title}" from YouTube`);
     } catch (err) {
       requested.set(tag, 'failed');
       console.error(`[leihu] Import of "${entry.title}" failed:`, err.response?.data?.error || err.message);
     }
-  } else if (status.state === 'ready') {
+  } else if (status.state === 'ready' || status.state === 'nolyrics') {
     const k = transpose(entry.key);
     if (!k) return;
     const tag = `key:${status.id}:${k}`;
@@ -201,11 +224,14 @@ function getLibrary() {
 async function open(entry) {
   if (!canOpen) throw new Error('Leihu Singsing does not support remote open');
   const status = statusFor(entry.title, entry.artist);
-  if (status.state !== 'ready') throw new Error(`song is not ready in Leihu (${status.state})`);
+  if (status.state !== 'ready' && status.state !== 'nolyrics') throw new Error(`song is not ready in Leihu (${status.state})`);
   const key = transpose(entry.key) ?? 0;
   await axios.post(`${baseUrl()}/api/remote/open`, { id: status.id, key }, { timeout: 5000 });
   console.log(`[leihu] Opening "${entry.title}" at key ${key > 0 ? '+' : ''}${key}`);
   return key;
 }
 
-module.exports = { start, getStatus, getLibrary, setLink, prepare, open, refresh, videoId, transpose, songKey };
+module.exports = {
+  start, getStatus, getLibrary, setLink, prepare, open, refresh, importVideo, tabLanguage,
+  baseUrl, videoId, transpose, songKey,
+};
