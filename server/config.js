@@ -11,6 +11,11 @@ module.exports = {
   // Tabs to exclude from the song list (e.g. practice/draft tabs)
   EXCLUDED_TABS: ['待練勿點'],
 
+  // Header of the YouTube link column. It isn't set up by hand: the link finder
+  // (dashboard → 🔗 links) creates it in a tab the first time it saves links
+  // there, and fills it. Leihu Singsing matches songs to backing tracks by it.
+  YT_LINK_HEADER: 'YTLink',
+
   // How often to refresh the song list from Google Sheets (milliseconds)
   SHEET_REFRESH_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
 

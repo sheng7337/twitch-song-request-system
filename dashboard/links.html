@@ -148,7 +148,8 @@
   <div class="hint">
     Finds, for each song in your sheet without a YouTube link, the video whose recording matches the
     lyrics Leihu Singsing can find — so its backing track and timed lyrics line up. Nothing is written
-    to your sheet until you accept a video and press <b>Save to sheet</b>, and filled cells are never changed.
+    to your sheet until you accept a video and press <b>Save to sheet</b>. Links go into a <b>YTLink</b> column,
+    which is added to a tab the first time you save links there; filled cells are never changed.
     Leihu Singsing must be running.
   </div>
   <div class="job-line" id="job-line"></div>
@@ -227,7 +228,7 @@ function renderJob() {
   if (j.running) line.push(`Searching ${j.done} / ${j.total}${j.current ? ' — ' + esc(j.current) : ''} (about ${Math.ceil((j.total - j.done) * 7.5 / 60)} min left)`);
   else if (searched) line.push(`${searched} songs found so far`);
   if (view.written) line.push(`${view.written} links already saved to the sheet`);
-  if (j.skippedTabs && j.skippedTabs.length) line.push(`skipped tabs without the link column: ${j.skippedTabs.map(esc).join(', ')}`);
+  if (j.skippedTabs && j.skippedTabs.length) line.push(`skipped tabs without a song title column: ${j.skippedTabs.map(esc).join(', ')}`);
   document.getElementById('job-line').innerHTML = line.join(' · ');
   document.getElementById('job-error').textContent = j.error || '';
   const save = document.getElementById('btn-save');
@@ -378,7 +379,8 @@ async function saveLinks() {
   btn.disabled = true;
   try {
     const r = await post('save');
-    showToast(`saved ${r.written} links to the sheet${r.skipped ? `, ${r.skipped} skipped (see notes)` : ''}`);
+    const added = r.createdIn && r.createdIn.length ? `, added the YTLink column to ${r.createdIn.join(', ')}` : '';
+    showToast(`saved ${r.written} links to the sheet${added}${r.skipped ? `, ${r.skipped} skipped (see notes)` : ''}`);
   } catch (err) {
     showToast(err.message, true);
   }

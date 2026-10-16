@@ -1,8 +1,9 @@
 // server/link-finder.js
-// Fills the sheet's YouTube link column (SHEET_URL_COLUMN): finds, for each song
-// without a link, the video that matches its lyric version, lets the streamer
-// review the picks on /dashboard/links.html, then writes the accepted links into
-// the sheet — only into empty cells.
+// Owns the sheet's YouTube link column (header config.YT_LINK_HEADER, "YTLink"):
+// finds, for each song without a link, the video that matches its lyric version,
+// lets the streamer review the picks on /dashboard/links.html, then writes the
+// accepted links into the sheet — only into empty cells, creating the column in
+// a tab the first time links are saved there.
 //
 // Searching runs tools/find-videos.py with Leihu Singsing's bundled Python, so it
 // uses Leihu's own lyric sites and yt-dlp; Leihu must be running so we can find its
@@ -75,31 +76,35 @@ function findColumns(headerRow) {
   return {
     title: col(process.env.SHEET_SONG_COLUMN || 'title'),
     artist: col(process.env.SHEET_ARTIST_COLUMN || 'artist'),
-    url: col(process.env.SHEET_URL_COLUMN),
+    url: col(config.YT_LINK_HEADER),
   };
 }
 
-// Every tab's values, A:Z like sheets.js, excluding config.EXCLUDED_TABS.
+// Every tab's values, A:Z like sheets.js, excluding config.EXCLUDED_TABS, plus
+// what's needed to add a column (sheetId, columnCount).
 async function readTabs(api) {
-  const sheetId = process.env.GOOGLE_SHEET_ID;
-  const meta = await api.spreadsheets.get({ spreadsheetId: sheetId });
-  const tabs = meta.data.sheets.map(s => s.properties.title).filter(t => !config.EXCLUDED_TABS.includes(t));
-  const res = await api.spreadsheets.values.batchGet({ spreadsheetId: sheetId, ranges: tabs.map(t => `${quoteTab(t)}!A:Z`) });
-  return tabs.map((tab, i) => ({ tab, rows: res.data.valueRanges[i].values || [] }));
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const meta = await api.spreadsheets.get({ spreadsheetId });
+  const tabs = meta.data.sheets.map(s => s.properties).filter(p => !config.EXCLUDED_TABS.includes(p.title));
+  const res = await api.spreadsheets.values.batchGet({ spreadsheetId, ranges: tabs.map(p => `${quoteTab(p.title)}!A:Z`) });
+  return tabs.map((p, i) => ({
+    tab: p.title, sheetId: p.sheetId, columnCount: p.gridProperties?.columnCount ?? 26,
+    rows: res.data.valueRanges[i].values || [],
+  }));
 }
 
-// Sheet rows that have a title but an empty YouTube link cell.
+// Sheet rows that have a title but no YouTube link yet — including every row of a
+// tab that has no link column at all (it's created when links are first saved).
 async function rowsMissingLinks() {
-  if (!process.env.SHEET_URL_COLUMN) throw new Error('No YouTube link column chosen yet — pick it in Setup → song sheet step.');
   const tabs = await readTabs(await sheetsApi(false));
   const rows = [];
   const skippedTabs = [];
   for (const { tab, rows: values } of tabs) {
     const c = findColumns(values[0]);
-    if (c.title === -1 || c.url === -1) { skippedTabs.push(tab); continue; }
+    if (c.title === -1) { skippedTabs.push(tab); continue; }
     values.slice(1).forEach((r, i) => {
       const title = String(r[c.title] ?? '').trim();
-      if (!title || String(r[c.url] ?? '').trim()) return;
+      if (!title || (c.url !== -1 && String(r[c.url] ?? '').trim())) return;
       rows.push({ tab, row: i + 2, title, artist: c.artist !== -1 ? String(r[c.artist] ?? '').trim() : '' });
     });
   }
@@ -247,7 +252,7 @@ function acceptConfident() {
 // don't matter. Returns counts and per-song notes.
 async function save() {
   const pending = Object.values(state.songs).filter(s => s.decision === 'accepted' && !s.written && s.videoId);
-  if (!pending.length) return { written: 0, skipped: 0 };
+  if (!pending.length) return { written: 0, skipped: 0, createdIn: [] };
   let api;
   try {
     api = await sheetsApi(true);
@@ -266,13 +271,38 @@ async function save() {
     throw err;
   }
 
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   const tabs = await readTabs(api);
+
+  // A tab without the link column gets one, right after its last used header.
+  const grow = [];          // grid columns to add (a tab can be exactly as wide as its data)
+  const headerCells = [];
+  const createdIn = [];
+  for (const t of tabs) {
+    const c = findColumns(t.rows[0]);
+    if (c.title === -1 || c.url !== -1 || !pending.some(s => s.tab === t.tab)) continue;
+    const header = t.rows[0] || [];
+    let col = header.length;
+    while (col > 0 && !String(header[col - 1] ?? '').trim()) col--;
+    if (col >= 26) { t.full = true; continue; }   // songs are read from A:Z
+    if (col >= t.columnCount) grow.push({ appendDimension: { sheetId: t.sheetId, dimension: 'COLUMNS', length: col + 1 - t.columnCount } });
+    headerCells.push({ range: `${quoteTab(t.tab)}!${columnLetter(col)}1`, values: [[config.YT_LINK_HEADER]] });
+    t.rows[0] = Array.from({ length: col + 1 }, (_, i) => (i === col ? config.YT_LINK_HEADER : header[i] ?? ''));
+    createdIn.push(t.tab);
+  }
+  if (grow.length) await api.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: grow } });
+
   const data = [];
   let skipped = 0;
   for (const s of pending) {
     const t = tabs.find(x => x.tab === s.tab);
     const c = t && findColumns(t.rows[0]);
-    if (!t || c.title === -1 || c.url === -1) { s.note = 'tab or link column not found'; skipped++; continue; }
+    if (!t || c.title === -1) { s.note = 'tab or song column not found'; skipped++; continue; }
+    if (c.url === -1) {
+      s.note = t.full ? `this tab uses all columns A–Z — add a "${config.YT_LINK_HEADER}" column header yourself` : 'link column not found';
+      skipped++;
+      continue;
+    }
     const same = r => r && String(r[c.title] ?? '').trim() === s.title
       && (c.artist === -1 || String(r[c.artist] ?? '').trim() === s.artist);
     let idx = same(t.rows[s.row - 1]) ? s.row - 1 : t.rows.findIndex((r, i) => i > 0 && same(r));
@@ -280,16 +310,17 @@ async function save() {
     if (String(t.rows[idx][c.url] ?? '').trim()) { s.note = 'link cell already filled — left as is'; s.written = true; skipped++; continue; }
     data.push({ s, range: `${quoteTab(s.tab)}!${columnLetter(c.url)}${idx + 1}`, url: `https://www.youtube.com/watch?v=${s.videoId}` });
   }
-  if (data.length) {
+  if (data.length || headerCells.length) {
     await api.spreadsheets.values.batchUpdate({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      requestBody: { valueInputOption: 'RAW', data: data.map(d => ({ range: d.range, values: [[d.url]] })) },
+      spreadsheetId,
+      requestBody: { valueInputOption: 'RAW', data: [...headerCells, ...data.map(d => ({ range: d.range, values: [[d.url]] }))] },
     });
     for (const d of data) { d.s.written = true; d.s.note = ''; }
   }
   saveState();
-  console.log(`[links] Wrote ${data.length} links to the sheet, skipped ${skipped}`);
-  return { written: data.length, skipped };
+  console.log(`[links] Wrote ${data.length} links to the sheet, skipped ${skipped}` +
+    (createdIn.length ? `, added the ${config.YT_LINK_HEADER} column to ${createdIn.join(', ')}` : ''));
+  return { written: data.length, skipped, createdIn };
 }
 
 // ── "Check with Leihu" ───────────────────────────────────────────────────────

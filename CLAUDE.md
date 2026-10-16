@@ -173,7 +173,7 @@ vtuber-song-queue/
   and keep changes to it minimal
 - Polls its `/api/songs` + `/api/status` every 5s (30s while unreachable). Offline = no badges,
   the queue works as before
-- A queue entry links to a Leihu song by **YouTube video ID** (sheet column `SHEET_URL_COLUMN`
+- A queue entry links to a Leihu song by **YouTube video ID** (sheet column `YTLink`
   vs Leihu's `source_url`), or by a manual link picked on the dashboard and saved in
   `song-links.json` (key `title|artist` lowercased → Leihu song ID), for audio-file imports
 - Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
@@ -191,7 +191,10 @@ vtuber-song-queue/
   the same video twice; the `requested` map in leihu.js prevents it
 
 ### YouTube link finder (link-finder.js, link-score.js, tools/find-videos.py)
-- Fills `SHEET_URL_COLUMN` for songs without a link. Review page: `/dashboard/links.html`
+- Owns the sheet's YouTube link column: header `YTLink` (`YT_LINK_HEADER` in config.js), never
+  configured in `.env` or the wizard. Fills it for songs without a link; a tab without the
+  column is still searched, and gets the column (right after its last used header, growing
+  the grid if needed) the first time links are saved there. Review page: `/dashboard/links.html`
 - Search: `tools/find-videos.py` runs with **Leihu's bundled Python** (`<root>/python/python.exe`,
   root from Leihu's `/api/status`, so Leihu must be running) and calls Leihu's own
   `search_lrclib/netease/kugou`, `_norm`, `to_simplified` and yt-dlp (`ytsearch10`, metadata
@@ -207,7 +210,8 @@ vtuber-song-queue/
 - State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
   is recomputed from the raw results, so scoring changes need no new search
 - Saving: proves Editor access with a no-op write of A1, re-reads the sheet, finds each row
-  again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW)
+  again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW).
+  Songs are read from A:Z, so a tab already using all 26 columns can't get the column added
 - "Check with Leihu": imports the video into Leihu (language from the tab), waits for
   processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
   is unreliable (usual for 台語). Adds the song to Leihu's library
@@ -293,7 +297,6 @@ See `.env.example` for full descriptions.
 - `TWITCH_RANDOM_REWARDS` — JSON array of random song rewards; each entry has `id`, `name`, and `tabs` (empty array = all tabs)
 - `GOOGLE_SHEET_ID` — song list sheet
 - `SHEET_SONG_COLUMN` / `SHEET_ARTIST_COLUMN` / `SHEET_KEY_COLUMN` — column headers (e.g. `曲名`, `歌手名`, `key`)
-- `SHEET_URL_COLUMN` — optional YouTube link column, links songs to Leihu Singsing
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
 - `PORT` — default 3000
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
@@ -306,6 +309,7 @@ See `.env.example` for full descriptions.
 ## Tuneable settings (server/config.js)
 
 - `EXCLUDED_TABS` — sheet tabs to skip
+- `YT_LINK_HEADER` — header of the YouTube link column the link finder creates and fills (`YTLink`)
 - `SHEET_REFRESH_INTERVAL_MS` — how often to re-read the sheet (default 5min)
 - `AUTO_ACCEPT_THRESHOLD` — confidence % for auto-queue vs pending (default 80)
 - `MATCH_THRESHOLD` — fuse.js strictness 0-1 (default 0.4)

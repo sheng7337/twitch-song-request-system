@@ -5,7 +5,8 @@
 // as "offline" and the song queue works exactly as without it.
 //
 // A queue entry is linked to a Leihu song in one of two ways:
-//   1. The sheet's YouTube link column (SHEET_URL_COLUMN) has the same video
+//   1. The sheet's YouTube link column (config.YT_LINK_HEADER, filled by the
+//      link finder) has the same video
 //      as the Leihu song's source_url — compared by video ID.
 //   2. A manual link picked on the dashboard, saved in song-links.json
 //      (for songs imported into Leihu as audio files).

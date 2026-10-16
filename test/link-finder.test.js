@@ -13,18 +13,23 @@ fs.mkdirSync(path.join(tmp, 'python'));
 fs.writeFileSync(path.join(tmp, 'python', 'python.exe'), '');
 Object.assign(process.env, {
   LINK_SEARCH_STATE: path.join(tmp, 'link-search.json'),
-  GOOGLE_SHEET_ID: 'sheet', SHEET_SONG_COLUMN: 'title', SHEET_ARTIST_COLUMN: 'artist', SHEET_URL_COLUMN: 'YTLink',
+  GOOGLE_SHEET_ID: 'sheet', SHEET_SONG_COLUMN: 'title', SHEET_ARTIST_COLUMN: 'artist',
 });
 
-// Fake Google Sheets: one tab, edited in place by the tests.
+// Fake Google Sheets: tabs edited in place by the tests. A tab's grid is exactly as
+// wide as its header row, so adding a column needs the grid to grow first.
 let sheet;
 const writes = [];
+const grows = [];
 let canWrite = true;
 const tabOf = range => range.match(/^'(.*)'!/)[1].replace(/''/g, "'");
 const google = {
   auth: { GoogleAuth: class { async getClient() { return {}; } } },
   sheets: () => ({ spreadsheets: {
-    get: async () => ({ data: { sheets: Object.keys(sheet).map(title => ({ properties: { title } })) } }),
+    get: async () => ({ data: { sheets: Object.keys(sheet).map((title, i) => ({
+      properties: { title, sheetId: 100 + i, gridProperties: { columnCount: sheet[title][0].length } },
+    })) } }),
+    batchUpdate: async ({ requestBody }) => { grows.push(...requestBody.requests); return {}; },
     values: {
       batchGet: async ({ ranges }) => ({ data: { valueRanges: ranges.map(r => ({ values: sheet[tabOf(r)] })) } }),
       get: async () => ({ data: { values: [['title']] } }),
@@ -84,6 +89,8 @@ const raw = (t, channel) => ({
 });
 results.a = raw('a', 'x - Topic');
 results.c = raw('c', 'fan');
+results.e = raw('e', 'x - Topic');
+results.f = raw('f', 'fan');
 const waitForJob = async () => { while (F.getJob().running) await new Promise(r => setImmediate(r)); };
 
 test('only songs with an empty link cell are searched, and a restart resumes', async () => {
@@ -121,7 +128,7 @@ test('saving writes only into empty cells, at the row where the song is now', as
   sheet['國語'][4][2] = 'https://youtu.be/handfilled1';
 
   const r = await F.save();
-  assert.deepStrictEqual(r, { written: 1, skipped: 1 });
+  assert.deepStrictEqual(r, { written: 1, skipped: 1, createdIn: [] });
   assert.deepStrictEqual(writes, [{ range: "'國語'!C3", values: [['https://www.youtube.com/watch?v=aaaaaaaaaaa']] }]);
   assert.deepStrictEqual(F.getView().songs, []);   // both done: one written, one left as the streamer filled it
 });
@@ -132,6 +139,26 @@ test('pasted links are accepted in any form, other text is refused', () => {
   F.decide('k', 'accepted', 'youtu.be/dddddddddd1?si=x');
   assert.strictEqual(F.getView().songs[0].videoId, 'dddddddddd1');
   assert.throws(() => F.decide('k', 'accepted', 'not a link'), /not a YouTube/);
+});
+
+test('a tab without the YTLink column gets one when its first links are saved', async () => {
+  sheet = { '日語': [['title', 'artist'], ['e', 'x'], ['f', 'x']] };
+  F._setState({ songs: {} });
+  sent = [];
+  await F.start();
+  await waitForJob();
+  assert.deepStrictEqual(sent, ['e', 'f']);   // searched even though the tab has no link column yet
+
+  const e = F.getView().songs.find(s => s.title === 'e');
+  F.decide(e.key, 'accepted', 'eeeeeeeeeee');
+  writes.length = 0;
+  const r = await F.save();
+  assert.deepStrictEqual(r, { written: 1, skipped: 0, createdIn: ['日語'] });
+  assert.deepStrictEqual(grows, [{ appendDimension: { sheetId: 100, dimension: 'COLUMNS', length: 1 } }]);
+  assert.deepStrictEqual(writes, [
+    { range: "'日語'!C1", values: [['YTLink']] },
+    { range: "'日語'!C2", values: [['https://www.youtube.com/watch?v=eeeeeeeeeee']] },
+  ]);
 });
 
 test.after(() => {

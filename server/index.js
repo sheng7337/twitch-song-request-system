@@ -437,7 +437,7 @@ app.post('/api/leihu/open', async (req, res) => {
   }
 });
 
-// ── YouTube link finder (fills SHEET_URL_COLUMN, see link-finder.js) ─────────
+// ── YouTube link finder (fills the YTLink column, see link-finder.js) ────────
 app.get('/api/links', (req, res) => res.json(linkFinder.getView()));
 app.post('/api/links/start', async (req, res) => res.json(await linkFinder.start({ limit: Number(req.body.limit) || 0 })));
 app.post('/api/links/stop', (req, res) => res.json(linkFinder.stop()));
