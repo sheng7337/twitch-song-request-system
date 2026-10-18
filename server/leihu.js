@@ -17,6 +17,7 @@ const axios = require('axios');
 const { getSongs } = require('./sheets');
 const { getState } = require('./queue');
 const config = require('./config');
+const { UserError } = require('./messages');
 
 const LINKS_PATH = path.join(__dirname, '..', 'song-links.json');
 const POLL_MS = 5000;
@@ -286,9 +287,11 @@ function findByVideo(vid) {
 // Ask Leihu's practice window to open a ready song at its sheet key (0 if the key
 // can't be used). Needs Leihu's remote-open patch. Returns the key used.
 async function open(entry) {
-  if (!canOpen) throw new Error('Leihu Singsing does not support remote open');
+  if (!canOpen) throw new UserError('noRemoteOpen', {}, 'Leihu Singsing does not support remote open');
   const status = statusFor(entry.title, entry.artist);
-  if (status.state !== 'ready' && status.state !== 'nolyrics') throw new Error(`song is not ready in Leihu (${status.state})`);
+  if (status.state !== 'ready' && status.state !== 'nolyrics') {
+    throw new UserError('notReady', { state: status.state }, `song is not ready in Leihu (${status.state})`);
+  }
   const key = transpose(entry.key) ?? 0;
   await axios.post(`${baseUrl()}/api/remote/open`, { id: status.id, key }, { timeout: 5000 });
   console.log(`[leihu] Opening "${entry.title}" at key ${key > 0 ? '+' : ''}${key}`);

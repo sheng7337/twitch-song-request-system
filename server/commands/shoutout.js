@@ -86,7 +86,7 @@ module.exports = function register(registerCommand) {
       const payload = {
         type: 'media',
         kind: 'video',
-        label: 'Shoutout',
+        label: 'Shoutout', labelKey: 'shoutout',   // the clip player shows labelKey in the overlay language
         src: videoUrl,
         title: clip.title,
         credit: `@${clip.broadcaster_name}`,

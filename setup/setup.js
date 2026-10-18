@@ -284,7 +284,7 @@ async function pollDeviceAuth(interval) {
     renderStep();
   } else if (res.status === 'error') {
     clearInterval(deviceTimerInterval);
-    alert(t.errGeneric(res.error));
+    alert(t.errGeneric(I18N.server(res)));
     renderStep();
   } else {
     // pending — keep polling
@@ -1021,7 +1021,8 @@ async function api(method, url, body) {
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  // Server messages with a code are shown in the wizard's language (shared/i18n-server.js)
+  if (!res.ok) throw new Error(I18N.server(data) || `HTTP ${res.status}`);
   return data;
 }
 

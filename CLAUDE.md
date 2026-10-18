@@ -66,7 +66,11 @@ vtuber-song-queue/
 │   ├── media-history.js   Last played media, for !replay
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
+│   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk)
+├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
+│                          messages), i18n-viewer.js (overlay + clip player strings)
+├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
 ├── dashboard/index.html   Streamer control panel — 2×2 panels, drag/drop, history, manual add, ⚙ settings popover
@@ -237,6 +241,29 @@ vtuber-song-queue/
   processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
   is unreliable (usual for 台語). Adds the song to Leihu's library
 
+### Languages: English + 繁體中文 (shared/i18n.js)
+- Every web page is in English and Traditional Chinese (Taiwan). Strings live in tables:
+  `shared/i18n-*.js`, `dashboard/i18n-*.js`, and the wizard's own `setup/i18n.js`. Each table file
+  registers itself in the browser and `module.exports` itself in Node, for the tests
+- Look-ups: `I18N.t(key, params)` (`{name}` placeholders, or a function for plurals),
+  `I18N.tHtml` (escapes params for innerHTML), `data-i18n` / `data-i18n-html` / `-title` /
+  `-placeholder` / `-aria-label` attributes for fixed markup, `I18N.onChange` to redraw
+- Streamer pages (dashboard, links, wizard): EN / 中文 switch; one saved choice
+  (localStorage `ui_lang`, the wizard's old `setup_lang` is read once); first visit follows the
+  browser language (zh* → zh-TW, else en); `?lang=` overrides
+- Viewer pages (overlay, clip player in OBS): no switch — the dashboard's ⚙ "Overlay language"
+  setting (`OVERLAY_LANGUAGE` in `.env`, default `en`), pushed live over the WebSocket. Clip labels
+  are sent as `labelKey` (`shoutout` / `watching`) next to the English `label`. The `!tk`
+  sponsor roll stays Japanese by design
+- Server messages: user-facing errors and notes carry a `code` (+ `params`) from
+  `server/messages.js` (`UserError`, `message()`, `errorBody()`); pages show
+  `I18N.server(body)` — the translation from `shared/i18n-server.js`, else the English text.
+  Stored notes keep `noteCode` / `errorCode` next to the text. Console logs stay English
+- `test/i18n.test.js` fails when a key or placeholder is missing in one language, a page
+  uses an unknown key, or the server sends a code without a translation
+- zh-TW terms (match the wizard and SETUP_zh_TW.md): 正在演唱 / 待唱歌單 / 已唱歌單 / 待審核,
+  唱完了, 雷虎練唱台 for Leihu Singsing, KEY for the key
+
 ---
 
 ## Chat commands (mods and broadcaster only)
@@ -287,7 +314,7 @@ register it in index.js.
 | POST | `/api/refresh-songs` | Force re-fetch song list from Google Sheets |
 | GET | `/api/songs` | Full song list (for dashboard autocomplete) |
 | GET | `/api/history` | Request history snapshot (startup state) |
-| GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness |
+| GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness, overlay language, Leihu auto-prepare |
 | GET | `/api/hls`, `/api/clip-stream` | Proxies for Twitch clip playback (Twitch hosts only) |
 | GET | `/api/leihu/status` | Leihu state of nowPlaying + queue, keyed by title + artist |
 | GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
@@ -322,7 +349,7 @@ See `.env.example` for full descriptions.
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
 - `PORT` — default 3000
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
-- `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS` — also adjustable from the dashboard
+- `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS`, `OVERLAY_LANGUAGE` (`en` / `zh-TW`) — also adjustable from the dashboard
 - `LEIHU_URL` — Leihu Singsing address (default `http://127.0.0.1:8765`)
 - `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
 

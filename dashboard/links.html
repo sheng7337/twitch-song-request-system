@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>YouTube Links</title>
+<script src="/shared/i18n.js"></script>
+<script src="/shared/i18n-server.js"></script>
+<script src="/dashboard/i18n-links.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -46,6 +49,13 @@
   .topbar a { color: var(--text-dim); font-size: 13px; text-decoration: none; }
   .topbar a:hover { color: var(--purple); }
   .spacer { flex: 1; }
+  .lang-switch { display: flex; gap: 4px; }
+  .lang-btn {
+    font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 4px 9px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim);
+  }
+  .lang-btn:hover { color: var(--text); }
+  .lang-btn.active { color: var(--purple); border-color: var(--purple); }
 
   .btn {
     font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 6px 14px;
@@ -146,17 +156,18 @@
 <body>
 
 <div class="topbar">
-  <a href="/dashboard/">← dashboard</a>
-  <span class="topbar-title">YouTube Links</span>
+  <a href="/dashboard/" data-i18n="links.back">← dashboard</a>
+  <span class="topbar-title" data-i18n="links.title">YouTube Links</span>
   <span class="spacer"></span>
-  <button class="btn" id="btn-start" onclick="startSearch()">Search songs without a link</button>
-  <button class="btn warn" id="btn-stop" onclick="post('stop').then(load)" hidden>Stop</button>
+  <span class="lang-switch" role="group" aria-label="Language"></span>
+  <button class="btn" id="btn-start" onclick="startSearch()" data-i18n="links.start">Search songs without a link</button>
+  <button class="btn warn" id="btn-stop" onclick="post('stop').then(load)" hidden data-i18n="links.stop">Stop</button>
   <button class="btn" id="btn-confident" onclick="acceptConfident()">Accept all confident</button>
   <button class="btn go" id="btn-save" onclick="saveLinks()">Save to sheet</button>
 </div>
 
 <div class="job" id="job">
-  <div class="hint">
+  <div class="hint" data-i18n-html="links.intro">
     Finds, for each song in your sheet without a YouTube link, the video whose recording matches the
     lyrics Leihu Singsing can find — so its backing track and timed lyrics line up. Nothing is written
     to your sheet until you accept a video and press <b>Save to sheet</b>. Links go into a <b>YTLink</b> column,
@@ -174,23 +185,22 @@
 <div class="toast" id="toast"></div>
 
 <script>
+const t = I18N.t, tHtml = I18N.tHtml;
 let view = { job: {}, songs: [], written: 0 };
 let filter = 'review';
 let lastJson = '';
 const typed = {};   // paste-a-link inputs, kept across re-renders
 
 const FILTERS = [
-  ['review', 'Needs a look', s => !s.decision && s.status === 'review'],
-  ['confident', 'Confident', s => !s.decision && s.status === 'confident'],
-  ['none', 'Nothing found', s => !s.decision && s.status === 'none'],
-  ['accepted', 'Accepted', s => s.decision === 'accepted'],
-  ['skipped', 'Skipped', s => s.decision === 'skipped'],
+  ['review', s => !s.decision && s.status === 'review'],
+  ['confident', s => !s.decision && s.status === 'confident'],
+  ['none', s => !s.decision && s.status === 'none'],
+  ['accepted', s => s.decision === 'accepted'],
+  ['skipped', s => s.decision === 'skipped'],
 ];
-const TAGS = {
-  instrumental: 'no vocals', compilation: 'compilation', live: 'live', 'tv show': 'TV show',
-  cover: 'cover', remix: 'remix', karaoke: 'karaoke', 'fan edit': 'fan edit', 'title differs': 'title differs',
-  'other language': 'other-language version', 'romanized title': 'title in romaji/pinyin',
-};
+const tagText = r => I18N.has('links.tag.' + r) ? t('links.tag.' + r) : r;
+// A message the server stored next to its code (notes, check results, errors)
+const serverText = (text, code, params) => I18N.server({ error: text, code, params });
 const WARN_TAGS = ['romanized title'];   // worth a look, not a fault
 
 function esc(s) {
@@ -213,7 +223,7 @@ async function post(path, body = {}) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'request failed');
+  if (!res.ok) throw new Error(I18N.server(data, 'links.toast.requestFailed'));
   return data;
 }
 
@@ -238,20 +248,20 @@ function renderJob() {
   const searched = view.songs.length;
   const pending = view.songs.filter(s => s.decision === 'accepted').length;
   const line = [];
-  if (j.running) line.push(`Searching ${j.done} / ${j.total}${j.current ? ' — ' + esc(j.current) : ''} (about ${Math.ceil((j.total - j.done) * 7.5 / 60)} min left)`);
-  else if (searched) line.push(`${searched} songs found so far`);
-  if (view.written) line.push(`${view.written} links already saved to the sheet`);
-  if (j.skippedTabs && j.skippedTabs.length) line.push(`skipped tabs without a song title column: ${j.skippedTabs.map(esc).join(', ')}`);
+  if (j.running) line.push(esc(t('links.job.searching', { done: j.done, total: j.total, current: j.current, min: Math.ceil((j.total - j.done) * 7.5 / 60) })));
+  else if (searched) line.push(esc(t('links.job.found', { n: searched })));
+  if (view.written) line.push(esc(t('links.job.written', { n: view.written })));
+  if (j.skippedTabs && j.skippedTabs.length) line.push(tHtml('links.job.skippedTabs', { tabs: j.skippedTabs.join(', ') }));
   document.getElementById('job-line').innerHTML = line.join(' · ');
-  document.getElementById('job-error').textContent = j.error || '';
+  document.getElementById('job-error').textContent = j.error ? serverText(j.error, j.errorCode, j.errorParams) : '';
   const save = document.getElementById('btn-save');
   const canEdit = view.access && view.access.canEdit;
-  save.textContent = canEdit ? `Save ${pending} to sheet` : 'Share as Editor to save';
-  save.title = canEdit ? '' : 'Searching and reviewing work without it — see the box at the top';
+  save.textContent = canEdit ? t('links.save', { n: pending }) : t('links.saveNeedsAccess');
+  save.title = canEdit ? '' : t('links.saveNeedsAccessTitle');
   save.disabled = !pending || !canEdit;
-  const confident = view.songs.filter(FILTERS[1][2]).length;
+  const confident = view.songs.filter(FILTERS[1][1]).length;
   const bc = document.getElementById('btn-confident');
-  bc.textContent = `Accept all confident (${confident})`;
+  bc.textContent = t('links.acceptConfident', { n: confident });
   bc.disabled = !confident;
 }
 
@@ -260,36 +270,32 @@ function renderJob() {
 function renderAccess() {
   const a = view.access;
   const el = document.getElementById('access');
-  const email = view.serviceEmail ? esc(view.serviceEmail) : 'the service account';
-  const sheet = view.sheetUrl ? `<a href="${esc(view.sheetUrl)}" target="_blank" rel="noopener">Open my sheet ↗</a>` : '';
+  const email = esc(view.serviceEmail || t('links.access.serviceAccount'));
+  const sheet = view.sheetUrl ? `<a href="${esc(view.sheetUrl)}" target="_blank" rel="noopener">${esc(t('links.access.openSheet'))}</a>` : '';
   if (a && a.canEdit) {
-    el.innerHTML = `<div class="access-ok">✓ Links can be saved to your sheet (Editor access)
-      <button class="btn small" onclick="checkAccess()">Check again</button></div>`;
+    el.innerHTML = `<div class="access-ok">${esc(t('links.access.ok'))}
+      <button class="btn small" onclick="checkAccess()">${esc(t('links.access.checkAgain'))}</button></div>`;
     return;
   }
   el.innerHTML = `
     <div class="access">
-      <div class="access-title">Step 1 — let this app write links into your sheet</div>
-      <div class="hint">
-        Your song list is read with view access; saving links needs <b>Editor</b>. In Google Sheets press
-        <b>Share</b>, add this address as <b>Editor</b> (untick “Notify people”), then press Check access.
-        You can search and review songs meanwhile.
-      </div>
+      <div class="access-title">${esc(t('links.access.title'))}</div>
+      <div class="hint">${t('links.access.hint')}</div>
       <div class="access-row">
         <code id="service-email">${email}</code>
-        ${view.serviceEmail ? '<button class="btn small" onclick="copyEmail()">Copy</button>' : ''}
+        ${view.serviceEmail ? `<button class="btn small" onclick="copyEmail()">${esc(t('links.access.copy'))}</button>` : ''}
         ${sheet}
         <span class="spacer"></span>
-        <button class="btn small go" onclick="checkAccess()">Check access</button>
+        <button class="btn small go" onclick="checkAccess()">${esc(t('links.access.check'))}</button>
       </div>
-      ${a && a.error ? `<div class="error">${esc(a.error)}</div>` : ''}
+      ${a && a.error ? `<div class="error">${esc(serverText(a.error, a.errorCode, a.errorParams))}</div>` : ''}
     </div>`;
 }
 
 async function checkAccess() {
   try {
     const a = await post('access');
-    showToast(a.canEdit ? 'Editor access confirmed — links can be saved' : 'still no Editor access', !a.canEdit);
+    showToast(t(a.canEdit ? 'links.toast.accessOk' : 'links.toast.accessStill'), !a.canEdit);
     await load();
   } catch (err) { showToast(err.message, true); }
 }
@@ -297,22 +303,22 @@ async function checkAccess() {
 async function copyEmail() {
   try {
     await navigator.clipboard.writeText(view.serviceEmail);
-    showToast('copied');
+    showToast(t('links.toast.copied'));
   } catch (_) {
-    showToast('copy failed — select the address and copy it by hand', true);
+    showToast(t('links.toast.copyFailed'), true);
   }
 }
 
 function render() {
   renderAccess();
   renderJob();
-  document.getElementById('tabs').innerHTML = FILTERS.map(([id, label, fn]) =>
-    `<button class="tab${filter === id ? ' cur' : ''}" onclick="setFilter('${id}')">${label} ${view.songs.filter(fn).length}</button>`).join('');
-  const fn = FILTERS.find(f => f[0] === filter)[2];
+  document.getElementById('tabs').innerHTML = FILTERS.map(([id, fn]) =>
+    `<button class="tab${filter === id ? ' cur' : ''}" onclick="setFilter('${id}')">${esc(t('links.filter.' + id))} ${view.songs.filter(fn).length}</button>`).join('');
+  const fn = FILTERS.find(f => f[0] === filter)[1];
   const songs = view.songs.filter(fn);
   document.getElementById('list').innerHTML = songs.length
     ? songs.map(songHtml).join('')
-    : `<div class="empty">${view.songs.length ? 'Nothing in this group' : 'Press “Search songs without a link” to start'}</div>`;
+    : `<div class="empty">${esc(t(view.songs.length ? 'links.empty.group' : 'links.empty.start'))}</div>`;
   for (const [k, v] of Object.entries(typed)) {
     const el = document.querySelector(`input[data-key="${CSS.escape(k)}"]`);
     if (el) el.value = v;
@@ -321,13 +327,13 @@ function render() {
 
 function songHtml(s) {
   const k = esc(s.key);
-  const status = s.decision ? '' : `<span class="status ${s.status}">${{ confident: 'confident', review: 'needs a look', none: 'nothing found' }[s.status]}</span>`;
+  const status = s.decision ? '' : `<span class="status ${s.status}">${esc(t('links.status.' + s.status))}</span>`;
   const ref = s.refDuration
-    ? `lyrics ${mmss(s.refDuration)} · ${s.lyricSources.map(esc).join(', ')}`
-    : 'no lyrics found online — Leihu will rely on its own recognition';
+    ? tHtml('links.song.lyricsRef', { len: mmss(s.refDuration), sources: s.lyricSources.join(', ') })
+    : esc(t('links.song.noLyrics'));
   const cands = s.candidates.map(c => candHtml(s, c)).join('');
   const chosenOther = s.decision === 'accepted' && !s.candidates.some(c => c.id === s.videoId)
-    ? `<div class="cand chosen"><div class="cand-info"><a class="cand-title" href="https://www.youtube.com/watch?v=${esc(s.videoId)}" target="_blank" rel="noopener">your link: youtube.com/watch?v=${esc(s.videoId)}</a></div></div>` : '';
+    ? `<div class="cand chosen"><div class="cand-info"><a class="cand-title" href="https://www.youtube.com/watch?v=${esc(s.videoId)}" target="_blank" rel="noopener">${tHtml('links.song.yourLink', { url: 'youtube.com/watch?v=' + s.videoId })}</a></div></div>` : '';
   return `
     <div class="song${s.decision ? ' ' + s.decision : ''}">
       <div class="song-head">
@@ -337,31 +343,31 @@ function songHtml(s) {
         ${status}
         <span class="song-ref">${ref}</span>
       </div>
-      ${chosenOther}${cands || '<div class="hint">No YouTube results.</div>'}
+      ${chosenOther}${cands || `<div class="hint">${esc(t('links.song.noResults'))}</div>`}
       <div class="song-foot">
-        <input type="text" placeholder="or paste a YouTube link…" data-key="${k}" oninput="typed[this.dataset.key]=this.value" />
-        <button class="btn small" onclick="useTyped(this)" data-key="${k}">Use link</button>
+        <input type="text" placeholder="${esc(t('links.song.pastePlaceholder'))}" data-key="${k}" oninput="typed[this.dataset.key]=this.value" />
+        <button class="btn small" onclick="useTyped(this)" data-key="${k}">${esc(t('links.song.useLink'))}</button>
         ${s.decision
-          ? `<button class="btn small" onclick="decide(this.dataset.key, null)" data-key="${k}">Undo</button>`
-          : `<button class="btn small warn" onclick="decide(this.dataset.key, 'skipped')" data-key="${k}">Skip</button>`}
+          ? `<button class="btn small" onclick="decide(this.dataset.key, null)" data-key="${k}">${esc(t('links.song.undo'))}</button>`
+          : `<button class="btn small warn" onclick="decide(this.dataset.key, 'skipped')" data-key="${k}">${esc(t('links.song.skip'))}</button>`}
         ${checkHtml(s)}
       </div>
-      ${s.note ? `<div class="note">${esc(s.note)}</div>` : ''}
+      ${s.note ? `<div class="note">${esc(serverText(s.note, s.noteCode, s.noteParams))}</div>` : ''}
     </div>`;
 }
 
 function candHtml(s, c) {
   const chosen = s.decision === 'accepted' && s.videoId === c.id;
-  const len = c.tier === 'exact' ? `<span class="tag good">exact length</span>`
-    : c.tier === 'workable' ? `<span class="tag ok">Leihu re-times lyrics</span>`
-    : c.tier === 'off' ? `<span class="tag bad">different length</span>` : '';
+  const len = c.tier === 'exact' ? `<span class="tag good">${esc(t('links.tag.exact'))}</span>`
+    : c.tier === 'workable' ? `<span class="tag ok">${esc(t('links.tag.workable'))}</span>`
+    : c.tier === 'off' ? `<span class="tag bad">${esc(t('links.tag.off'))}</span>` : '';
   const diff = c.diff != null ? ` (${c.diff === 0 ? '±0' : '±' + c.diff}s)` : '';
   const tags = [
-    c.topic ? '<span class="tag good">YouTube Music</span>' : c.official ? '<span class="tag good">official</span>' : '',
+    c.topic ? `<span class="tag good">${esc(t('links.tag.youtubeMusic'))}</span>` : c.official ? `<span class="tag good">${esc(t('links.tag.official'))}</span>` : '',
     len,
-    ...c.reasons.map(r => `<span class="tag ${WARN_TAGS.includes(r) ? 'ok' : 'bad'}">${esc(TAGS[r] || r)}</span>`),
+    ...c.reasons.map(r => `<span class="tag ${WARN_TAGS.includes(r) ? 'ok' : 'bad'}">${esc(tagText(r))}</span>`),
   ].join('');
-  const views = c.views != null ? `${Number(c.views).toLocaleString()} views` : '';
+  const views = c.views != null ? esc(t('links.song.views', { n: Number(c.views).toLocaleString() })) : '';
   return `
     <div class="cand${chosen ? ' chosen' : ''}">
       <img loading="lazy" src="https://i.ytimg.com/vi/${esc(c.id)}/mqdefault.jpg" alt="" />
@@ -371,10 +377,10 @@ function candHtml(s, c) {
       </div>
       <div class="cand-actions">
         ${chosen
-          ? '<span class="tag good">accepted</span>'
-          : `<button class="btn small go" onclick="decide(this.dataset.key, 'accepted', this.dataset.id)" data-key="${esc(s.key)}" data-id="${esc(c.id)}">Use this</button>`}
+          ? `<span class="tag good">${esc(t('links.tag.accepted'))}</span>`
+          : `<button class="btn small go" onclick="decide(this.dataset.key, 'accepted', this.dataset.id)" data-key="${esc(s.key)}" data-id="${esc(c.id)}">${esc(t('links.song.useThis'))}</button>`}
         <button class="btn small" onclick="runCheck(this.dataset.key, this.dataset.id)" data-key="${esc(s.key)}" data-id="${esc(c.id)}"
-          title="Import into Leihu Singsing and compare the sung lyrics with the online lyrics (downloads the song, uses the GPU for a minute or two)">Check with Leihu</button>
+          title="${esc(t('links.song.checkTitle'))}">${esc(t('links.song.check'))}</button>
       </div>
     </div>`;
 }
@@ -383,16 +389,12 @@ function checkHtml(s) {
   const c = s.check;
   if (!c) return '';
   const which = s.candidates.find(x => x.id === c.videoId);
-  const label = which ? `“${esc(which.title.slice(0, 40))}”` : esc(c.videoId);
-  const text = {
-    running: 'checking in Leihu… (download + processing, a few minutes)',
-    match: `lyrics match (${Math.round(c.similarity * 100)}%)`,
-    partial: `lyrics partly match (${Math.round(c.similarity * 100)}%)`,
-    nomatch: `lyrics don't match (${Math.round(c.similarity * 100)}%)`,
-    inconclusive: 'inconclusive — ' + esc(c.note || ''),
-    failed: 'check failed — ' + esc(c.note || ''),
-  }[c.state] || esc(c.state);
-  return `<span class="check ${c.state}">Leihu check of ${label}: ${text}</span>`;
+  const label = which ? `“${which.title.slice(0, 40)}”` : c.videoId;
+  const note = c.note ? serverText(c.note, c.noteCode, c.noteParams) : '';
+  const text = I18N.has('links.check.' + c.state)
+    ? t('links.check.' + c.state, { p: Math.round((c.similarity || 0) * 100), note })
+    : c.state;
+  return `<span class="check ${esc(c.state)}">${tHtml('links.check.of', { label, text })}</span>`;
 }
 
 function setFilter(f) { filter = f; render(); }
@@ -408,14 +410,14 @@ async function decide(key, decision, videoId) {
 function useTyped(btn) {
   const key = btn.dataset.key;
   const val = (typed[key] || '').trim();
-  if (!val) return showToast('paste a YouTube link first', true);
+  if (!val) return showToast(t('links.toast.pasteFirst'), true);
   decide(key, 'accepted', val);
 }
 
 async function runCheck(key, videoId) {
   try {
     await post('check', { key, videoId });
-    showToast('checking in Leihu — this takes a few minutes');
+    showToast(t('links.toast.checking'));
     await load();
   } catch (err) { showToast(err.message, true); }
 }
@@ -423,7 +425,7 @@ async function runCheck(key, videoId) {
 async function startSearch() {
   try {
     const job = await post('start');
-    if (job.error) showToast(job.error, true);
+    if (job.error) showToast(serverText(job.error, job.errorCode, job.errorParams), true);
     await load();
   } catch (err) { showToast(err.message, true); }
 }
@@ -431,7 +433,7 @@ async function startSearch() {
 async function acceptConfident() {
   try {
     const r = await post('accept-confident');
-    showToast(`accepted ${r.accepted} confident picks — press Save to write them`);
+    showToast(t('links.toast.accepted', { n: r.accepted }));
     filter = 'accepted';
     await load();
     render();
@@ -443,13 +445,17 @@ async function saveLinks() {
   btn.disabled = true;
   try {
     const r = await post('save');
-    const added = r.createdIn && r.createdIn.length ? `, added the YTLink column to ${r.createdIn.join(', ')}` : '';
-    showToast(`saved ${r.written} links to the sheet${added}${r.skipped ? `, ${r.skipped} skipped (see notes)` : ''}`);
+    const added = r.createdIn && r.createdIn.length ? t('links.toast.savedColumn', { tabs: r.createdIn.join(', ') }) : '';
+    showToast(t('links.toast.saved', { n: r.written }) + added + (r.skipped ? t('links.toast.savedSkipped', { n: r.skipped }) : ''));
   } catch (err) {
     showToast(err.message, true);
   }
   await load();
 }
+
+I18N.init();
+document.title = t('links.pageTitle');
+I18N.onChange(() => { document.title = t('links.pageTitle'); render(); });
 
 load();
 </script>

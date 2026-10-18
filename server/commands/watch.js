@@ -30,7 +30,7 @@ const resolvers = [
         console.warn(`[watch] Could not sign Twitch clip: ${err.message}`); return null;
       }
       return {
-        type: 'media', kind: 'video', label: 'Now Watching',
+        type: 'media', kind: 'video', label: 'Now Watching', labelKey: 'watching',
         src, title: clip.title, credit: `@${clip.broadcaster_name}`, duration: clip.duration,
       };
     },
@@ -56,7 +56,7 @@ const resolvers = [
         title = res.data.title;
       } catch {}
       return {
-        type: 'media', kind: 'youtube', label: 'Now Watching',
+        type: 'media', kind: 'youtube', label: 'Now Watching', labelKey: 'watching',
         src: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0&enablejsapi=1`,
         title: title || `youtu.be/${videoId}`,
         credit: `@${event.chatter_user_login}`,
@@ -77,7 +77,7 @@ async function resolveDirectVideo(raw, event) {
   const ext = raw.split('?')[0].split('.').pop().toLowerCase();
   if (!VIDEO_EXTS.has(ext)) return null;
   return {
-    type: 'media', kind: 'video', label: 'Now Watching',
+    type: 'media', kind: 'video', label: 'Now Watching', labelKey: 'watching',
     src: raw,
     title: raw.split('/').pop().split('?')[0],
     credit: `@${event.chatter_user_login}`,

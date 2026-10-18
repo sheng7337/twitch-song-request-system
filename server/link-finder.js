@@ -18,6 +18,7 @@ const { google } = require('googleapis');
 const config = require('./config');
 const leihu = require('./leihu');
 const { scoreSong } = require('./link-score');
+const { UserError } = require('./messages');
 
 const ROOT = path.join(__dirname, '..');
 const STATE_PATH = process.env.LINK_SEARCH_STATE || path.join(ROOT, 'link-search.json');   // tests use a temp file
@@ -36,13 +37,23 @@ function loadState() {
   let s;
   try { s = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')); } catch { return { songs: {} }; }
   for (const song of Object.values(s.songs || {})) {
-    if (song.check && song.check.state === 'running') song.check = { ...song.check, state: 'failed', note: 'interrupted by a server restart' };
+    if (song.check && song.check.state === 'running') song.check = { ...song.check, state: 'failed', note: 'interrupted by a server restart', noteCode: 'checkInterrupted' };
   }
   return s;
 }
 
 function saveState() {
   fs.writeFileSync(STATE_PATH, JSON.stringify(state));
+}
+
+// A note on a song for the review page, with its message code (shared/i18n-server.js)
+function setNote(s, code, params, text) {
+  Object.assign(s, { note: text, noteCode: code, noteParams: params || {} });
+}
+
+// The job's error, with its message code when it has one
+function setJobError(err) {
+  Object.assign(job, { error: err.message, errorCode: err.messageCode || null, errorParams: err.messageParams || {} });
 }
 
 function rowKey(tab, title, artist) {
@@ -118,17 +129,17 @@ async function leihuPython() {
   try {
     root = (await axios.get(`${leihu.baseUrl()}/api/status`, { timeout: 3000 })).data.root;
   } catch {
-    throw new Error('Leihu Singsing is not running — start it first, the search uses its lyric sites and YouTube tools.');
+    throw new UserError('leihuNotRunning', {}, 'Leihu Singsing is not running — start it first, the search uses its lyric sites and YouTube tools.');
   }
   const python = path.join(root || '', 'python', 'python.exe');
-  if (!root || !fs.existsSync(python)) throw new Error(`Leihu Singsing's Python was not found in ${root}`);
+  if (!root || !fs.existsSync(python)) throw new UserError('leihuPythonMissing', { root }, `Leihu Singsing's Python was not found in ${root}`);
   return { root, python };
 }
 
 // limit: search only this many new songs (a trial run); the rest stay for the next start.
 async function start({ limit } = {}) {
   if (job.running) return getJob();
-  Object.assign(job, { running: true, total: 0, done: 0, current: '', error: '', skippedTabs: [] });
+  Object.assign(job, { running: true, total: 0, done: 0, current: '', error: '', errorCode: null, errorParams: {}, skippedTabs: [] });
   try {
     const { root, python } = await leihuPython();
     const { rows, skippedTabs } = await rowsMissingLinks();
@@ -148,7 +159,7 @@ async function start({ limit } = {}) {
     runHelper(python, root, todo);
   } catch (err) {
     job.running = false;
-    job.error = err.message;
+    setJobError(err);
   }
   return getJob();
 }
@@ -172,16 +183,19 @@ function runHelper(python, root, todo) {
     child = null;
     job.running = false;
     job.current = '';
-    if (code && !job.error && job.done < job.total) job.error = `search stopped (exit ${code}) ${stderr.trim().split('\n').pop() || ''}`;
+    if (code && !job.error && job.done < job.total) {
+      const detail = `exit ${code}${stderr.trim() ? ': ' + stderr.trim().split('\n').pop() : ''}`;
+      setJobError(new UserError('searchStopped', { detail }, `search stopped (${detail})`));
+    }
     console.log(`[links] Search finished: ${job.done}/${job.total} songs`);
   });
-  child.on('error', err => { job.error = err.message; });
+  child.on('error', err => setJobError(err));
 }
 
 function onHelperLine(line, todo) {
   let msg;
   try { msg = JSON.parse(line); } catch { return; }
-  if (msg.fatal) { job.error = msg.fatal; return; }
+  if (msg.fatal) { setJobError(new Error(msg.fatal)); return; }
   if (msg.ready) {
     child.stdin.write(todo.map(r => JSON.stringify({ key: rowKey(r.tab, r.title, r.artist), title: r.title, artist: r.artist })).join('\n') + '\n');
     child.stdin.end();
@@ -214,7 +228,8 @@ function getView() {
     .filter(([, s]) => s.raw && !s.written)
     .map(([key, s]) => ({
       key, tab: s.tab, row: s.row, title: s.title, artist: s.artist,
-      decision: s.decision, videoId: s.videoId || null, note: s.note || '', check: s.check || null,
+      decision: s.decision, videoId: s.videoId || null, check: s.check || null,
+      note: s.note || '', noteCode: s.note ? s.noteCode || null : null, noteParams: s.noteParams || {},
       ...scoreSong(s.raw, { tab: s.tab, title: s.title }),
     }));
   const written = Object.values(state.songs).filter(s => s.written).length;
@@ -229,14 +244,14 @@ function getView() {
 
 function decide(key, decision, videoId) {
   const s = state.songs[key];
-  if (!s) throw new Error('unknown song');
+  if (!s) throw new UserError('unknownSong', {}, 'unknown song');
   if (decision === 'accepted') {
     const vid = leihu.videoId(videoId) || (/^[A-Za-z0-9_-]{11}$/.test(videoId || '') ? videoId : null);
-    if (!vid) throw new Error('not a YouTube video link');
+    if (!vid) throw new UserError('notYouTube', {}, 'not a YouTube video link');
     s.videoId = vid;
   }
   s.decision = decision || null;
-  s.note = '';
+  setNote(s, null, {}, '');
   saveState();
 }
 
@@ -278,7 +293,8 @@ async function checkAccess(api) {
     state.access = { canEdit: true, checked: Date.now(), sheetId: spreadsheetId };
   } catch (err) {
     if (err.code !== 403 && !/permission/i.test(err.message)) throw err;
-    state.access = { canEdit: false, checked: Date.now(), sheetId: spreadsheetId, error: noPermissionMessage() };
+    state.access = { canEdit: false, checked: Date.now(), sheetId: spreadsheetId, error: noPermissionMessage(),
+      errorCode: 'noEditor', errorParams: { email: serviceEmail() || 'the service account' } };
   }
   saveState();
   return state.access;
@@ -292,13 +308,15 @@ async function save() {
   if (!pending.length) return { written: 0, skipped: 0, createdIn: [] };
   const api = await sheetsApi(true);
   // Checked again on every save: access can be taken away after the review page's check
-  if (!(await checkAccess(api)).canEdit) throw new Error(noPermissionMessage());
+  if (!(await checkAccess(api)).canEdit) {
+    throw new UserError('noEditor', { email: serviceEmail() || 'the service account' }, noPermissionMessage());
+  }
   try {
     return await writeLinks(api, pending);
   } catch (err) {
     // Editors can still be kept out of protected tabs or ranges (Data → Protect sheets and ranges)
     if (/protected/i.test(err.message)) {
-      throw new Error('Part of the sheet is protected (Data → Protect sheets and ranges). Let ' +
+      throw new UserError('protectedRange', { email: serviceEmail() || 'the service account' }, 'Part of the sheet is protected (Data → Protect sheets and ranges). Let ' +
         `${serviceEmail() || 'the service account'} edit it, or remove the protection, then save again.`);
     }
     throw err;
@@ -332,17 +350,18 @@ async function writeLinks(api, pending) {
   for (const s of pending) {
     const t = tabs.find(x => x.tab === s.tab);
     const c = t && findColumns(t.rows[0]);
-    if (!t || c.title === -1) { s.note = 'tab or song column not found'; skipped++; continue; }
+    if (!t || c.title === -1) { setNote(s, 'noteNoColumn', {}, 'tab or song column not found'); skipped++; continue; }
     if (c.url === -1) {
-      s.note = t.full ? `this tab uses all columns A–Z — add a "${config.YT_LINK_HEADER}" column header yourself` : 'link column not found';
+      if (t.full) setNote(s, 'noteTabFull', { header: config.YT_LINK_HEADER }, `this tab uses all columns A–Z — add a "${config.YT_LINK_HEADER}" column header yourself`);
+      else setNote(s, 'noteNoLinkColumn', {}, 'link column not found');
       skipped++;
       continue;
     }
     const same = r => r && String(r[c.title] ?? '').trim() === s.title
       && (c.artist === -1 || String(r[c.artist] ?? '').trim() === s.artist);
     let idx = same(t.rows[s.row - 1]) ? s.row - 1 : t.rows.findIndex((r, i) => i > 0 && same(r));
-    if (idx < 1) { s.note = 'row not found in the sheet'; skipped++; continue; }
-    if (String(t.rows[idx][c.url] ?? '').trim()) { s.note = 'link cell already filled — left as is'; s.written = true; skipped++; continue; }
+    if (idx < 1) { setNote(s, 'noteRowNotFound', {}, 'row not found in the sheet'); skipped++; continue; }
+    if (String(t.rows[idx][c.url] ?? '').trim()) { setNote(s, 'noteCellFilled', {}, 'link cell already filled — left as is'); s.written = true; skipped++; continue; }
     data.push({ s, range: `${quoteTab(s.tab)}!${columnLetter(c.url)}${idx + 1}`, url: `https://www.youtube.com/watch?v=${s.videoId}` });
   }
   if (data.length || headerCells.length) {
@@ -350,7 +369,7 @@ async function writeLinks(api, pending) {
       spreadsheetId,
       requestBody: { valueInputOption: 'RAW', data: [...headerCells, ...data.map(d => ({ range: d.range, values: [[d.url]] }))] },
     });
-    for (const d of data) { d.s.written = true; d.s.note = ''; }
+    for (const d of data) { d.s.written = true; setNote(d.s, null, {}, ''); }
   }
   saveState();
   console.log(`[links] Wrote ${data.length} links to the sheet, skipped ${skipped}` +
@@ -366,12 +385,13 @@ async function writeLinks(api, pending) {
 //   { state: 'running' | 'match' | 'partial' | 'nomatch' | 'inconclusive' | 'failed', similarity, note }
 async function check(key, videoId) {
   const s = state.songs[key];
-  if (!s) throw new Error('unknown song');
+  if (!s) throw new UserError('unknownSong', {}, 'unknown song');
   const vid = leihu.videoId(videoId) || videoId;
   s.check = { state: 'running', videoId: vid, started: Date.now() };
   saveState();
   runCheck(s, vid).catch(err => {
-    s.check = { state: 'failed', videoId: vid, note: err.response?.data?.error || err.message };
+    s.check = { state: 'failed', videoId: vid, note: err.response?.data?.error || err.message,
+      noteCode: err.messageCode || null, noteParams: err.messageParams || {} };
     saveState();
   });
 }
@@ -383,11 +403,11 @@ async function runCheck(s, vid) {
   if (!id) id = await leihu.importVideo(vid, s.tab, s);
   const deadline = Date.now() + CHECK_TIMEOUT_MS;
   for (;;) {
-    if (Date.now() > deadline) throw new Error('Leihu took too long to process the song');
+    if (Date.now() > deadline) throw new UserError('checkTooLong', {}, 'Leihu took too long to process the song');
     await new Promise(r => setTimeout(r, CHECK_POLL_MS));
     await leihu.refresh();
     const st = leihu.findByVideo(vid)?.state;
-    if (st === 'failed') throw new Error('Leihu could not process this video');
+    if (st === 'failed') throw new UserError('checkFailed', {}, 'Leihu could not process this video');
     if (st === 'ready' || st === 'nolyrics') break;
   }
   const [song, cands] = await Promise.all([
@@ -400,7 +420,7 @@ async function runCheck(s, vid) {
   const best = sims.length ? Math.max(...sims) : null;
   let result;
   if (!reliable || best == null) {
-    result = { state: 'inconclusive', note: 'Leihu could not recognize the sung lyrics reliably (common for 台語) — judge by length and channel' };
+    result = { state: 'inconclusive', noteCode: 'checkInconclusive', note: 'Leihu could not recognize the sung lyrics reliably (common for 台語) — judge by length and channel' };
   } else {
     result = { state: best >= 0.6 ? 'match' : best >= 0.3 ? 'partial' : 'nomatch', similarity: best };
   }

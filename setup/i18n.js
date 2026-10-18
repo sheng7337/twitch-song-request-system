@@ -506,24 +506,15 @@ const STRINGS = {
 };
 
 // ── Locale detection & persistence ───────────────────────────────────────────
+// Shared with the dashboard and links page (shared/i18n.js): ?lang=, then the saved
+// choice, then the browser language. Switching here switches those pages too.
 
-function detectLang() {
-  const params = new URLSearchParams(location.search);
-  const fromUrl = params.get('lang');
-  if (fromUrl && STRINGS[fromUrl]) return fromUrl;
-
-  const stored = localStorage.getItem('setup_lang');
-  if (stored && STRINGS[stored]) return stored;
-
-  return 'en';
-}
-
-let currentLang = detectLang();
+let currentLang = I18N.getLang();
 
 function setLang(lang) {
   if (!STRINGS[lang]) return;
   currentLang = lang;
-  localStorage.setItem('setup_lang', lang);
+  I18N.setLang(lang);
   document.documentElement.lang = lang;
   document.title = T().title;
   const logoEl = document.getElementById('logo');

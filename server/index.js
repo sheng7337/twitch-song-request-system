@@ -24,6 +24,7 @@ const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
 const leihu = require('./leihu');
 const linkFinder = require('./link-finder');
+const { errorBody, message } = require('./messages');
 
 const app = express();
 const server = http.createServer(app);
@@ -55,6 +56,7 @@ app.use('/overlay', express.static(path.join(__dirname, '..', 'overlay')));
 app.use('/dashboard', express.static(path.join(__dirname, '..', 'dashboard')));
 app.use('/setup', express.static(path.join(__dirname, '..', 'setup')));
 app.use('/clip-player', express.static(path.join(__dirname, '..', 'clip-player')));
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));   // language helper + strings
 
 // ── Setup detection: redirect to wizard if not configured ─────────────────────
 function isSetupComplete() {
@@ -195,7 +197,7 @@ app.post('/api/clear', (req, res) => { clearQueue(); res.json({ ok: true }); });
 
 app.post('/api/add', (req, res) => {
   const { title, artist, key, requester } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
   const entry = addSong({ title: title.trim(), artist: artist || '', key: key || '', requester: requester || 'manual' });
   res.json({ ok: true, entry });
 });
@@ -252,10 +254,10 @@ app.post('/api/redraw', (req, res) => {
 
   const tabs = currentSong.tabs || [];
   const picked = pickRandom(excludeTitles, tabs);
-  if (!picked) return res.status(400).json({ error: 'no songs available to redraw' });
+  if (!picked) return res.status(400).json(message('noRedraw', {}, 'no songs available to redraw'));
 
   const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester, tabs });
-  if (!ok) return res.status(400).json({ error: 'redraw failed' });
+  if (!ok) return res.status(400).json(message('redrawFailed', {}, 'redraw failed'));
 
   console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);
   res.json({ ok: true });
@@ -411,7 +413,7 @@ app.get('/api/leihu/library', (req, res) => res.json(leihu.getLibrary()));
 // Manual link for a song imported into Leihu as an audio file. id: null unlinks.
 app.post('/api/leihu/link', async (req, res) => {
   const { title, artist, id } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
   if (id != null && !/^[a-z0-9]{6,16}$/.test(id)) return res.status(400).json({ error: 'invalid id' });
   leihu.setLink(title, artist, id || null);
   res.json({ ok: true });
@@ -420,7 +422,7 @@ app.post('/api/leihu/link', async (req, res) => {
 // Import / render the key of one song now, whether or not auto-prepare is on.
 app.post('/api/leihu/prepare', async (req, res) => {
   const { title, artist, key } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
   await leihu.prepare({ title, artist, key }, { retry: true });
   await leihu.refresh();
   res.json({ ok: true });
@@ -429,11 +431,11 @@ app.post('/api/leihu/prepare', async (req, res) => {
 // Open a ready song in Leihu's practice window at its sheet key.
 app.post('/api/leihu/open', async (req, res) => {
   const { title, artist, key } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
   try {
     res.json({ ok: true, key: await leihu.open({ title, artist, key }) });
   } catch (err) {
-    res.status(400).json({ error: err.response?.data?.error || err.message });
+    res.status(400).json(err.messageCode ? errorBody(err) : { error: err.response?.data?.error || err.message });
   }
 });
 
@@ -451,7 +453,7 @@ app.post('/api/links/decide', (req, res) => {
     linkFinder.decide(key, decision ?? null, videoId);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json(errorBody(err));
   }
 });
 
@@ -460,7 +462,7 @@ app.post('/api/links/access', async (req, res) => {
   try {
     res.json(await linkFinder.checkAccess());
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json(errorBody(err));
   }
 });
 
@@ -470,7 +472,7 @@ app.post('/api/links/save', async (req, res) => {
     if (result.written) require('./sheets').fetchSongs().catch(() => {});
     res.json({ ok: true, ...result });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json(errorBody(err));
   }
 });
 
@@ -480,7 +482,7 @@ app.post('/api/links/check', async (req, res) => {
     await linkFinder.check(key, videoId);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json(errorBody(err));
   }
 });
 
@@ -497,6 +499,11 @@ const PANEL_BG_ALPHA_DEFAULT = 0.92;
 const TEXT_BRIGHTNESS_DEFAULT = 1;
 const TEXT_BRIGHTNESS_MIN = 0.5;
 const TEXT_BRIGHTNESS_MAX = 2;
+const OVERLAY_LANGUAGES = ['en', 'zh-TW'];   // what viewers see on the overlay and clip player
+
+function overlayLanguage() {
+  return OVERLAY_LANGUAGES.includes(process.env.OVERLAY_LANGUAGE) ? process.env.OVERLAY_LANGUAGE : 'en';
+}
 
 app.get('/api/settings', (req, res) => {
   const rawDays = process.env.RANDOM_COOLDOWN_DAYS;
@@ -513,6 +520,7 @@ app.get('/api/settings', (req, res) => {
     panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
     textBrightness: Number.isFinite(brightness) && brightness >= TEXT_BRIGHTNESS_MIN && brightness <= TEXT_BRIGHTNESS_MAX ? brightness : TEXT_BRIGHTNESS_DEFAULT,
     leihuAutoPrepare: process.env.LEIHU_AUTO_PREPARE === '1',
+    overlayLanguage: overlayLanguage(),
   });
 });
 
@@ -546,6 +554,15 @@ app.post('/api/settings', (req, res) => {
     updates.textBrightness = brightness;
     setupRouter.writeEnvValues({ OVERLAY_TEXT_BRIGHTNESS: String(brightness) });
     broadcastSettings({ textBrightness: brightness });
+  }
+
+  if (req.body.overlayLanguage !== undefined) {
+    if (!OVERLAY_LANGUAGES.includes(req.body.overlayLanguage)) {
+      return res.status(400).json({ error: `overlayLanguage must be one of ${OVERLAY_LANGUAGES.join(', ')}` });
+    }
+    updates.overlayLanguage = req.body.overlayLanguage;
+    setupRouter.writeEnvValues({ OVERLAY_LANGUAGE: updates.overlayLanguage });
+    broadcastSettings({ overlayLanguage: updates.overlayLanguage });
   }
 
   if (req.body.leihuAutoPrepare !== undefined) {
