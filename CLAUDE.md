@@ -69,7 +69,7 @@ vtuber-song-queue/
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk)
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
-├── dashboard/index.html   Streamer control panel — 4 columns, drag/drop, history, manual add, settings
+├── dashboard/index.html   Streamer control panel — 2×2 panels, drag/drop, history, manual add, ⚙ settings popover
 ├── dashboard/links.html   YouTube link finder review page
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)

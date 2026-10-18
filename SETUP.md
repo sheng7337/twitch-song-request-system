@@ -122,8 +122,9 @@ Open `http://localhost:3000/dashboard` during streams.
 
 | Feature | Description |
 |---|---|
-| 4 columns | Now Playing · Up Next · Played · Pending Review |
-| Drag & drop | Move songs between columns or reorder within |
+| 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
+| Drag & drop | Move songs between panels or reorder within |
+| ⚙ Settings | Random cooldown, overlay opacity / brightness, Leihu auto-prepare, YouTube link finder — each saves on its own |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
 | Pending column | Weak/unmatched requests — edit and accept manually |
 | Manual request bar | Add songs without Channel Points |

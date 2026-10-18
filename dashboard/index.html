@@ -25,7 +25,7 @@
     --blue: #5a9aff;
     --red: #ff5a5a;
     --text: #d4c8f0;
-    --text-dim: #7a6a9a;
+    --text-dim: #9a8cbc;
     --text-muted: #3a3060;
     --drag-over: rgba(176,106,255,0.15);
     --orange: #ff8c32;
@@ -33,12 +33,14 @@
   }
 
   html, body {
-    min-height: 100vh;
+    height: 100%;
     background: var(--bg);
     font-family: 'Share Tech Mono', monospace;
     color: var(--text);
-    font-size: 13px;
+    font-size: 15px;
   }
+  /* The page is exactly the window: each panel scrolls on its own */
+  body { display: flex; flex-direction: column; }
 
   /* ── Top bar ── */
   .topbar {
@@ -50,36 +52,65 @@
   }
   .topbar-title {
     font-family: 'Orbitron', sans-serif;
-    font-size: 11px; font-weight: 500; letter-spacing: 3px; color: var(--purple);
+    font-size: 14px; font-weight: 500; letter-spacing: 3px; color: var(--purple); white-space: nowrap;
   }
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); animation: blink 2s infinite; }
   .status-dot.off { background: #ff4444; animation: none; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .topbar-spacer { flex: 1; }
-  .cooldown-group {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 10px; color: var(--text-muted);
-  }
   .cooldown-input {
-    width: 52px;
+    width: 64px;
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: 4px; padding: 5px 6px;
-    font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text);
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--text);
     outline: none; transition: border-color .15s;
   }
   .cooldown-input:focus { border-color: var(--purple); }
   .opacity-slider {
-    width: 90px; accent-color: var(--purple); cursor: pointer;
+    flex: 1; min-width: 0; accent-color: var(--purple); cursor: pointer;
   }
   .opacity-value {
-    width: 30px; text-align: right;
-    font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text);
+    width: 40px; text-align: right;
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--text);
   }
-  .topbar-hint { font-size: 10px; color: var(--text-muted); }
+
+  /* Leihu status chip in the top bar (opens its settings) */
+  .chip {
+    font-family: 'Share Tech Mono', monospace; font-size: 13px; white-space: nowrap;
+    padding: 5px 12px; border-radius: 14px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .chip:hover { background: rgba(176,106,255,0.1); }
+  .chip.on { color: var(--green); border-color: var(--border-green); }
+
+  /* Settings popover under the ⚙ button */
+  .settings-wrap { position: relative; }
+  .settings {
+    position: absolute; right: 0; top: calc(100% + 8px); z-index: 300;
+    width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; display: flex; flex-direction: column; gap: 18px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  }
+  .settings[hidden] { display: none; }
+  .settings section { display: flex; flex-direction: column; gap: 8px; border-radius: 6px; transition: background .4s; }
+  .settings section.flash { background: rgba(176,106,255,0.12); }
+  .settings h3 {
+    font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--purple);
+  }
+  .setting { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
+  .setting-name { width: 120px; flex-shrink: 0; }
+  .setting input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--purple); }
+  .setting-hint { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .link-btn {
+    align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer;
+    font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--purple); text-decoration: underline;
+  }
 
   .btn {
     font-family: 'Share Tech Mono', monospace;
-    font-size: 11px; padding: 5px 12px;
+    font-size: 14px; padding: 6px 14px; white-space: nowrap;
     background: transparent; border: 1px solid var(--border);
     border-radius: 4px; color: var(--purple); cursor: pointer;
     transition: background .15s;
@@ -90,14 +121,23 @@
   .btn.skip { color: var(--amber); border-color: var(--border-amber); }
   .btn.skip:hover { background: rgba(255,184,74,0.1); }
 
-  /* ── Layout ── */
-  .columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: 12px;
-    padding: 12px 16px;
-    align-items: start;
-    height: calc(100vh - 98px);
+  /* ── Layout: 2×2 — left: Now Playing over Up Next, right: Pending Review over Played ── */
+  .board {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 14px; padding: 14px 16px;
+  }
+  .stack { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .col-panel.grow { flex: 1; }
+  .np-panel { flex-shrink: 0; }
+  .np-panel .drop-zone { min-height: 72px; }
+  .pending-panel { flex: 0 1 auto; max-height: 55%; }
+  /* Narrow windows: one column, the page scrolls */
+  @media (max-width: 900px) {
+    html, body { height: auto; }
+    .board { grid-template-columns: 1fr; }
+    .col-panel.grow { min-height: 320px; }
+    .pending-panel { max-height: none; }
   }
 
   /* ── Column panels ── */
@@ -107,7 +147,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 0;
   }
   .col-header {
     display: flex; align-items: center; gap: 8px;
@@ -122,18 +162,18 @@
 
   .col-title {
     font-family: 'Orbitron', sans-serif;
-    font-size: 9px; font-weight: 500; letter-spacing: 2px;
+    font-size: 12px; font-weight: 500; letter-spacing: 2px;
     text-transform: uppercase; flex: 1;
   }
-  .col-title.purple { color: var(--purple-dim); }
-  .col-title.green  { color: var(--green-dim); }
-  .col-title.amber  { color: var(--amber-dim); }
-  .col-title.orange { color: var(--orange-dim); }
+  .col-title.purple { color: var(--purple); }
+  .col-title.green  { color: var(--green); }
+  .col-title.amber  { color: var(--amber); }
+  .col-title.orange { color: var(--orange); }
 
   .col-badge.orange { background: rgba(80,45,10,0.4); border: 1px solid rgba(160,90,20,0.3); color: var(--orange); }
 
   .col-badge {
-    font-size: 9px; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px;
+    font-size: 12px; padding: 2px 8px; border-radius: 3px; letter-spacing: 1px;
   }
   .col-badge.purple { background: rgba(80,30,120,0.4); border: 1px solid rgba(120,60,200,0.3); color: var(--purple); }
   .col-badge.green  { background: rgba(20,80,50,0.4);  border: 1px solid rgba(40,140,80,0.3);  color: var(--green); }
@@ -148,7 +188,7 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(176,106,255,0.2) transparent;
   }
-  .drop-zone::-webkit-scrollbar { width: 3px; }
+  .drop-zone::-webkit-scrollbar { width: 6px; }
   .drop-zone::-webkit-scrollbar-thumb { background: rgba(176,106,255,0.2); border-radius: 2px; }
   .drop-zone.drag-over { background: var(--drag-over); }
 
@@ -187,41 +227,41 @@
   .pending-card:last-child { margin-bottom: 0; }
   .pending-top { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   .pending-original {
-    font-size: 10px; color: var(--orange); flex: 1;
+    font-size: 14px; color: var(--orange); flex: 1;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .pending-confidence {
-    font-size: 9px; padding: 1px 6px; border-radius: 3px; white-space: nowrap;
+    font-size: 12px; padding: 1px 6px; border-radius: 3px; white-space: nowrap;
     background: rgba(80,45,10,0.5); border: 1px solid rgba(160,90,20,0.3); color: var(--orange);
   }
   .pending-confidence.no-match {
     background: rgba(80,20,20,0.5); border-color: rgba(160,40,40,0.3); color: var(--red);
   }
-  .pending-req { font-size: 9px; color: var(--blue); }
+  .pending-req { font-size: 13px; color: var(--blue); }
   .pending-fields { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
   .pending-field {
     width: 100%; background: rgba(10,8,20,0.8);
     border: 1px solid rgba(120,60,220,0.2); border-radius: 3px;
     padding: 4px 7px; font-family: 'Share Tech Mono', monospace;
-    font-size: 11px; color: var(--text); outline: none;
+    font-size: 14px; color: var(--text); outline: none;
     transition: border-color .15s;
   }
   .pending-field:focus { border-color: var(--purple); }
-  .pending-field::placeholder { color: var(--text-muted); }
+  .pending-field::placeholder { color: var(--text-dim); opacity: 0.7; }
   .pending-actions { display: flex; gap: 5px; }
   .accept-btn {
-    flex: 1; padding: 4px 8px;
+    flex: 1; padding: 5px 10px;
     background: rgba(74,255,154,0.08); border: 1px solid rgba(74,255,154,0.3);
-    border-radius: 3px; color: var(--green); font-size: 10px;
+    border-radius: 3px; color: var(--green); font-size: 13px;
     font-family: 'Share Tech Mono', monospace; cursor: pointer;
     transition: all .15s;
   }
   .accept-btn:hover { background: rgba(74,255,154,0.18); }
   .pending-del {
-    flex-shrink: 0; width: 24px; height: 24px;
-    background: transparent; border: 1px solid rgba(255,90,90,0.2);
-    border-radius: 3px; color: rgba(255,90,90,0.5);
-    cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; width: 28px; height: 28px;
+    background: transparent; border: 1px solid rgba(255,90,90,0.3);
+    border-radius: 3px; color: rgba(255,90,90,0.75);
+    cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center;
     transition: all .15s;
   }
   .pending-del:hover { background: rgba(255,90,90,0.15); color: var(--red); border-color: rgba(255,90,90,0.5); }
@@ -237,12 +277,12 @@
   }
   .candidate-item:hover { background: rgba(74,255,154,0.08); border-color: rgba(74,255,154,0.3); }
   .candidate-conf {
-    font-size: 9px; padding: 2px 5px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+    font-size: 12px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
     background: rgba(80,45,10,0.5); border: 1px solid rgba(160,90,20,0.3); color: var(--orange);
   }
   .candidate-info { flex: 1; min-width: 0; }
-  .candidate-title { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-  .candidate-artist { font-size: 9px; color: var(--text-dim); display: block; }
+  .candidate-title { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .candidate-artist { font-size: 12px; color: var(--text-dim); display: block; }
 
   .drag-handle {
     color: var(--text-muted); font-size: 14px; cursor: grab; flex-shrink: 0;
@@ -253,15 +293,15 @@
   }
 
   .song-info { flex: 1; min-width: 0; }
-  .song-title { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .song-artist { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
-  .song-req { font-size: 9px; color: var(--blue); margin-top: 2px; }
+  .song-title { font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .song-artist { font-size: 13px; color: var(--text-dim); margin-top: 1px; }
+  .song-req { font-size: 12px; color: var(--blue); margin-top: 2px; }
 
   .del-btn {
-    flex-shrink: 0; width: 22px; height: 22px;
-    background: transparent; border: 1px solid rgba(255,90,90,0.2);
-    border-radius: 3px; color: rgba(255,90,90,0.5);
-    cursor: pointer; font-size: 13px; line-height: 1;
+    flex-shrink: 0; width: 28px; height: 28px;
+    background: transparent; border: 1px solid rgba(255,90,90,0.3);
+    border-radius: 3px; color: rgba(255,90,90,0.75);
+    cursor: pointer; font-size: 15px; line-height: 1;
     display: flex; align-items: center; justify-content: center;
     transition: all .15s;
   }
@@ -277,29 +317,29 @@
     margin: 8px;
     display: flex; align-items: center; gap: 10px;
   }
-  .now-playing-card .song-info .song-title { font-size: 13px; color: #ddc8ff; }
+  .now-playing-card .song-info .song-title { font-size: 16px; color: #ddc8ff; }
   .now-playing-card .song-line1 {
     display: flex; align-items: baseline; gap: 10px;
     flex-wrap: wrap; justify-content: space-between;
   }
-  .now-playing-card .song-line1 .song-title  { font-size: 16px; color: #ddc8ff; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-  .now-playing-card .song-line1 .song-req    { font-size: 13px; color: var(--blue); white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+  .now-playing-card .song-line1 .song-title  { font-size: 22px; color: #ddc8ff; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .now-playing-card .song-line1 .song-req    { font-size: 15px; color: var(--blue); white-space: nowrap; flex-shrink: 0; margin-left: auto; }
 
   .song-line1 {
     display: flex; align-items: baseline; gap: 10px;
     flex-wrap: wrap; justify-content: space-between;
   }
-  .song-line1 .song-title  { font-size: 13px; color: var(--text); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .song-line1 .song-req    { font-size: 11px; color: var(--blue); white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+  .song-line1 .song-title  { font-size: 16px; color: var(--text); flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .song-line1 .song-req    { font-size: 13px; color: var(--blue); white-space: nowrap; flex-shrink: 0; margin-left: auto; }
   .song-line2 {
     display: flex; align-items: baseline; gap: 10px; margin-top: 2px;
   }
-  .song-line2 .song-artist { font-size: 11px; color: var(--text-dim); flex: 1; }
-  .song-line2 .song-req    { font-size: 11px; color: var(--blue); white-space: nowrap; }
+  .song-line2 .song-artist { font-size: 13px; color: var(--text-dim); flex: 1; }
+  .song-line2 .song-req    { font-size: 13px; color: var(--blue); white-space: nowrap; }
   .now-playing-label {
-    font-size: 8px; letter-spacing: 2px; color: var(--purple-dim); margin-bottom: 4px;
+    font-size: 11px; letter-spacing: 2px; color: var(--purple); margin-bottom: 4px;
   }
-  .np-empty { font-size: 11px; color: var(--text-muted); padding: 12px; text-align: center; }
+  .np-empty { font-size: 14px; color: var(--text-dim); padding: 12px; text-align: center; }
 
   /* ── Drop placeholder ── */
   .drop-placeholder {
@@ -312,7 +352,7 @@
   .drop-placeholder.visible { display: block; }
 
   /* ── Empty state ── */
-  .empty-state { font-size: 10px; color: var(--text-muted); text-align: center; padding: 20px 0; }
+  .empty-state { font-size: 14px; color: var(--text-dim); text-align: center; padding: 20px 12px; line-height: 1.6; }
 
   /* ── Manual request bar ── */
   .request-bar {
@@ -320,22 +360,22 @@
     padding: 10px 20px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
-    position: sticky; top: 49px; z-index: 90;
+    z-index: 90;
   }
   .request-label {
-    font-size: 9px; letter-spacing: 2px; color: var(--text-muted);
+    font-size: 12px; letter-spacing: 2px; color: var(--text-dim);
     white-space: nowrap; text-transform: uppercase;
   }
   .request-input-wrap { position: relative; flex: 2; }
   .request-input-wrap input {
     width: 100%;
     background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 4px; padding: 6px 10px;
-    font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text);
+    border-radius: 4px; padding: 7px 10px;
+    font-family: 'Share Tech Mono', monospace; font-size: 15px; color: var(--text);
     outline: none; transition: border-color .15s;
   }
   .request-input-wrap input:focus { border-color: var(--purple); }
-  .request-input-wrap input::placeholder { color: var(--text-muted); }
+  .request-input-wrap input::placeholder { color: var(--text-dim); opacity: 0.7; }
 
   .suggest-list {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
@@ -346,32 +386,32 @@
   }
   .suggest-list.open { display: block; }
   .suggest-item {
-    padding: 7px 10px; cursor: pointer; font-size: 12px;
+    padding: 8px 10px; cursor: pointer; font-size: 15px;
     border-bottom: 1px solid rgba(120,60,220,0.1);
     transition: background .1s;
   }
   .suggest-item:last-child { border-bottom: none; }
   .suggest-item:hover, .suggest-item.active { background: rgba(176,106,255,0.12); }
-  .suggest-item .s-artist { font-size: 10px; color: var(--text-dim); margin-left: 6px; }
+  .suggest-item .s-artist { font-size: 13px; color: var(--text-dim); margin-left: 6px; }
 
   .requester-input {
     flex: 1;
     background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 4px; padding: 6px 10px;
-    font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text);
+    border-radius: 4px; padding: 7px 10px;
+    font-family: 'Share Tech Mono', monospace; font-size: 15px; color: var(--text);
     outline: none; transition: border-color .15s; min-width: 0;
   }
   .requester-input:focus { border-color: var(--blue); }
-  .requester-input::placeholder { color: var(--text-muted); }
+  .requester-input::placeholder { color: var(--text-dim); opacity: 0.7; }
 
   .btn.add { color: var(--green); border-color: var(--border-green); white-space: nowrap; }
   .btn.add:hover { background: rgba(74,255,154,0.1); }
   .btn.add:disabled { opacity: 0.35; cursor: not-allowed; }
 
   .finish-btn {
-    flex-shrink: 0; padding: 5px 10px;
+    flex-shrink: 0; padding: 6px 12px;
     background: rgba(74,255,154,0.08); border: 1px solid rgba(74,255,154,0.3);
-    border-radius: 4px; color: var(--green); font-size: 10px; letter-spacing: 1px;
+    border-radius: 4px; color: var(--green); font-size: 13px; letter-spacing: 1px;
     font-family: 'Share Tech Mono', monospace; cursor: pointer;
     transition: all .15s; white-space: nowrap;
   }
@@ -379,9 +419,9 @@
 
   /* Opens the song in Leihu Singsing's practice window (shown by paintBadges) */
   .sing-btn {
-    margin: 4px 0 0 4px; padding: 2px 8px; vertical-align: top;
+    margin: 4px 0 0 4px; padding: 3px 10px; vertical-align: top;
     background: rgba(255,184,74,0.08); border: 1px solid var(--border-amber);
-    border-radius: 4px; color: var(--amber); font-size: 10px; letter-spacing: 1px;
+    border-radius: 4px; color: var(--amber); font-size: 13px; letter-spacing: 1px;
     font-family: 'Share Tech Mono', monospace; cursor: pointer;
     transition: all .15s; white-space: nowrap;
   }
@@ -389,19 +429,19 @@
   .sing-btn[hidden] { display: none; }
 
   .key-badge {
-    width: 36px; height: 36px; min-width: 36px; min-height: 36px;
+    width: 42px; height: 42px; min-width: 42px; min-height: 42px;
     border-radius: 50%; flex-shrink: 0; box-sizing: border-box;
     background: rgba(50,30,80,0.5); border: 2px solid rgba(140,80,255,0.5); color: #c09aff;
-    font-family: 'Share Tech Mono', monospace; font-size: 11px; font-weight: 500;
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; font-weight: 500;
     display: inline-flex; align-items: center; justify-content: center;
     vertical-align: middle; line-height: 1;
   }
 
   .copy-btn {
-    flex-shrink: 0; padding: 0 5px; height: 20px;
-    background: transparent; border: 1px solid rgba(90,154,255,0.2);
-    border-radius: 3px; color: rgba(90,154,255,0.35);
-    cursor: pointer; font-size: 10px; letter-spacing: 0.5px;
+    flex-shrink: 0; padding: 0 7px; height: 28px;
+    background: transparent; border: 1px solid rgba(90,154,255,0.3);
+    border-radius: 3px; color: rgba(90,154,255,0.7);
+    cursor: pointer; font-size: 14px; letter-spacing: 0.5px;
     display: flex; align-items: center;
     transition: all .15s; white-space: nowrap;
     font-family: 'Share Tech Mono', monospace;
@@ -409,23 +449,28 @@
   .copy-btn:hover { background: rgba(90,154,255,0.1); color: var(--blue); border-color: rgba(90,154,255,0.4); }
 
   .redraw-btn {
-    flex-shrink: 0; width: 22px; height: 22px;
-    background: transparent; border: 1px solid rgba(120,60,220,0.2);
-    border-radius: 3px; color: rgba(176,106,255,0.45);
-    cursor: pointer; font-size: 13px;
+    flex-shrink: 0; width: 28px; height: 28px;
+    background: transparent; border: 1px solid rgba(120,60,220,0.3);
+    border-radius: 3px; color: rgba(176,106,255,0.75);
+    cursor: pointer; font-size: 15px;
     display: flex; align-items: center; justify-content: center;
     transition: all .15s;
   }
   .redraw-btn:hover { background: rgba(176,106,255,0.12); color: var(--purple); border-color: rgba(176,106,255,0.5); }
 
-  .song-history { display: flex; gap: 8px; margin-top: 2px; }
-  .h-days { font-size: 9px; color: var(--text-muted); }
-  .h-req  { font-size: 9px; color: var(--blue); opacity: 0.6; }
+  /* Artist · history · Leihu badge on one line (wraps when narrow) */
+  .song-meta { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; margin-top: 3px; }
+  .song-meta:empty { display: none; }
+  .song-meta .song-artist { margin-top: 0; }
+  .song-meta .bt-badge, .song-meta .sing-btn { margin: 0; }
+  .song-history { display: flex; gap: 8px; }
+  .h-days { font-size: 12px; color: var(--text-dim); }
+  .h-req  { font-size: 12px; color: var(--blue); opacity: 0.8; }
 
   /* Leihu Singsing backing-track badge (filled in by paintBadges) */
   .bt-badge {
     display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 3px;
-    font-family: 'Share Tech Mono', monospace; font-size: 10px; white-space: nowrap;
+    font-family: 'Share Tech Mono', monospace; font-size: 12px; white-space: nowrap;
     border: 1px solid var(--border); color: var(--text-dim); background: transparent;
   }
   .bt-badge:empty { display: none; }
@@ -444,27 +489,30 @@
     width: min(520px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column; gap: 8px;
     background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px;
   }
-  .picker-title { font-size: 12px; color: var(--purple); }
+  .picker-title { font-size: 15px; color: var(--purple); }
   .picker input {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
-    color: var(--text); padding: 6px 8px; font-size: 12px;
+    color: var(--text); padding: 7px 9px; font-size: 14px;
   }
   .picker-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
   .picker-item {
-    padding: 6px 8px; border-radius: 3px; cursor: pointer; font-size: 12px; color: var(--text);
+    padding: 7px 9px; border-radius: 3px; cursor: pointer; font-size: 14px; color: var(--text);
     display: flex; justify-content: space-between; gap: 8px;
   }
   .picker-item:hover, .picker-item.cur { background: var(--bg-hover); }
-  .picker-item .st { color: var(--text-dim); font-size: 10px; white-space: nowrap; }
+  .picker-item .st { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
   .picker-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
   .toast {
-    font-size: 10px; padding: 4px 10px; border-radius: 3px;
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 400;
+    max-width: calc(100vw - 32px); pointer-events: none;
+    font-size: 13px; padding: 5px 12px; border-radius: 3px;
     opacity: 0; transition: opacity .3s;
-    background: rgba(74,255,154,0.15); border: 1px solid rgba(74,255,154,0.3); color: var(--green);
-    white-space: nowrap;
+    background: linear-gradient(rgba(74,255,154,0.15), rgba(74,255,154,0.15)), var(--bg-panel);
+    border: 1px solid rgba(74,255,154,0.3); color: var(--green);
+    white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
   }
-  .toast.error { background: rgba(255,90,90,0.15); border-color: rgba(255,90,90,0.3); color: var(--red); }
+  .toast.error { background: linear-gradient(rgba(255,90,90,0.15), rgba(255,90,90,0.15)), var(--bg-panel); border-color: rgba(255,90,90,0.3); color: var(--red); }
   .toast.show { opacity: 1; }
 
 </style>
@@ -475,33 +523,54 @@
   <span class="status-dot off" id="dot"></span>
   <span class="topbar-title">Song Queue Dashboard</span>
   <span class="topbar-spacer"></span>
-  <span class="topbar-hint">drag songs between columns to move them</span>
-  <span class="cooldown-group" title="Minimum days after a song is requested before the Random Song reward can pick it again — 0 disables the cooldown (max 60 days / ~2 months)">
-    🎲 cooldown
-    <input type="number" class="cooldown-input" id="cooldown-input" min="0" max="60" step="1"
-           onkeydown="if(event.key==='Enter') saveCooldown()" />
-    days
-    <button class="btn" onclick="saveCooldown()">Save</button>
-  </span>
-  <span class="cooldown-group" title="Overlay panel background opacity — 0 is fully transparent, 1 is solid">
-    🎨 opacity
-    <input type="range" class="opacity-slider" id="opacity-input" min="0" max="1" step="0.01"
-           oninput="document.getElementById('opacity-value').textContent = this.value" />
-    <span class="opacity-value" id="opacity-value">0.92</span>
-    <button class="btn" onclick="saveOpacity()">Save</button>
-  </span>
-  <span class="cooldown-group" title="Overlay brightness — 0.5 is darker, 2 is brighter, 1 is normal">
-    🔆 brightness
-    <input type="range" class="opacity-slider" id="brightness-input" min="0.5" max="2" step="0.05"
-           oninput="document.getElementById('brightness-value').textContent = this.value" />
-    <span class="opacity-value" id="brightness-value">1</span>
-    <button class="btn" onclick="saveBrightness()">Save</button>
-  </span>
-  <span class="cooldown-group" title="Leihu Singsing (backing tracks + lyrics). Auto-prepare imports queued songs from the sheet's YouTube link and renders their key ahead of time — this uses the GPU during stream.">
+  <button class="chip" id="leihu-chip" onclick="toggleSettings('settings-leihu')" title="Leihu Singsing (backing tracks + lyrics) — click for its settings">
     🎤 <span id="leihu-state">Leihu offline</span>
-    <label><input type="checkbox" id="leihu-auto" onchange="saveLeihuAuto()" /> auto-prepare</label>
-  </span>
-  <a class="btn" style="text-decoration:none" href="/dashboard/links.html" title="Find YouTube links for songs in your sheet that don't have one">🔗 links</a>
+  </button>
+  <div class="settings-wrap">
+    <button class="btn" id="settings-btn" onclick="toggleSettings()" aria-expanded="false" aria-controls="settings">⚙ Settings</button>
+    <!-- Settings save on their own: the number box on Enter or when leaving it, sliders when let go -->
+    <div class="settings" id="settings" hidden>
+      <section>
+        <h3>Random song reward</h3>
+        <label class="setting">
+          <span class="setting-name">Cooldown</span>
+          <input type="number" class="cooldown-input" id="cooldown-input" min="0" max="60" step="1" onchange="saveCooldown()" />
+          days
+        </label>
+        <p class="setting-hint">Days after a song is requested before the random reward can pick it again. 0 = no cooldown, at most 60.</p>
+      </section>
+      <section>
+        <h3>Overlay look</h3>
+        <label class="setting">
+          <span class="setting-name">Panel opacity</span>
+          <input type="range" class="opacity-slider" id="opacity-input" min="0" max="1" step="0.01"
+                 oninput="document.getElementById('opacity-value').textContent = this.value" onchange="saveOpacity()" />
+          <span class="opacity-value" id="opacity-value">0.92</span>
+        </label>
+        <label class="setting">
+          <span class="setting-name">Brightness</span>
+          <input type="range" class="opacity-slider" id="brightness-input" min="0.5" max="2" step="0.05"
+                 oninput="document.getElementById('brightness-value').textContent = this.value" onchange="saveBrightness()" />
+          <span class="opacity-value" id="brightness-value">1</span>
+        </label>
+        <p class="setting-hint">Opacity: 0 = see-through, 1 = solid. Brightness: 1 = normal.</p>
+        <button class="link-btn" onclick="resetOverlay()">Reset to default (0.92 / 1)</button>
+      </section>
+      <section id="settings-leihu">
+        <h3>Leihu Singsing</h3>
+        <p class="setting-hint" id="leihu-detail">Not running.</p>
+        <label class="setting">
+          <input type="checkbox" id="leihu-auto" onchange="saveLeihuAuto()" />
+          Auto-prepare queued songs
+        </label>
+        <p class="setting-hint">Imports queued songs from the sheet's YouTube link and renders their key ahead of time. Uses the GPU during stream.</p>
+      </section>
+      <section>
+        <h3>Tools</h3>
+        <a class="btn" style="text-decoration:none; align-self:flex-start" href="/dashboard/links.html">🔗 Find YouTube links for the sheet</a>
+      </section>
+    </div>
+  </div>
   <button class="btn skip" onclick="api('skip')">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm('Clear entire queue?')) api('clear')">✕ Clear All</button>
 </div>
@@ -519,9 +588,10 @@
   <span class="toast" id="toast"></span>
 </div>
 
-<div class="columns">
+<div class="board">
+ <div class="stack">
   <!-- Now Playing -->
-  <div class="col-panel">
+  <div class="col-panel np-panel">
     <div class="col-header amber">
       <span class="col-title amber">Now Playing</span>
       <span class="col-badge amber" id="np-badge">—</span>
@@ -534,33 +604,22 @@
   </div>
 
   <!-- Up Next -->
-  <div class="col-panel">
+  <div class="col-panel grow">
     <div class="col-header">
       <span class="col-title purple">Up Next</span>
       <span class="col-badge purple" id="queue-badge">0</span>
     </div>
     <div class="drop-zone" id="zone-queue" data-zone="queue"
          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, getDropIndex(event, 'zone-queue'))">
-      <p class="empty-state" id="queue-empty" style="display:none">no requests yet...</p>
+      <p class="empty-state" id="queue-empty" style="display:none">no requests yet<br>drag songs between panels to move them</p>
       <div id="queue-list"></div>
     </div>
   </div>
+ </div>
 
-  <!-- Played -->
-  <div class="col-panel">
-    <div class="col-header green">
-      <span class="col-title green">Played</span>
-      <span class="col-badge green" id="played-badge">0</span>
-    </div>
-    <div class="drop-zone" id="zone-played" data-zone="played"
-         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, getDropIndex(event, 'zone-played'))">
-      <p class="empty-state" id="played-empty" style="display:none">nothing played yet...</p>
-      <div id="played-list"></div>
-    </div>
-  </div>
-
+ <div class="stack">
   <!-- Pending -->
-  <div class="col-panel">
+  <div class="col-panel pending-panel">
     <div class="col-header orange">
       <span class="col-title orange">Pending Review</span>
       <span class="col-badge orange" id="pending-badge">0</span>
@@ -572,6 +631,19 @@
     </div>
   </div>
 
+  <!-- Played -->
+  <div class="col-panel grow">
+    <div class="col-header green">
+      <span class="col-title green">Played</span>
+      <span class="col-badge green" id="played-badge">0</span>
+    </div>
+    <div class="drop-zone" id="zone-played" data-zone="played"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event, getDropIndex(event, 'zone-played'))">
+      <p class="empty-state" id="played-empty" style="display:none">nothing played yet...</p>
+      <div id="played-list"></div>
+    </div>
+  </div>
+ </div>
 </div>
 
 <script>
@@ -607,15 +679,18 @@ function render() {
            ondragend="onDragEnd(event)">
         <div class="drag-handle"><span></span><span></span><span></span></div>
         <div class="song-info">
-          <div class="now-playing-label">NOW PLAYING</div>
           <div class="song-line1">
             <span class="song-title">${esc(nowPlaying.title)}</span>
             <span class="song-req">@${esc(nowPlaying.requester)}</span>
           </div>
-          ${nowPlaying.artist ? `<div class="song-artist" style="font-size:13px;color:var(--text-dim);margin-top:2px;">${esc(nowPlaying.artist)}</div>` : ''}
-          ${historyHtml(nowPlaying.title)}
-          <span class="bt-badge" data-zone="nowPlaying" data-index="0"></span>
-          <button class="sing-btn" hidden onclick="singInLeihu()" title="Open this song in Leihu Singsing at its key">🎤 Sing</button>
+          <div class="song-meta">
+            ${nowPlaying.artist ? `<span class="song-artist">${esc(nowPlaying.artist)}</span>` : ''}
+            ${historyHtml(nowPlaying.title)}
+          </div>
+          <div class="song-meta">
+            <span class="bt-badge" data-zone="nowPlaying" data-index="0"></span>
+            <button class="sing-btn" hidden onclick="singInLeihu()" title="Open this song in Leihu Singsing at its key">🎤 Sing</button>
+          </div>
         </div>
         ${nowPlaying.key != null && nowPlaying.key !== '' ? `<span class="key-badge">${nowPlaying.key >= 0 ? '+' : ''}${esc(nowPlaying.key)}</span>` : ''}
         <button class="copy-btn" onclick="copyTitle('${esc(nowPlaying.title)}')" title="Copy title">⧉</button>
@@ -642,11 +717,13 @@ function render() {
       <div class="song-info">
         <div class="song-line1">
           <span class="song-title">${esc(item.title)}</span>
-          <span class="song-req" style="font-size:11px;color:var(--blue);margin-left:auto;">@${esc(item.requester)}</span>
+          <span class="song-req">@${esc(item.requester)}</span>
         </div>
-        ${item.artist ? `<div class="song-artist" style="font-size:11px;color:var(--text-dim);margin-top:2px;">${esc(item.artist)}</div>` : ''}
-        ${historyHtml(item.title)}
-        <span class="bt-badge" data-zone="queue" data-index="${i}"></span>
+        <div class="song-meta">
+          ${item.artist ? `<span class="song-artist">${esc(item.artist)}</span>` : ''}
+          ${historyHtml(item.title)}
+          <span class="bt-badge" data-zone="queue" data-index="${i}"></span>
+        </div>
       </div>
       ${item.key != null && item.key !== '' ? `<span class="key-badge">${item.key >= 0 ? '+' : ''}${esc(item.key)}</span>` : ''}
       <button class="copy-btn" onclick="copyTitle('${esc(item.title)}')" title="Copy title">⧉</button>
@@ -667,10 +744,12 @@ function render() {
       <div class="song-info">
         <div class="song-line1">
           <span class="song-title">${esc(item.title)}</span>
-          <span class="song-req" style="font-size:11px;color:var(--blue);margin-left:auto;">@${esc(item.requester)}</span>
+          <span class="song-req">@${esc(item.requester)}</span>
         </div>
-        ${item.artist ? `<div class="song-artist" style="font-size:11px;color:var(--text-dim);margin-top:2px;">${esc(item.artist)}</div>` : ''}
-        ${historyHtml(item.title)}
+        <div class="song-meta">
+          ${item.artist ? `<span class="song-artist">${esc(item.artist)}</span>` : ''}
+          ${historyHtml(item.title)}
+        </div>
       </div>
       ${item.key != null && item.key !== '' ? `<span class="key-badge">${item.key >= 0 ? '+' : ''}${esc(item.key)}</span>` : ''}
       <button class="copy-btn" onclick="copyTitle('${esc(item.title)}')" title="Copy title">⧉</button>
@@ -870,6 +949,38 @@ async function loadSettings() {
     document.getElementById('brightness-value').textContent = settings.textBrightness;
     document.getElementById('leihu-auto').checked = settings.leihuAutoPrepare;
   } catch(_) {}
+}
+
+// ⚙ Settings popover. With a section ID (the Leihu chip) it opens at that section.
+function toggleSettings(sectionId) {
+  const panel = document.getElementById('settings');
+  panel.hidden = sectionId ? false : !panel.hidden;
+  document.getElementById('settings-btn').setAttribute('aria-expanded', String(!panel.hidden));
+  if (sectionId) {
+    const sec = document.getElementById(sectionId);
+    sec.scrollIntoView({ block: 'nearest' });
+    sec.classList.add('flash');
+    setTimeout(() => sec.classList.remove('flash'), 800);
+  }
+}
+
+function closeSettings() {
+  document.getElementById('settings').hidden = true;
+  document.getElementById('settings-btn').setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.settings-wrap, #leihu-chip')) closeSettings();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+
+function resetOverlay() {
+  document.getElementById('opacity-input').value = 0.92;
+  document.getElementById('opacity-value').textContent = '0.92';
+  document.getElementById('brightness-input').value = 1;
+  document.getElementById('brightness-value').textContent = '1';
+  saveOpacity();
+  saveBrightness();
 }
 
 async function saveCooldown() {
@@ -1119,7 +1230,11 @@ function entryAt(zone, index) {
 }
 
 function paintBadges() {
-  document.getElementById('leihu-state').textContent = leihuStatus.online ? 'Leihu' : 'Leihu offline';
+  document.getElementById('leihu-state').textContent = leihuStatus.online ? 'Leihu ready' : 'Leihu offline';
+  document.getElementById('leihu-chip').classList.toggle('on', !!leihuStatus.online);
+  document.getElementById('leihu-detail').textContent = leihuStatus.online
+    ? 'Connected — queued songs show their backing-track status.' + (leihuStatus.canOpen ? ' The 🎤 Sing button can open songs in Leihu.' : '')
+    : 'Not running — start Leihu Singsing to see backing tracks for queued songs.';
   for (const el of document.querySelectorAll('.bt-badge')) {
     const entry = entryAt(el.dataset.zone, Number(el.dataset.index));
     const st = entry && leihuStatus.songs[songKey(entry.title, entry.artist)];
