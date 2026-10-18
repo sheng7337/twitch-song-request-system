@@ -455,6 +455,15 @@ app.post('/api/links/decide', (req, res) => {
   }
 });
 
+// Can the server edit the song sheet? (a write that changes nothing)
+app.post('/api/links/access', async (req, res) => {
+  try {
+    res.json(await linkFinder.checkAccess());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/links/save', async (req, res) => {
   try {
     const result = await linkFinder.save();

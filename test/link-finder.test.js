@@ -22,6 +22,7 @@ let sheet;
 const writes = [];
 const grows = [];
 let canWrite = true;
+let protectedRange = false;
 const tabOf = range => range.match(/^'(.*)'!/)[1].replace(/''/g, "'");
 const google = {
   auth: { GoogleAuth: class { async getClient() { return {}; } } },
@@ -37,7 +38,11 @@ const google = {
         if (!canWrite) { const e = new Error('The caller does not have permission'); e.code = 403; throw e; }
         return {};
       },
-      batchUpdate: async ({ requestBody }) => { writes.push(...requestBody.data); return {}; },
+      batchUpdate: async ({ requestBody }) => {
+        if (protectedRange) throw new Error('You are trying to edit a protected cell or object.');
+        writes.push(...requestBody.data);
+        return {};
+      },
     },
   } }),
 };
@@ -113,11 +118,32 @@ test('"accept all confident" accepts only the confident picks', () => {
   assert.strictEqual(a.videoId, 'aaaaaaaaaaa');
 });
 
-test('saving without Editor access explains how to fix it and writes nothing', async () => {
+test('Editor access is unknown until checked, and the result is kept for this sheet', async () => {
+  assert.strictEqual(F.getView().access, null);
   canWrite = false;
+  assert.strictEqual((await F.checkAccess()).canEdit, false);
+  assert.match(F.getView().access.error, /Editor/);
+  canWrite = true;
+  assert.strictEqual((await F.checkAccess()).canEdit, true);
+  process.env.GOOGLE_SHEET_ID = 'another-sheet';
+  assert.strictEqual(F.getView().access, null);   // a different sheet needs its own check
+  process.env.GOOGLE_SHEET_ID = 'sheet';
+  assert.strictEqual(F.getView().access.canEdit, true);
+});
+
+test('saving without Editor access explains how to fix it and writes nothing', async () => {
+  canWrite = false;   // access was taken away after the check
   await assert.rejects(F.save(), /Editor/);
   assert.strictEqual(writes.length, 0);
+  assert.strictEqual(F.getView().access.canEdit, false);
   canWrite = true;
+});
+
+test('a protected range gets a readable error, and nothing counts as written', async () => {
+  protectedRange = true;
+  await assert.rejects(F.save(), /protected.*Protect sheets and ranges/);
+  protectedRange = false;
+  assert.strictEqual(F.getView().songs.find(s => s.title === 'a').decision, 'accepted');
 });
 
 test('saving writes only into empty cells, at the row where the song is now', async () => {

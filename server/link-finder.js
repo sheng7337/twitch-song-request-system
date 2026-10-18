@@ -218,7 +218,13 @@ function getView() {
       ...scoreSong(s.raw, { tab: s.tab, title: s.title }),
     }));
   const written = Object.values(state.songs).filter(s => s.written).length;
-  return { job: getJob(), songs, written };
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+  return {
+    job: getJob(), songs, written,
+    access: state.access && state.access.sheetId === sheetId ? state.access : null,   // null = not checked for this sheet
+    serviceEmail: serviceEmail(),
+    sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/edit` : null,
+  };
 }
 
 function decide(key, decision, videoId) {
@@ -247,30 +253,59 @@ function acceptConfident() {
 
 // ── Writing to the sheet ─────────────────────────────────────────────────────
 
+// The Google account the server uses — the one to share the sheet with.
+function serviceEmail() {
+  try { return JSON.parse(fs.readFileSync(CREDS_PATH, 'utf8')).client_email || null; } catch { return null; }
+}
+
+function noPermissionMessage() {
+  return `No permission to edit the song sheet. Share it with ${serviceEmail() || 'the service account'} as Editor, then try again.`;
+}
+
+// Proves Editor access with a write that changes nothing (A1 written back as-is, formulas
+// included — same check as the history sheet). Only run on request or when saving, since
+// even this write can show up in the sheet's version history. The result is kept in
+// state.access for the review page. Returns { canEdit, checked, sheetId, error }.
+async function checkAccess(api) {
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  try {
+    api = api || await sheetsApi(true);
+    const a1 = await api.spreadsheets.values.get({ spreadsheetId, range: 'A1', valueRenderOption: 'FORMULA' });
+    await api.spreadsheets.values.update({
+      spreadsheetId, range: 'A1', valueInputOption: 'USER_ENTERED',
+      requestBody: { values: a1.data.values || [['']] },
+    });
+    state.access = { canEdit: true, checked: Date.now(), sheetId: spreadsheetId };
+  } catch (err) {
+    if (err.code !== 403 && !/permission/i.test(err.message)) throw err;
+    state.access = { canEdit: false, checked: Date.now(), sheetId: spreadsheetId, error: noPermissionMessage() };
+  }
+  saveState();
+  return state.access;
+}
+
 // Writes every accepted link into the sheet, only into empty link cells. Rows are
 // found again by tab + title + artist, so rows inserted or moved since the search
 // don't matter. Returns counts and per-song notes.
 async function save() {
   const pending = Object.values(state.songs).filter(s => s.decision === 'accepted' && !s.written && s.videoId);
   if (!pending.length) return { written: 0, skipped: 0, createdIn: [] };
-  let api;
+  const api = await sheetsApi(true);
+  // Checked again on every save: access can be taken away after the review page's check
+  if (!(await checkAccess(api)).canEdit) throw new Error(noPermissionMessage());
   try {
-    api = await sheetsApi(true);
-    // Prove Editor access with a write that changes nothing (same check as the history sheet)
-    const sheetId = process.env.GOOGLE_SHEET_ID;
-    const a1 = await api.spreadsheets.values.get({ spreadsheetId: sheetId, range: 'A1', valueRenderOption: 'FORMULA' });
-    await api.spreadsheets.values.update({
-      spreadsheetId: sheetId, range: 'A1', valueInputOption: 'USER_ENTERED',
-      requestBody: { values: a1.data.values || [['']] },
-    });
+    return await writeLinks(api, pending);
   } catch (err) {
-    const email = (() => { try { return JSON.parse(fs.readFileSync(CREDS_PATH, 'utf8')).client_email; } catch { return 'the service account'; } })();
-    if (err.code === 403 || /permission/i.test(err.message)) {
-      throw new Error(`No permission to edit the song sheet. Share it with ${email} as Editor, then try again.`);
+    // Editors can still be kept out of protected tabs or ranges (Data → Protect sheets and ranges)
+    if (/protected/i.test(err.message)) {
+      throw new Error('Part of the sheet is protected (Data → Protect sheets and ranges). Let ' +
+        `${serviceEmail() || 'the service account'} edit it, or remove the protection, then save again.`);
     }
     throw err;
   }
+}
 
+async function writeLinks(api, pending) {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   const tabs = await readTabs(api);
 
@@ -374,7 +409,7 @@ async function runCheck(s, vid) {
 }
 
 module.exports = {
-  start, stop, getJob, getView, decide, acceptConfident, save, check,
+  start, stop, getJob, getView, decide, acceptConfident, save, check, checkAccess,
   // for tests
   rowKey, columnLetter, findColumns, _setState: s => { state = s; },
 };

@@ -66,6 +66,17 @@
   .error { color: var(--red); font-size: 11px; }
   .hint { color: var(--text-dim); font-size: 11px; line-height: 1.6; }
 
+  .access { border: 1px solid var(--border-amber); border-radius: 6px; padding: 10px 12px; max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
+  .access-title { color: var(--amber); }
+  .access-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .access code {
+    font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px;
+    overflow-wrap: anywhere;
+  }
+  .access-ok { font-size: 11px; color: var(--green); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .access a { color: var(--purple); }
+
   .tabs { display: flex; gap: 6px; padding: 10px 20px; flex-wrap: wrap; align-items: center; }
   .tab {
     font-family: 'Share Tech Mono', monospace; font-size: 11px; padding: 4px 10px; border-radius: 12px;
@@ -152,6 +163,7 @@
     which is added to a tab the first time you save links there; filled cells are never changed.
     Leihu Singsing must be running.
   </div>
+  <div id="access"></div>
   <div class="job-line" id="job-line"></div>
   <div class="meter" id="meter" hidden><i id="meter-bar"></i></div>
   <div class="error" id="job-error"></div>
@@ -233,15 +245,66 @@ function renderJob() {
   document.getElementById('job-line').innerHTML = line.join(' · ');
   document.getElementById('job-error').textContent = j.error || '';
   const save = document.getElementById('btn-save');
-  save.textContent = `Save ${pending} to sheet`;
-  save.disabled = !pending;
+  const canEdit = view.access && view.access.canEdit;
+  save.textContent = canEdit ? `Save ${pending} to sheet` : 'Share as Editor to save';
+  save.title = canEdit ? '' : 'Searching and reviewing work without it — see the box at the top';
+  save.disabled = !pending || !canEdit;
   const confident = view.songs.filter(FILTERS[1][2]).length;
   const bc = document.getElementById('btn-confident');
   bc.textContent = `Accept all confident (${confident})`;
   bc.disabled = !confident;
 }
 
+// Editor access to the song sheet: needed only to save. Checked when the streamer asks
+// (and on every save), never on page load — the check is a write, even if it changes nothing.
+function renderAccess() {
+  const a = view.access;
+  const el = document.getElementById('access');
+  const email = view.serviceEmail ? esc(view.serviceEmail) : 'the service account';
+  const sheet = view.sheetUrl ? `<a href="${esc(view.sheetUrl)}" target="_blank" rel="noopener">Open my sheet ↗</a>` : '';
+  if (a && a.canEdit) {
+    el.innerHTML = `<div class="access-ok">✓ Links can be saved to your sheet (Editor access)
+      <button class="btn small" onclick="checkAccess()">Check again</button></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="access">
+      <div class="access-title">Step 1 — let this app write links into your sheet</div>
+      <div class="hint">
+        Your song list is read with view access; saving links needs <b>Editor</b>. In Google Sheets press
+        <b>Share</b>, add this address as <b>Editor</b> (untick “Notify people”), then press Check access.
+        You can search and review songs meanwhile.
+      </div>
+      <div class="access-row">
+        <code id="service-email">${email}</code>
+        ${view.serviceEmail ? '<button class="btn small" onclick="copyEmail()">Copy</button>' : ''}
+        ${sheet}
+        <span class="spacer"></span>
+        <button class="btn small go" onclick="checkAccess()">Check access</button>
+      </div>
+      ${a && a.error ? `<div class="error">${esc(a.error)}</div>` : ''}
+    </div>`;
+}
+
+async function checkAccess() {
+  try {
+    const a = await post('access');
+    showToast(a.canEdit ? 'Editor access confirmed — links can be saved' : 'still no Editor access', !a.canEdit);
+    await load();
+  } catch (err) { showToast(err.message, true); }
+}
+
+async function copyEmail() {
+  try {
+    await navigator.clipboard.writeText(view.serviceEmail);
+    showToast('copied');
+  } catch (_) {
+    showToast('copy failed — select the address and copy it by hand', true);
+  }
+}
+
 function render() {
+  renderAccess();
   renderJob();
   document.getElementById('tabs').innerHTML = FILTERS.map(([id, label, fn]) =>
     `<button class="tab${filter === id ? ' cur' : ''}" onclick="setFilter('${id}')">${label} ${view.songs.filter(fn).length}</button>`).join('');

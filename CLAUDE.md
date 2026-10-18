@@ -223,7 +223,14 @@ vtuber-song-queue/
   or a fan upload with ≥ `LINK_CONFIDENT_FAN_VIEWS` views) / needs a look / nothing found
 - State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
   is recomputed from the raw results, so scoring changes need no new search
-- Saving: proves Editor access with a no-op write of A1, re-reads the sheet, finds each row
+- Editor access is asked for on the review page, not in the wizard (the song list itself only
+  needs view access, and finished setups never see the wizard again): a "Step 1" card shows
+  the service-account email (copy button) and a link to the sheet; "Check access" runs the
+  no-op A1 write and keeps the result in `link-search.json` (per sheet ID), after which the card
+  shrinks to one line. Never checked on page load — even a no-op write can appear in the sheet's
+  version history. Searching and reviewing work without access; Save is disabled until checked
+- Saving: proves Editor access again with a no-op write of A1 (a protected tab/range gets its
+  own readable error), re-reads the sheet, finds each row
   again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW).
   Songs are read from A:Z, so a tab already using all 26 columns can't get the column added
 - "Check with Leihu": imports the video into Leihu (language from the tab), waits for
@@ -292,6 +299,7 @@ register it in index.js.
 | POST | `/api/links/stop` | Stop the search |
 | POST | `/api/links/decide` | `{key, decision: 'accepted' \| 'skipped' \| null, videoId}` (videoId: ID or any YouTube link) |
 | POST | `/api/links/accept-confident` | Accept every confident pick |
+| POST | `/api/links/access` | Check Editor access to the song sheet (no-op write) → `{canEdit, checked, error}` |
 | POST | `/api/links/save` | Write accepted links into empty sheet cells |
 | POST | `/api/links/check` | Verify a candidate with Leihu `{key, videoId}` (imports it) |
 
