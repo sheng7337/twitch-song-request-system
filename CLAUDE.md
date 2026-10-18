@@ -58,6 +58,8 @@ vtuber-song-queue/
 │   ├── leihu.js           Optional link to Leihu Singsing (backing tracks + lyrics), song-links.json
 │   ├── link-finder.js     Finds YouTube links for the sheet (search job, review, writes the sheet)
 │   ├── link-score.js      Scores YouTube candidates against the lyric version (pure functions)
+│   ├── romaji.js          Matches romanized video titles to 漢字/かな song titles
+│   ├── data/han-readings.json  Pinyin + Japanese readings per 漢字 (generated from Unicode's Unihan)
 │   ├── history.js         Request history sheet (debounced 1.5s), startup snapshot
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
 │   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
@@ -75,6 +77,7 @@ vtuber-song-queue/
 │   └── sponsor-bgs/       !tk background images (one picked at random each time)
 ├── test/                  node:test suite (`npm test`), stubs Google Sheets
 ├── tools/find-videos.py   Lyric-site + YouTube search, run with Leihu Singsing's bundled Python
+├── tools/build-han-readings.js  Rebuilds server/data/han-readings.json from Unihan_Readings.txt
 ├── setup.ps1 / setup_zh.ps1   Terminal setup wizard (alternative to the web wizard)
 ├── start.ps1 / start_zh.ps1   Every-stream startup: starts server, opens browser when ready
 ├── *.bat                  Double-click launchers (avoid PowerShell execution-policy issues)
@@ -206,6 +209,11 @@ vtuber-song-queue/
   else off. Bonuses: "- Topic" channels, official/label channels, artist spelled as on the lyric
   sites. Penalties: live, TV show, cover, instrumental/伴奏, remix, compilation, fan edit,
   karaoke, other-language version (allowed when it is the tab's language; never offered otherwise)
+- Romanized titles (romaji.js): a run of whole Latin words in the video title that spells the
+  sheet title counts as a title match — each 漢字 by pinyin or any Japanese reading (一青窈's
+  四照花 is "Shishouka"), かな as written, loosely (Hepburn/Kunrei, long vowels, doubling,
+  rendaku, okurigana, particles は/へ). Needs ≥ 2 漢字/かな. Tagged "romanized title", so it is
+  offered but never confident (a 國語 song's Japanese original can spell the same 漢字)
 - Groups: confident (top pick is exact length, no penalties, artist matches, and official —
   or a fan upload with ≥ `LINK_CONFIDENT_FAN_VIEWS` views) / needs a look / nothing found
 - State in `link-search.json` (raw search results + decisions): restarts resume, and scoring

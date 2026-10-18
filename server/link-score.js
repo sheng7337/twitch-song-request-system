@@ -9,6 +9,7 @@
 // lowercase, letters and digits only).
 
 const config = require('./config');
+const { romanizedTitleMatch } = require('./romaji');
 
 const EXACT_S = 3;      // Leihu uses timed lyrics unchanged within this length difference
 const WORKABLE_S = 25;  // Leihu re-times lyrics up to ±25 s offset…
@@ -92,7 +93,9 @@ function lengthTier(duration, ref) {
   return 'off';
 }
 
-function scoreVideo(v, raw, ref, aliases = artistAliases(raw, ref), tab = '') {
+// `title` is the sheet's title as written: a video titled in Latin letters ("Shishouka")
+// matches it by reading (romaji.js), but never counts as confident.
+function scoreVideo(v, raw, ref, aliases = artistAliases(raw, ref), tab = '', title = '') {
   const reasons = [];
   let score = 0;
   const tier = lengthTier(v.duration, ref);
@@ -101,8 +104,11 @@ function scoreVideo(v, raw, ref, aliases = artistAliases(raw, ref), tab = '') {
   else if (tier === 'workable') score += 30 - (diff - EXACT_S);
   else if (tier === 'off') score -= 100;
 
-  const titleMatch = !!raw.title_n && v.title_n.includes(raw.title_n);
-  score += titleMatch ? 25 : -40;
+  const exactTitle = !!raw.title_n && v.title_n.includes(raw.title_n);
+  const romanized = !exactTitle && romanizedTitleMatch(title, v.title);
+  const titleMatch = exactTitle || romanized;
+  score += exactTitle ? 25 : romanized ? 20 : -40;
+  if (romanized) reasons.push('romanized title');
   if (!titleMatch) reasons.push('title differs');
   const topic = isTopic(v.channel);
   const artistChannel = aliases.some(a => artistMatches(a, v.channel_n));
@@ -131,12 +137,12 @@ function scoreVideo(v, raw, ref, aliases = artistAliases(raw, ref), tab = '') {
 //                         config.LINK_CONFIDENT_FAN_VIEWS views
 //          'review'    — something plausible, needs a look
 //          'none'      — nothing usable found
-function scoreSong(raw, { tab = '', fanViews = config.LINK_CONFIDENT_FAN_VIEWS } = {}) {
+function scoreSong(raw, { tab = '', title = '', fanViews = config.LINK_CONFIDENT_FAN_VIEWS } = {}) {
   const ref = referenceDuration(raw);
   const aliases = artistAliases(raw, ref);
   const scored = (raw.videos || [])
     .filter(v => v.id && v.duration)
-    .map(v => scoreVideo(v, raw, ref, aliases, tab))
+    .map(v => scoreVideo(v, raw, ref, aliases, tab, title))
     .sort((a, b) => b.score - a.score);
   // Another language's version is a different recording — never offered as a pick
   const usable = scored.filter(c => c.titleMatch && c.tier !== 'off' && !c.reasons.includes('other language'));

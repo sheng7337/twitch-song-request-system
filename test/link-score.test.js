@@ -89,3 +89,15 @@ test('an exact-length fan upload is confident only with very high views', () => 
   // 0 turns the rule off
   assert.strictEqual(scoreSong(fan(5e6), { fanViews: 0 }).status, 'review');
 });
+
+test('a romanized title of the right length is offered, but never confident', () => {
+  const raw = { title_n: '四照花', artist_n: '一青窈', lyrics: [lyric(332, '四照花', '一青窈')], videos: [
+    video('romanized01', 333, 'Shishouka (Chinese Version)', '一青窈', { title_n: 'shishoukachineseversion', channel_n: '一青窈', views: 11233 }),
+    video('japanese001', 355, '四照花（日文版）', 'fan', { title_n: '四照花日文版' }),
+  ] };
+  const r = scoreSong(raw, { tab: '國語', title: '四照花' });
+  assert.deepStrictEqual(r.candidates.map(c => c.id), ['romanized01']);
+  assert.ok(r.candidates[0].reasons.includes('romanized title'));
+  assert.strictEqual(r.status, 'review');
+  assert.strictEqual(scoreSong(raw, { tab: '國語' }).status, 'none');   // without the sheet title: no match
+});

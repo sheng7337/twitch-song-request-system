@@ -177,8 +177,9 @@ const FILTERS = [
 const TAGS = {
   instrumental: 'no vocals', compilation: 'compilation', live: 'live', 'tv show': 'TV show',
   cover: 'cover', remix: 'remix', karaoke: 'karaoke', 'fan edit': 'fan edit', 'title differs': 'title differs',
-  'other language': 'other-language version',
+  'other language': 'other-language version', 'romanized title': 'title in romaji/pinyin',
 };
+const WARN_TAGS = ['romanized title'];   // worth a look, not a fault
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -295,7 +296,7 @@ function candHtml(s, c) {
   const tags = [
     c.topic ? '<span class="tag good">YouTube Music</span>' : c.official ? '<span class="tag good">official</span>' : '',
     len,
-    ...c.reasons.map(r => `<span class="tag bad">${esc(TAGS[r] || r)}</span>`),
+    ...c.reasons.map(r => `<span class="tag ${WARN_TAGS.includes(r) ? 'ok' : 'bad'}">${esc(TAGS[r] || r)}</span>`),
   ].join('');
   const views = c.views != null ? `${Number(c.views).toLocaleString()} views` : '';
   return `

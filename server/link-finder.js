@@ -215,7 +215,7 @@ function getView() {
     .map(([key, s]) => ({
       key, tab: s.tab, row: s.row, title: s.title, artist: s.artist,
       decision: s.decision, videoId: s.videoId || null, note: s.note || '', check: s.check || null,
-      ...scoreSong(s.raw, { tab: s.tab }),
+      ...scoreSong(s.raw, { tab: s.tab, title: s.title }),
     }));
   const written = Object.values(state.songs).filter(s => s.written).length;
   return { job: getJob(), songs, written };
@@ -238,7 +238,7 @@ function acceptConfident() {
   let n = 0;
   for (const s of Object.values(state.songs)) {
     if (!s.raw || s.written || s.decision) continue;
-    const r = scoreSong(s.raw, { tab: s.tab });
+    const r = scoreSong(s.raw, { tab: s.tab, title: s.title });
     if (r.status === 'confident') { s.decision = 'accepted'; s.videoId = r.candidates[0].id; n++; }
   }
   saveState();
