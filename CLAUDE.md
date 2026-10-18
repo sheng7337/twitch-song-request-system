@@ -182,6 +182,11 @@ vtuber-song-queue/
 - Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
   Leihu) / link broken / link. "No lyrics": Leihu 1.4.7+ finishes processing with blank lyrics
   when its recognition is unreliable — the streamer picks online lyrics in Leihu
+- Blank lyrics on songs **we** imported (Prepare, auto-prepare, "Check with Leihu"; tracked
+  per server run) are filled once: a Leihu lyric candidate with timed lyrics, the sheet's title
+  (brackets ignored), the sheet's artist and ≤ 3 s from the audio — first from the candidates
+  Leihu saved (`/lyrics/candidates`), else Leihu's search by sheet title + artist
+  (`/lyrics/search?q=`), applied with `POST /lyrics/apply`. Lyrics Leihu set are never replaced
 - Imports set Leihu's per-song recognition language from the sheet tab
   (`LEIHU_TAB_LANGUAGES` in config.js; 台語 stays automatic). Needs Leihu 1.4.7+
 - Sing button (Now Playing): asks Leihu's practice window to open the song at the sheet key.

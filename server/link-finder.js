@@ -345,7 +345,7 @@ async function runCheck(s, vid) {
   const base = leihu.baseUrl();
   await leihu.refresh();
   let id = leihu.findByVideo(vid)?.id;
-  if (!id) id = await leihu.importVideo(vid, s.tab);
+  if (!id) id = await leihu.importVideo(vid, s.tab, s);
   const deadline = Date.now() + CHECK_TIMEOUT_MS;
   for (;;) {
     if (Date.now() > deadline) throw new Error('Leihu took too long to process the song');

@@ -25,7 +25,8 @@ const OFFLINE_POLL_MS = 30000;
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
 let canOpen = false;         // Leihu has the remote-open patch (/api/status reports `remote`)
-const requested = new Map(); // import/key-render tag → 'sent' | 'failed', for this run
+const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
+const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
 let links = loadLinks();
 
 function baseUrl() {
@@ -120,15 +121,70 @@ function tabLanguage(tab) {
 
 // Import a YouTube video into Leihu and set its recognition language from the sheet tab.
 // Returns Leihu's new song ID. Setting the language needs Leihu 1.4.7+ (older versions ignore it).
-async function importVideo(vid, tab) {
+// `song` (the sheet's { title, artist }) lets fillMissingLyrics() fill the lyrics if Leihu
+// leaves them blank.
+async function importVideo(vid, tab, song = null) {
   const res = await axios.post(`${baseUrl()}/api/youtube`, { url: `https://www.youtube.com/watch?v=${vid}` }, { timeout: 10000 });
   const id = res.data && res.data.id;
+  if (song) imported.set(vid, { title: song.title, artist: song.artist });
   const lang = tabLanguage(tab);
   if (id && lang) {
     await axios.patch(`${baseUrl()}/api/songs/${id}`, { lyrics_language: lang }, { timeout: 5000 })
       .catch(err => console.error(`[leihu] Could not set language for ${id}:`, err.message));
   }
   return id;
+}
+
+// Letters and digits only, lowercase; brackets dropped ("四照花 (Chinese Ver.)" → "四照花").
+function plainTitle(s) {
+  return (s || '').replace(/[(（[【［].*?[)）\]】］]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+// A Leihu lyric candidate that is surely this song's recording: timed lyrics, the sheet's
+// title, the sheet's artist, and within 3 s of the audio (Leihu then uses its timing as-is).
+function lyricFits(c, song) {
+  const artist = plainTitle(song.artist);
+  const cArtist = plainTitle(c.artist);
+  return !!c.synced && c.diff != null && c.diff <= 3
+    && plainTitle(c.track) === plainTitle(song.title)
+    && !!artist && !!cArtist && (cArtist.includes(artist) || artist.includes(cArtist));
+}
+
+// Fill blank lyrics with a fitting online lyric: first from the candidates Leihu saved while
+// processing, else from Leihu's lyric search by the sheet's title + artist (Leihu's own search
+// used the YouTube title, which may be romanized). Returns true when lyrics were applied.
+async function fillLyrics(id, song) {
+  const pick = list => (list || []).filter(c => lyricFits(c, song)).sort((a, b) => a.diff - b.diff)[0];
+  let cand = pick((await axios.get(`${baseUrl()}/api/songs/${id}/lyrics/candidates`, { timeout: 60000 })).data.results);
+  if (!cand) {
+    const q = `${song.title} ${song.artist || ''}`.trim();
+    cand = pick((await axios.get(`${baseUrl()}/api/songs/${id}/lyrics/search`, { params: { q }, timeout: 60000 })).data.results);
+  }
+  if (!cand) {
+    console.log(`[leihu] No fitting online lyrics for "${song.title}" — pick them in Leihu`);
+    return false;
+  }
+  await axios.post(`${baseUrl()}/api/songs/${id}/lyrics/apply`, { candidate: cand }, { timeout: 60000 });
+  console.log(`[leihu] Filled the blank lyrics of "${song.title}" from ${cand.source} (${cand.track} / ${cand.artist})`);
+  return true;
+}
+
+// Songs we imported that Leihu finished with blank lyrics (its recognition was unreliable)
+// get fitting online lyrics. Lyrics Leihu did set are never replaced. Once per song per run.
+async function fillMissingLyrics() {
+  for (const s of library || []) {
+    const song = imported.get(s.videoId);
+    if (!song || songState(s) !== 'nolyrics') continue;
+    const tag = `lyrics:${s.id}`;
+    if (requested.has(tag)) continue;
+    requested.set(tag, 'sent');
+    try {
+      await fillLyrics(s.id, song);
+    } catch (err) {
+      requested.set(tag, 'failed');
+      console.error(`[leihu] Filling lyrics of "${song.title}" failed:`, err.response?.data?.error || err.message);
+    }
+  }
 }
 
 // Where a queue entry stands in Leihu:
@@ -170,7 +226,7 @@ async function prepare(entry, { retry = false } = {}) {
     if (requested.has(tag)) return;
     requested.set(tag, 'sent');
     try {
-      await importVideo(vid, sheetSong(entry.title, entry.artist)?.tab);
+      await importVideo(vid, sheetSong(entry.title, entry.artist)?.tab, entry);
       console.log(`[leihu] Importing "${entry.title}" from YouTube`);
     } catch (err) {
       requested.set(tag, 'failed');
@@ -193,6 +249,7 @@ async function prepare(entry, { retry = false } = {}) {
 
 async function tick() {
   await refresh();
+  await fillMissingLyrics();
   if (library && autoPrepareEnabled()) {
     const { nowPlaying, queue } = getState();
     for (const entry of [nowPlaying, ...queue]) {
@@ -240,5 +297,5 @@ async function open(entry) {
 
 module.exports = {
   start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, tabLanguage,
-  baseUrl, videoId, transpose, songKey,
+  fillMissingLyrics, baseUrl, videoId, transpose, songKey,
 };

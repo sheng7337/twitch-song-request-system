@@ -3,13 +3,16 @@ const assert = require('node:assert');
 const { stubModule } = require('./helpers');
 
 // Fake Leihu Singsing API: GET returns `leihu`, POSTs are recorded.
-const leihu = { up: true, songs: [], jobs: [], remote: false };
+const leihu = { up: true, songs: [], jobs: [], remote: false, candidates: [], search: [] };
 const posts = [];
+const searches = [];
 const axiosStub = {
-  get: async (url) => {
+  get: async (url, opts = {}) => {
     if (!leihu.up) throw new Error('connect ECONNREFUSED');
     if (url.endsWith('/api/songs')) return { data: leihu.songs };
     if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}) } };
+    if (url.endsWith('/lyrics/candidates')) return { data: { results: leihu.candidates } };
+    if (url.endsWith('/lyrics/search')) { searches.push(opts.params.q); return { data: { results: leihu.search } }; }
     throw new Error('unexpected GET ' + url);
   },
   post: async (url, body) => { posts.push({ url, body }); return { data: url.endsWith('/api/youtube') ? { id: 'newsong001' } : {} }; },
@@ -140,4 +143,38 @@ test('the recognition language comes from the sheet tab; unlisted tabs stay auto
   posts.length = 0;
   await L.importVideo('dQw4w9WgXcQ', '台語');
   assert.deepStrictEqual(posts.map(p => p.url), ['http://127.0.0.1:8765/api/youtube']);
+});
+
+test('blank lyrics of a song we imported are filled with a fitting online lyric', async () => {
+  const lyric = (track, artist, diff, synced = '[00:01.00]la') => ({ source: '網易雲音樂', track, artist, diff, synced, plain: 'la' });
+  const vid = 'Shishouka01';
+  leihu.songs = [{ id: 'dddddddddd', title: 'Shishouka (Chinese Version)', source_url: `https://youtu.be/${vid}`, steps: done, lyrics_text: '' }];
+  leihu.jobs = [];
+  // Leihu searched by the YouTube title: nothing that fits
+  leihu.candidates = [lyric('四照花', '一青窈', 25), lyric('Shishouka', '一青窈', 0, '')];
+  leihu.search = [lyric('四照花', '別人', 0), lyric('四照花 (Chinese Ver.)', '一青窈', 1), lyric('四照花', '一青窈', 2)];
+  await L.importVideo(vid, '國語', { title: '四照花', artist: '一青窈' });
+  await L.refresh();
+
+  posts.length = 0;
+  await L.fillMissingLyrics();
+  await L.fillMissingLyrics();   // once per song
+  assert.deepStrictEqual(searches, ['四照花 一青窈']);
+  assert.deepStrictEqual(posts, [{
+    url: 'http://127.0.0.1:8765/api/songs/dddddddddd/lyrics/apply',
+    body: { candidate: lyric('四照花 (Chinese Ver.)', '一青窈', 1) },
+  }]);
+});
+
+test("lyrics Leihu set, and songs we didn't import, are left alone", async () => {
+  leihu.candidates = [{ source: 'LRCLIB', track: '很愛很愛你', artist: '劉若英', diff: 0, synced: '[00:01.00]la', plain: 'la' }];
+  leihu.songs = [
+    { id: 'eeeeeeeeee', title: 't', source_url: 'https://youtu.be/importedOK1', steps: done, lyrics_text: LYR },
+    { id: 'ffffffffff', title: 't', source_url: 'https://youtu.be/notImported', steps: done, lyrics_text: '' },
+  ];
+  await L.importVideo('importedOK1', '國語', { title: '很愛很愛你', artist: '劉若英' });
+  await L.refresh();
+  posts.length = 0;
+  await L.fillMissingLyrics();
+  assert.deepStrictEqual(posts, []);
 });
