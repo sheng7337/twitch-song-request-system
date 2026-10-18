@@ -85,7 +85,7 @@
       bt: {
         label: {
           ready: '♫ ready', nolyrics: '♫ no lyrics', processing: '♫ preparing…', failed: '♫ failed · retry',
-          missing: '♫ prepare', broken: '♫ link broken', unlinked: '♫ link',
+          missing: '♫ prepare', broken: '♫ link broken', unlinked: '♫ link', blocked: '♫ YouTube blocked',
         },
         hint: {
           ready: 'Backing track and lyrics are ready in Leihu Singsing',
@@ -97,6 +97,8 @@
           unlinked: 'No YouTube link in the sheet — click to pick the matching Leihu Singsing song',
         },
         leihuTitle: 'Leihu: {title}',
+        reason: 'Leihu says: {reason}',
+        blocked: 'YouTube is refusing downloads from this PC (“confirm you’re not a bot”) — not a problem with this song. It usually clears within hours; see SETUP, "YouTube blocks downloads". Click to try again.',
         manual: '(manual link — click to change)',
       },
       picker: {
@@ -219,7 +221,7 @@
       bt: {
         label: {
           ready: '♫ 已就緒', nolyrics: '♫ 沒有歌詞', processing: '♫ 準備中…', failed: '♫ 失敗 · 重試',
-          missing: '♫ 準備', broken: '♫ 連結失效', unlinked: '♫ 連結',
+          missing: '♫ 準備', broken: '♫ 連結失效', unlinked: '♫ 連結', blocked: '♫ YouTube 拒絕下載',
         },
         hint: {
           ready: '雷虎練唱台的伴奏和歌詞都準備好了',
@@ -231,6 +233,8 @@
           unlinked: '試算表裡沒有 YouTube 連結 — 點一下選擇對應的雷虎練唱台歌曲',
         },
         leihuTitle: '雷虎練唱台：{title}',
+        reason: '雷虎練唱台的訊息：{reason}',
+        blocked: 'YouTube 暫時拒絕這台電腦下載（要求「確認你不是機器人」）— 不是這首歌的問題。通常幾小時內會恢復；請看安裝說明「YouTube 拒絕下載」。點一下再試一次。',
         manual: '（手動連結 — 點一下可以更改）',
       },
       picker: {

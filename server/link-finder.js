@@ -407,7 +407,12 @@ async function runCheck(s, vid) {
     await new Promise(r => setTimeout(r, CHECK_POLL_MS));
     await leihu.refresh();
     const st = leihu.findByVideo(vid)?.state;
-    if (st === 'failed') throw new UserError('checkFailed', {}, 'Leihu could not process this video');
+    if (st === 'failed') {
+      const f = leihu.failure(id);
+      if (f && f.blocked) throw new UserError('youtubeBlocked', {}, `YouTube is blocking downloads from this PC: ${f.reason}`);
+      if (f) throw new UserError('checkFailedReason', { reason: f.reason }, `Leihu could not process this video: ${f.reason}`);
+      throw new UserError('checkFailed', {}, 'Leihu could not process this video');
+    }
     if (st === 'ready' || st === 'nolyrics') break;
   }
   const [song, cands] = await Promise.all([

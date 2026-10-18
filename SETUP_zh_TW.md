@@ -246,3 +246,19 @@ vtuber-song-queue/
 - 點歌紀錄**約 2 秒內寫入**試算表（有防抖設計，不會頻繁呼叫 API）
 - Twitch 連線會**自動續約** — 不需要手動更新權杖，也不需要重啟通道
 - 想讓系統 24 小時運作而不必開著電腦？可部署至 Railway 或 Render 等平台
+
+---
+
+## YouTube 拒絕下載
+
+雷虎練唱台用 yt-dlp 下載歌曲。YouTube 有時會拒絕，並要求「確認你不是機器人」（*Sign in to confirm
+you're not a bot*）：控制台的標籤會顯示 **♫ YouTube 拒絕下載**，「用雷虎練唱台檢查」也會這樣說明。
+這是 YouTube 暫時封鎖你的網路連線（常發生在同一台電腦短時間內大量存取 YouTube 之後），不是歌曲的問題。
+
+1. **等一下。** 通常幾小時到一天內就會恢復。
+2. **如果一直發生**，可以讓 yt-dlp 使用瀏覽器的 YouTube 登入狀態，雷虎練唱台本身不需要任何修改：
+   - 用 **Firefox** 登入 YouTube。Chrome 和 Edge 在 Windows 上會鎖住 Cookie，yt-dlp 讀不到。
+   - 建立檔案 `%APPDATA%\yt-dlp\config.txt`，內容只有這一行：
+     `--cookies-from-browser firefox`
+   - 之後雷虎練唱台下載時就會使用這個登入狀態。想恢復原狀，刪掉這個檔案即可。
+   - 建議使用次要的 Google 帳號：YouTube 可能會限制被發現在下載影片的帳號。

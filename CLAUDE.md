@@ -199,6 +199,12 @@ vtuber-song-queue/
 - `LEIHU_AUTO_PREPARE=1` (dashboard toggle): imports missing queued songs via Leihu's
   `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
   request is sent once per server run. Keys outside whole semitones ±6 are skipped
+- Failed Leihu jobs: `/api/status` keeps each job's `error` for ~10 min; leihu.js passes it on as
+  `failure: { reason, blocked }` (dashboard badge tooltip, "Check with Leihu" result). `blocked` =
+  YouTube's "confirm you're not a bot" refusal of yt-dlp — a temporary block on the PC's
+  connection; Leihu cuts the message, so `youtubeBlocked()` matches any part. Fix for users is in
+  SETUP ("YouTube blocks downloads": wait, or `--cookies-from-browser firefox` in yt-dlp's own
+  config file — no Leihu change)
 - Leihu's import returns an error for duplicates only after the download step — never send
   the same video twice; the `requested` map in leihu.js prevents it
 

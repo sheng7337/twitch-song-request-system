@@ -29,6 +29,8 @@
       checkInterrupted: 'interrupted by a server restart',
       checkTooLong: 'Leihu took too long to process the song',
       checkFailed: 'Leihu could not process this video',
+      checkFailedReason: 'Leihu could not process this video: {reason}',
+      youtubeBlocked: 'YouTube is refusing downloads from this PC (“confirm you’re not a bot”). It is not a problem with this video. It usually clears within a few hours to a day — or give yt-dlp your browser’s YouTube cookies (see SETUP, "YouTube blocks downloads").',
       checkInconclusive: 'Leihu could not recognize the sung lyrics reliably (common for 台語) — judge by length and channel',
       // setup wizard
       twitchUnreachable: 'Could not reach Twitch: {message}',
@@ -67,6 +69,8 @@
       checkInterrupted: '伺服器重新啟動，檢查中斷了',
       checkTooLong: '雷虎練唱台處理這首歌太久了',
       checkFailed: '雷虎練唱台無法處理這部影片',
+      checkFailedReason: '雷虎練唱台無法處理這部影片：{reason}',
+      youtubeBlocked: 'YouTube 暫時拒絕這台電腦下載（要求「確認你不是機器人」），不是這部影片的問題。通常幾小時到一天內會恢復；也可以讓 yt-dlp 使用瀏覽器的 YouTube Cookie（請看安裝說明「YouTube 拒絕下載」）。',
       checkInconclusive: '雷虎練唱台無法可靠地辨識歌詞（台語常見）— 請依長度和頻道判斷',
       twitchUnreachable: '無法連線到 Twitch：{message}',
       clientIdMissing: '尚未設定 Client ID',

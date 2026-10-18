@@ -192,3 +192,20 @@ vtuber-song-queue/
 - History sheet **updates within ~2 seconds** of each request
 - Your Twitch connection **renews itself automatically** — no token to babysit, no tunnel to restart
 - Want it running 24/7 without your PC on? Deploy to Railway or Render
+
+---
+
+## YouTube blocks downloads
+
+Leihu Singsing downloads songs with yt-dlp. Sometimes YouTube refuses with *"Sign in to confirm you're
+not a bot"*: the dashboard badge shows **♫ YouTube blocked**, and "Check with Leihu" says the same.
+It's a temporary block on your internet connection (often after many YouTube requests from one PC),
+not a problem with the song.
+
+1. **Wait.** It usually clears within a few hours to a day.
+2. **If it keeps happening**, let yt-dlp use your browser's YouTube login. Nothing in Leihu Singsing changes:
+   - Sign in to YouTube in **Firefox**. Chrome and Edge lock their cookies on Windows, so yt-dlp can't read them.
+   - Create the file `%APPDATA%\yt-dlp\config.txt` containing this one line:
+     `--cookies-from-browser firefox`
+   - Leihu's downloads now use that login. To undo it, delete the file.
+   - Use a secondary Google account if you can: YouTube may restrict accounts it sees downloading.

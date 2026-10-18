@@ -178,3 +178,18 @@ test("lyrics Leihu set, and songs we didn't import, are left alone", async () =>
   await L.fillMissingLyrics();
   assert.deepStrictEqual(posts, []);
 });
+
+test("a failed import shows Leihu's reason, and YouTube's bot check is recognized", async () => {
+  queueState.queue = [entry(sheet[0])];
+  leihu.songs = [{ id: 'gggggggggg', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: { import: false } }];
+  // Leihu cuts yt-dlp's message to its last characters
+  leihu.jobs = [{ song: 'gggggggggg', status: 'error', error: 'YouTube 下載失敗：s://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies.' }];
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'failed');
+  assert.strictEqual(statusOf(sheet[0]).failure.blocked, true);
+
+  leihu.jobs = [{ song: 'gggggggggg', status: 'error', error: '找不到 ffmpeg，無法轉換 YouTube 音訊' }];
+  await L.refresh();
+  assert.deepStrictEqual(statusOf(sheet[0]).failure, { reason: '找不到 ffmpeg，無法轉換 YouTube 音訊', blocked: false });
+  leihu.jobs = [];
+});

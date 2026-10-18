@@ -25,6 +25,7 @@ const OFFLINE_POLL_MS = 30000;
 
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
+let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
 let canOpen = false;         // Leihu has the remote-open patch (/api/status reports `remote`)
 const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
 const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
@@ -95,18 +96,40 @@ async function refresh() {
     activeJobs = new Set((statusRes.data.jobs || [])
       .filter(j => j.status === 'queued' || j.status === 'running')
       .map(j => j.song));
+    jobErrors = new Map((statusRes.data.jobs || [])
+      .filter(j => j.status === 'error' && j.error)
+      .map(j => [j.song, j.error]));
     if (!wasOnline) console.log(`[leihu] Connected — ${library.length} songs in Leihu Singsing`);
   } catch (err) {
     library = null;
     activeJobs = new Set();
+    jobErrors = new Map();
     canOpen = false;
     if (wasOnline) console.log(`[leihu] Leihu Singsing not reachable (${err.message})`);
   }
 }
 
+// For a failed song: { failure: { reason, blocked } } to spread into its status
+function failureOf(song) {
+  const f = songState(song) === 'failed' && failure(song.id);
+  return f ? { failure: f } : {};
+}
+
 function sheetSong(title, artist) {
   const k = songKey(title, artist);
   return getSongs().find(s => songKey(s.title, s.artist) === k) || null;
+}
+
+// YouTube refusing yt-dlp ("Sign in to confirm you're not a bot … --cookies"): a block on this
+// PC's connection, not a problem with the video. Leihu cuts its message, so match any part.
+function youtubeBlocked(text) {
+  return /not a bot|confirm you.re not|cookies-from-browser|pass-cookies|exporting-youtube-cookies/i.test(text || '');
+}
+
+// Why Leihu's last job for this song failed, if Leihu still remembers: { reason, blocked }
+function failure(id) {
+  const reason = jobErrors.get(id);
+  return reason ? { reason, blocked: youtubeBlocked(reason) } : null;
 }
 
 function songState(song) {
@@ -203,7 +226,7 @@ function statusFor(title, artist) {
   if (linkedId) {
     const song = library.find(s => s.id === linkedId);
     if (!song) return { state: 'broken', manual: true };
-    return { state: songState(song), id: song.id, leihuTitle: song.title, manual: true };
+    return { state: songState(song), id: song.id, leihuTitle: song.title, manual: true, ...failureOf(song) };
   }
   const vid = videoId(sheetSong(title, artist)?.url);
   if (!vid) return { state: 'unlinked' };
@@ -212,7 +235,7 @@ function statusFor(title, artist) {
     const sent = requested.get(`import:${vid}`);
     return { state: sent === 'sent' ? 'processing' : sent === 'failed' ? 'failed' : 'missing' };
   }
-  return { state: songState(song), id: song.id, leihuTitle: song.title };
+  return { state: songState(song), id: song.id, leihuTitle: song.title, ...failureOf(song) };
 }
 
 // Import a missing song, or render its sheet key once it's ready.
@@ -300,5 +323,5 @@ async function open(entry) {
 
 module.exports = {
   start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, tabLanguage,
-  fillMissingLyrics, baseUrl, videoId, transpose, songKey,
+  fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
 };
