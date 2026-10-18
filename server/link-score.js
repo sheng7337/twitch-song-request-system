@@ -138,7 +138,8 @@ function scoreSong(raw, { tab = '', fanViews = config.LINK_CONFIDENT_FAN_VIEWS }
     .filter(v => v.id && v.duration)
     .map(v => scoreVideo(v, raw, ref, aliases, tab))
     .sort((a, b) => b.score - a.score);
-  const usable = scored.filter(c => c.titleMatch && c.tier !== 'off');
+  // Another language's version is a different recording — never offered as a pick
+  const usable = scored.filter(c => c.titleMatch && c.tier !== 'off' && !c.reasons.includes('other language'));
   const top = usable[0];
   let status = 'none';
   if (top) {

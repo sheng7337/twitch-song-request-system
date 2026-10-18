@@ -71,11 +71,10 @@ test('without online lyrics nothing is confident', () => {
   assert.strictEqual(r.status, 'review');
 });
 
-test("another language's version is penalized, unless it is the sheet tab's language", () => {
+test("another language's version is never offered, unless it is the sheet tab's language", () => {
   const raw = song([lyric(300)], [video('jpversion01', 300, 'woshang 日文版', 'fan'), video('original001', 300, 'woshang', 'fan')]);
-  assert.strictEqual(scoreSong(raw, { tab: '國語' }).candidates[0].id, 'original001');
-  assert.ok(scoreSong(raw, { tab: '國語' }).candidates[1].reasons.includes('other language'));
-  assert.ok(!scoreSong(raw, { tab: '日語' }).candidates.some(c => c.reasons.includes('other language')));
+  assert.deepStrictEqual(scoreSong(raw, { tab: '國語' }).candidates.map(c => c.id), ['original001']);
+  assert.ok(scoreSong(raw, { tab: '日語' }).candidates.some(c => c.id === 'jpversion01'));
 });
 
 test('an exact-length fan upload is confident only with very high views', () => {

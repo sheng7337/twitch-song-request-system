@@ -205,7 +205,7 @@ vtuber-song-queue/
   ≤3 s exact (timed lyrics used as-is), ≤25 s and 0.8–1.25 ratio workable (Leihu re-times),
   else off. Bonuses: "- Topic" channels, official/label channels, artist spelled as on the lyric
   sites. Penalties: live, TV show, cover, instrumental/伴奏, remix, compilation, fan edit,
-  karaoke, other-language version (allowed when it is the tab's language)
+  karaoke, other-language version (allowed when it is the tab's language; never offered otherwise)
 - Groups: confident (top pick is exact length, no penalties, artist matches, and official —
   or a fan upload with ≥ `LINK_CONFIDENT_FAN_VIEWS` views) / needs a look / nothing found
 - State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
