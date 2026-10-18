@@ -206,7 +206,8 @@ vtuber-song-queue/
   else off. Bonuses: "- Topic" channels, official/label channels, artist spelled as on the lyric
   sites. Penalties: live, TV show, cover, instrumental/伴奏, remix, compilation, fan edit,
   karaoke, other-language version (allowed when it is the tab's language)
-- Groups: confident (exact, clean, official, artist matches) / needs a look / nothing found
+- Groups: confident (top pick is exact length, no penalties, artist matches, and official —
+  or a fan upload with ≥ `LINK_CONFIDENT_FAN_VIEWS` views) / needs a look / nothing found
 - State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
   is recomputed from the raw results, so scoring changes need no new search
 - Saving: proves Editor access with a no-op write of A1, re-reads the sheet, finds each row
@@ -310,6 +311,7 @@ See `.env.example` for full descriptions.
 
 - `EXCLUDED_TABS` — sheet tabs to skip
 - `YT_LINK_HEADER` — header of the YouTube link column the link finder creates and fills (`YTLink`)
+- `LINK_CONFIDENT_FAN_VIEWS` — views a fan upload needs to count as a confident pick (1,000,000; 0 = never)
 - `SHEET_REFRESH_INTERVAL_MS` — how often to re-read the sheet (default 5min)
 - `AUTO_ACCEPT_THRESHOLD` — confidence % for auto-queue vs pending (default 80)
 - `MATCH_THRESHOLD` — fuse.js strictness 0-1 (default 0.4)

@@ -77,3 +77,16 @@ test("another language's version is penalized, unless it is the sheet tab's lang
   assert.ok(scoreSong(raw, { tab: '國語' }).candidates[1].reasons.includes('other language'));
   assert.ok(!scoreSong(raw, { tab: '日語' }).candidates.some(c => c.reasons.includes('other language')));
 });
+
+test('an exact-length fan upload is confident only with very high views', () => {
+  const fan = views => song([lyric(284)], [video('fanlyricvid', 285, 'aa woshang lyrics', 'fan', { views })]);
+  assert.strictEqual(scoreSong(fan(999999), { fanViews: 1000000 }).status, 'review');
+  assert.strictEqual(scoreSong(fan(1000000), { fanViews: 1000000 }).status, 'confident');
+  // still not when the artist isn't named, or it's a live version
+  const noArtist = song([lyric(284)], [video('fanlyricvid', 285, 'woshang lyrics', 'fan', { views: 5e6 })]);
+  assert.strictEqual(scoreSong(noArtist, { fanViews: 1000000 }).status, 'review');
+  const live = song([lyric(284)], [video('fanliveclip', 285, 'aa woshang live', 'fan', { views: 5e6 })]);
+  assert.notStrictEqual(scoreSong(live, { fanViews: 1000000 }).status, 'confident');
+  // 0 turns the rule off
+  assert.strictEqual(scoreSong(fan(5e6), { fanViews: 0 }).status, 'review');
+});

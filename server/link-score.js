@@ -8,6 +8,8 @@
 // Text fields ending in _n are already normalized by Leihu (simplified Chinese,
 // lowercase, letters and digits only).
 
+const config = require('./config');
+
 const EXACT_S = 3;      // Leihu uses timed lyrics unchanged within this length difference
 const WORKABLE_S = 25;  // Leihu re-times lyrics up to ±25 s offset…
 const MIN_RATIO = 0.8;  // …and a 0.8–1.25 length ratio
@@ -124,10 +126,12 @@ function scoreVideo(v, raw, ref, aliases = artistAliases(raw, ref), tab = '') {
 }
 
 // Result for one song:
-//   status 'confident' — top video is an exact-length, clean, official upload of this title
+//   status 'confident' — top video is an exact-length, clean upload of this title by
+//                         this artist that is official, or a fan upload with at least
+//                         config.LINK_CONFIDENT_FAN_VIEWS views
 //          'review'    — something plausible, needs a look
 //          'none'      — nothing usable found
-function scoreSong(raw, { tab = '' } = {}) {
+function scoreSong(raw, { tab = '', fanViews = config.LINK_CONFIDENT_FAN_VIEWS } = {}) {
   const ref = referenceDuration(raw);
   const aliases = artistAliases(raw, ref);
   const scored = (raw.videos || [])
@@ -138,8 +142,9 @@ function scoreSong(raw, { tab = '' } = {}) {
   const top = usable[0];
   let status = 'none';
   if (top) {
-    status = top.tier === 'exact' && !top.reasons.length && top.official && (top.artistMatch || top.topic)
-      ? 'confident' : 'review';
+    const clean = top.tier === 'exact' && !top.reasons.length && (top.artistMatch || top.topic);
+    const trusted = top.official || (fanViews > 0 && (top.views || 0) >= fanViews);
+    status = clean && trusted ? 'confident' : 'review';
   }
   return {
     status,

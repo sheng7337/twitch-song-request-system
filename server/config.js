@@ -16,6 +16,11 @@ module.exports = {
   // there, and fills it. Leihu Singsing matches songs to backing tracks by it.
   YT_LINK_HEADER: 'YTLink',
 
+  // The link finder marks a pick "confident" when it's an official upload of the
+  // right length — or a fan upload (e.g. a lyric video) of the right length with
+  // at least this many views. Lower = fewer songs to review, more fan uploads.
+  LINK_CONFIDENT_FAN_VIEWS: 1000000,
+
   // How often to refresh the song list from Google Sheets (milliseconds)
   SHEET_REFRESH_INTERVAL_MS: 5 * 60 * 1000, // 5 minutes
 
