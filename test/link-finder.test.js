@@ -157,6 +157,20 @@ test('saving writes only into empty cells, at the row where the song is now', as
   assert.deepStrictEqual(r, { written: 1, skipped: 1, createdIn: [] });
   assert.deepStrictEqual(writes, [{ range: "'國語'!C3", values: [['https://www.youtube.com/watch?v=aaaaaaaaaaa']] }]);
   assert.deepStrictEqual(F.getView().songs, []);   // both done: one written, one left as the streamer filled it
+  assert.strictEqual(F.getView().filled, 1);
+});
+
+test('a skipped filled cell is written on a later save once the streamer clears it', async () => {
+  writes.length = 0;
+  let r = await F.save();   // still filled: left alone again
+  assert.deepStrictEqual(r, { written: 0, skipped: 1, createdIn: [] });
+  assert.deepStrictEqual(writes, []);
+
+  sheet['國語'][4][2] = '';
+  r = await F.save();
+  assert.deepStrictEqual(r, { written: 1, skipped: 0, createdIn: [] });
+  assert.deepStrictEqual(writes, [{ range: "'國語'!C5", values: [['https://www.youtube.com/watch?v=ccccccccccc']] }]);
+  assert.strictEqual(F.getView().filled, 0);
 });
 
 test('pasted links are accepted in any form, other text is refused', () => {

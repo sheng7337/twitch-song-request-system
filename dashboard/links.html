@@ -246,7 +246,8 @@ function renderJob() {
   document.getElementById('meter').hidden = !j.running;
   document.getElementById('meter-bar').style.width = j.total ? `${Math.round(j.done / j.total * 100)}%` : '0%';
   const searched = view.songs.length;
-  const pending = view.songs.filter(s => s.decision === 'accepted').length;
+  // Includes songs an earlier save skipped because their cell was filled: saving retries them
+  const pending = view.songs.filter(s => s.decision === 'accepted').length + (view.filled || 0);
   const line = [];
   if (j.running) line.push(esc(t('links.job.searching', { done: j.done, total: j.total, current: j.current, min: Math.ceil((j.total - j.done) * 7.5 / 60) })));
   else if (searched) line.push(esc(t('links.job.found', { n: searched })));

@@ -233,9 +233,10 @@ function getView() {
       ...scoreSong(s.raw, { tab: s.tab, title: s.title }),
     }));
   const written = Object.values(state.songs).filter(s => s.written).length;
+  const filled = Object.values(state.songs).filter(cellWasFilled).length;
   const sheetId = process.env.GOOGLE_SHEET_ID;
   return {
-    job: getJob(), songs, written,
+    job: getJob(), songs, written, filled,
     access: state.access && state.access.sheetId === sheetId ? state.access : null,   // null = not checked for this sheet
     serviceEmail: serviceEmail(),
     sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(sheetId)}/edit` : null,
@@ -300,11 +301,15 @@ async function checkAccess(api) {
   return state.access;
 }
 
+// Songs skipped by an earlier save because their link cell was filled. Every save tries
+// them again, so clearing those cells in the sheet is enough to have them written.
+const cellWasFilled = s => s.decision === 'accepted' && s.written && s.videoId && s.noteCode === 'noteCellFilled';
+
 // Writes every accepted link into the sheet, only into empty link cells. Rows are
 // found again by tab + title + artist, so rows inserted or moved since the search
 // don't matter. Returns counts and per-song notes.
 async function save() {
-  const pending = Object.values(state.songs).filter(s => s.decision === 'accepted' && !s.written && s.videoId);
+  const pending = Object.values(state.songs).filter(s => (s.decision === 'accepted' && !s.written && s.videoId) || cellWasFilled(s));
   if (!pending.length) return { written: 0, skipped: 0, createdIn: [] };
   const api = await sheetsApi(true);
   // Checked again on every save: access can be taken away after the review page's check
