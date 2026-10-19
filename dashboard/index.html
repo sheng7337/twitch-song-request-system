@@ -282,6 +282,42 @@
   }
   .pending-del:hover { background: rgba(255,90,90,0.15); color: var(--red); border-color: rgba(255,90,90,0.5); }
 
+  /* 🔍 Find: lyric sites + YouTube search for a song not on the sheet */
+  .find-btn {
+    flex-shrink: 0; padding: 4px 9px;
+    background: rgba(90,180,255,0.08); border: 1px solid rgba(90,180,255,0.3);
+    border-radius: 3px; color: var(--blue); font-size: 13px;
+    font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all .15s;
+  }
+  .find-btn:hover { background: rgba(90,180,255,0.18); }
+  .find-btn:disabled { opacity: 0.5; cursor: default; }
+  .found { margin-bottom: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .found-note { font-size: 13px; color: var(--text-muted); }
+  .found-note.error { color: var(--red); }
+  .found-status { font-size: 12px; padding: 1px 6px; border-radius: 3px; align-self: flex-start;
+    background: rgba(80,45,10,0.5); border: 1px solid rgba(160,90,20,0.3); color: var(--orange); }
+  .found-status.confident { background: rgba(20,80,45,0.5); border-color: rgba(74,255,154,0.3); color: var(--green); }
+  .found-video {
+    display: flex; align-items: flex-start; gap: 6px; padding: 4px 6px; cursor: pointer;
+    background: rgba(10,8,20,0.6); border: 1px solid rgba(120,60,220,0.2); border-radius: 4px;
+  }
+  .found-video input { margin-top: 3px; flex-shrink: 0; }
+  .found-video-info { flex: 1; min-width: 0; }
+  .found-video a { font-size: 13px; color: var(--text); text-decoration: none; display: block;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .found-video a:hover { text-decoration: underline; }
+  .found-video-meta { font-size: 12px; color: var(--text-muted); }
+  .found-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+  .found-actions .accept-btn { flex: 1 1 auto; }
+  .add-sheet-btn {
+    flex: 1 1 auto; padding: 5px 10px;
+    background: rgba(255,160,40,0.08); border: 1px solid rgba(255,160,40,0.3);
+    border-radius: 3px; color: var(--orange); font-size: 13px;
+    font-family: 'Share Tech Mono', monospace; cursor: pointer; transition: all .15s;
+  }
+  .add-sheet-btn:hover { background: rgba(255,160,40,0.18); }
+  .add-sheet-btn:disabled { opacity: 0.6; cursor: default; }
+
   /* Candidate picker (multiple matches) */
   .pending-candidates { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
   .candidate-item {
@@ -834,8 +870,11 @@ function render() {
         <input class="pending-field" id="pending-artist-${i}" placeholder="${esc(t('dash.pending.artistPlaceholder'))}"
                value="${esc(item.artist)}" />
       </div>
+      ${foundHtml(item, i)}
       <div class="pending-actions">
         <button class="accept-btn" onclick="acceptPending(${i})">${esc(t('dash.pending.accept'))}</button>
+        <button class="find-btn" onclick="findPending(${i})" title="${esc(t('dash.pending.findTitle'))}"
+                ${item.found && item.found.state === 'searching' ? 'disabled' : ''}>${esc(t('dash.pending.find'))}</button>
         <button class="pending-del" onclick="deleteSong('pending',${i})" title="${esc(t('dash.pending.dismissTitle'))}">✕</button>
       </div>
     </div>`;
@@ -943,6 +982,116 @@ function acceptPending(index) {
 
 function pickCandidate(pendingIndex, candidateIndex) {
   api('accept-pending', { index: pendingIndex, candidateIndex });
+}
+
+// ── 🔍 Find: songs not on the sheet ────────────────────────────────────────────
+// The video picked (or link pasted) on each pending card, by the request's addedAt,
+// so a re-render (any queue change) keeps the streamer's choice.
+const foundPicks = {};
+
+function fmtDuration(s) {
+  if (!s) return '';
+  s = Math.round(s);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function foundHtml(item, i) {
+  const f = item.found;
+  if (!f) return '';
+  if (f.state === 'searching') return `<div class="found"><span class="found-note">${esc(t('dash.pending.searching'))}</span></div>`;
+  if (f.state === 'failed') return `<div class="found"><span class="found-note error">${esc(t('dash.toast.findFailed', { message: I18N.server(f) }))}</span></div>`;
+  const pick = foundPicks[item.addedAt] || (foundPicks[item.addedAt] = { vid: f.status !== 'none' && f.candidates[0] ? f.candidates[0].id : '', link: '' });
+  const videos = (f.candidates || []).map(c => {
+    const meta = [c.channel, fmtDuration(c.duration), c.tier ? t('dash.pending.tier.' + c.tier) : '', ...(c.reasons || [])].filter(Boolean).join(' · ');
+    return `
+      <label class="found-video">
+        <input type="radio" name="found-${i}" value="${esc(c.id)}" ${pick.vid === c.id ? 'checked' : ''}
+               onchange="foundPicks[${Number(item.addedAt)}].vid = this.value" />
+        <span class="found-video-info">
+          <a href="https://www.youtube.com/watch?v=${encodeURIComponent(c.id)}" target="_blank" rel="noopener" title="${esc(c.title)}">${esc(c.title)}</a>
+          <span class="found-video-meta">${esc(meta)}</span>
+        </span>
+      </label>`;
+  }).join('');
+  const tab = f.practiceTab;
+  return `
+    <div class="found">
+      <span class="found-status ${f.status === 'confident' ? 'confident' : ''}">${esc(t('dash.pending.status.' + f.status))}</span>
+      ${videos}
+      <input class="pending-field" id="found-link-${i}" placeholder="${esc(t('dash.pending.pasteLink'))}" value="${esc(pick.link)}"
+             oninput="foundPicks[${Number(item.addedAt)}].link = this.value.trim()" />
+      <div class="found-actions">
+        <button class="accept-btn" onclick="queueFound(${i})" title="${esc(t('dash.pending.queuePrepareTitle'))}">${esc(t('dash.pending.queuePrepare'))}</button>
+        ${tab ? `<button class="add-sheet-btn" onclick="addFoundToSheet(${i})" ${item.addedTo ? 'disabled' : ''}
+                  title="${esc(t('dash.pending.addToTitle', { tab }))}">${esc(t(item.addedTo ? 'dash.pending.addedTo' : 'dash.pending.addTo', { tab }))}</button>` : ''}
+      </div>
+    </div>`;
+}
+
+// What the card holds now: the request and its (maybe edited) title + artist fields
+function pendingFields(i) {
+  const item = (state.pending || [])[i];
+  const title = document.getElementById(`pending-title-${i}`)?.value.trim() || '';
+  const artist = document.getElementById(`pending-artist-${i}`)?.value.trim() || '';
+  return { item, title, artist };
+}
+
+async function postJson(endpoint, body) {
+  const res = await fetch(`/api/${endpoint}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(I18N.server(data, 'dash.toast.requestFailed'));
+  return data;
+}
+
+// Searches for the card's title + artist when the streamer edited them, else what the viewer typed
+async function findPending(i) {
+  const { item, title, artist } = pendingFields(i);
+  if (!item) return;
+  const edited = title && (title !== (item.title || '') || artist !== (item.artist || ''));
+  const text = edited || !item.originalRequest ? `${title} ${artist}`.trim() : item.originalRequest;
+  if (!text) { showToast(t('dash.toast.enterTitleFirst'), true); return; }
+  delete foundPicks[item.addedAt];
+  try {
+    await postJson('pending/identify', { index: i, addedAt: item.addedAt, text });
+  } catch (err) {
+    showToast(t('dash.toast.findFailed', { message: err.message }), true);
+  }
+}
+
+function foundVideo(item) {
+  const pick = foundPicks[item.addedAt] || {};
+  return pick.link || pick.vid || '';
+}
+
+async function queueFound(i) {
+  const { item, title, artist } = pendingFields(i);
+  if (!item) return;
+  if (!title) { showToast(t('dash.toast.enterTitleFirst'), true); return; }
+  const videoId = foundVideo(item);
+  if (!videoId) { showToast(t('dash.toast.pickVideo'), true); return; }
+  try {
+    const r = await postJson('pending/queue-found', { index: i, addedAt: item.addedAt, title, artist, videoId });
+    delete foundPicks[item.addedAt];
+    if (r.leihu) showToast(t('dash.toast.queuedPreparing', { title }));
+    else showToast(t('dash.toast.queuedNoLeihu', { title, message: I18N.server(r) }), true);
+    pollLeihu();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function addFoundToSheet(i) {
+  const { item, title, artist } = pendingFields(i);
+  if (!item) return;
+  if (!title) { showToast(t('dash.toast.enterTitleFirst'), true); return; }
+  try {
+    const r = await postJson('pending/add-to-sheet', { index: i, addedAt: item.addedAt, title, artist, videoId: foundVideo(item) });
+    showToast(t(r.added ? 'dash.toast.addedToTab' : 'dash.toast.alreadyInTab', { tab: r.tab, title }));
+  } catch (err) {
+    showToast(err.message, true);
+  }
 }
 
 // ── Manual Request ─────────────────────────────────────────────────────────────

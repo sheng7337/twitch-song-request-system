@@ -438,8 +438,195 @@ async function runCheck(s, vid) {
   saveState();
 }
 
+// ── Songs not on the sheet (Pending Review) ──────────────────────────────────
+
+const IDENTIFY_TIMEOUT_MS = 90 * 1000;
+const SOURCE_ORDER = ['LRCLIB', '酷狗音樂', '網易雲音樂'];   // display names: LRCLIB/Kugou usually keep 繁體
+
+// Runs tools/find-videos.py for one search, apart from the search job.
+// Resolves with its result: { title_n, artist_n, lyrics, videos, errors }.
+async function searchOne(title, artist) {
+  const { root, python } = await leihuPython();
+  return new Promise((resolve, reject) => {
+    const proc = childProcess.spawn(python, [HELPER, root], { cwd: ROOT, windowsHide: true });
+    const timer = setTimeout(() => proc.kill(), IDENTIFY_TIMEOUT_MS);
+    let buf = '';
+    let stderr = '';
+    let result = null;
+    proc.stdout.setEncoding('utf8');
+    proc.stdout.on('data', chunk => {
+      buf += chunk;
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        let msg;
+        try { msg = JSON.parse(line); } catch { continue; }
+        if (msg.fatal) stderr = msg.fatal;
+        else if (msg.ready) {
+          proc.stdin.write(JSON.stringify({ key: 'one', title, artist }) + '\n');
+          proc.stdin.end();
+        } else if (msg.key === 'one') result = msg;
+      }
+    });
+    proc.stderr.on('data', d => { stderr = (stderr + d).slice(-2000); });
+    proc.on('error', err => { clearTimeout(timer); reject(err); });
+    proc.on('close', code => {
+      clearTimeout(timer);
+      if (result) {
+        const { key, ...raw } = result;
+        return resolve(raw);
+      }
+      const detail = stderr.trim() ? stderr.trim().split('\n').pop() : `exit ${code}`;
+      reject(new UserError('searchStopped', { detail }, `search stopped (${detail})`));
+    });
+  });
+}
+
+// Which song free text ("晴天 周董", "Lemon 米津玄師") means, from the lyric results of
+// searching that text: results whose title the text contains (or that contain the whole
+// text), grouped by title + artist. A group scores by how much of the text its title and
+// artist cover, how many lyric results agree, and how many videos carry its title (and
+// artist). Returns { title, artist, title_n, artist_n } with display names as written by
+// the viewer when they match, else by the first source in SOURCE_ORDER; null when no
+// lyric result fits.
+function pickSong(raw, text) {
+  const q = raw.title_n || '';
+  if (!q) return null;
+  const groups = new Map();
+  for (const l of raw.lyrics || []) {
+    if (!l.track_n || !(q.includes(l.track_n) || l.track_n.includes(q))) continue;
+    const k = `${l.track_n}|${l.artist_n || ''}`;
+    if (!groups.has(k)) groups.set(k, { track_n: l.track_n, artist_n: l.artist_n || '', items: [] });
+    groups.get(k).items.push(l);
+  }
+  let best = null;
+  for (const g of groups.values()) {
+    const artistTyped = !!g.artist_n && q.includes(g.artist_n);
+    const cover = q.includes(g.track_n)
+      ? (g.track_n.length + (artistTyped ? g.artist_n.length : 0)) / q.length
+      : 0.5 * q.length / g.track_n.length;
+    const videos = (raw.videos || []).filter(v => v.title_n.includes(g.track_n));
+    const byArtist = g.artist_n ? videos.filter(v => v.title_n.includes(g.artist_n) || (v.channel_n || '').includes(g.artist_n)) : [];
+    const score = 10 * cover + Math.min(g.items.length, 5) + 0.5 * videos.length + byArtist.length;
+    if (!best || score > best.score) best = { ...g, score };
+  }
+  if (!best) return null;
+  const rank = l => (text.includes(l.track) ? 0 : 1) * 10 + (SOURCE_ORDER.indexOf(l.source) + 1 || SOURCE_ORDER.length + 1);
+  const shown = [...best.items].sort((a, b) => rank(a) - rank(b))[0];
+  const artistShown = best.items.find(l => l.artist && text.includes(l.artist)) || shown;
+  return { title: shown.track, artist: artistShown.artist || '', title_n: best.track_n, artist_n: best.artist_n };
+}
+
+// The sheet tab whose rules fit free text: kana → 日語; anything else '' (automatic).
+// Chinese characters alone can't tell 國語 from 台語, so they stay automatic.
+function guessTab(text) {
+  return /[぀-ヿ]/.test(text || '') ? '日語' : '';
+}
+
+// Identifies the song a viewer asked for and scores YouTube videos for it like the
+// link finder does. Returns { title, artist, tab, status, refDuration, candidates }.
+async function identify(text) {
+  text = String(text || '').trim();
+  let raw = await searchOne(text, '');
+  const pick = pickSong(raw, text);
+  // The viewer didn't type the artist: search again by title + artist, which finds the
+  // official uploads a title-only search can miss (メリッサ alone finds other singers' versions)
+  if (pick && pick.artist_n && !(raw.title_n || '').includes(pick.artist_n)) {
+    try {
+      const more = await searchOne(pick.title, pick.artist);
+      const seen = new Set((raw.videos || []).map(v => v.id));
+      raw = { ...raw,
+        lyrics: [...(raw.lyrics || []), ...(more.lyrics || [])],
+        videos: [...(raw.videos || []), ...(more.videos || []).filter(v => !seen.has(v.id))] };
+    } catch (err) {
+      console.error(`[pending] Second search for "${pick.title} ${pick.artist}" failed:`, err.message);
+    }
+  }
+  const tab = guessTab(text);
+  const r = scoreSong(pick ? { ...raw, title_n: pick.title_n, artist_n: pick.artist_n } : raw,
+    { tab, title: pick ? pick.title : text });
+  return {
+    title: pick ? pick.title : text, artist: pick ? pick.artist : '', tab,
+    status: pick ? r.status : 'none', refDuration: r.refDuration,
+    candidates: r.candidates.map(c => ({
+      id: c.id, title: c.title, channel: c.channel, duration: c.duration, views: c.views,
+      tier: c.tier, diff: c.diff, official: c.official, reasons: c.reasons,
+    })),
+  };
+}
+
+// The tab new songs go to: the first excluded tab (待練勿點 by default), so they can't be
+// requested until the streamer moves them to another tab.
+function practiceTab() {
+  return config.EXCLUDED_TABS[0] || null;
+}
+
+// Appends a song to practiceTab() with its YouTube link (the YTLink column is created
+// when the tab has none). A song already in that tab isn't added again.
+// Returns { tab, added }.
+async function addToSheet({ title, artist, videoId }) {
+  title = String(title || '').trim();
+  artist = String(artist || '').trim();
+  const tab = practiceTab();
+  if (!tab) throw new UserError('noPracticeTab', {}, 'No tab to add songs to — list one in EXCLUDED_TABS in .env');
+  const api = await sheetsApi(true);
+  if (!(await checkAccess(api)).canEdit) {
+    throw new UserError('noEditor', { email: serviceEmail() || 'the service account' }, noPermissionMessage());
+  }
+  const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+  const meta = await api.spreadsheets.get({ spreadsheetId });
+  const p = meta.data.sheets.map(s => s.properties).find(x => x.title === tab);
+  if (!p) throw new UserError('practiceTabMissing', { tab }, `The tab "${tab}" is not in the song sheet`);
+  const rows = (await api.spreadsheets.values.get({ spreadsheetId, range: `${quoteTab(tab)}!A:Z` })).data.values || [];
+  const header = [...(rows[0] || [])];
+  const c = findColumns(header);
+  const songHeader = process.env.SHEET_SONG_COLUMN || 'title';
+  if (c.title === -1) throw new UserError('practiceTabNoTitle', { tab, header: songHeader }, `The tab "${tab}" has no "${songHeader}" column`);
+  const same = r => String(r[c.title] ?? '').trim() === title && (c.artist === -1 || String(r[c.artist] ?? '').trim() === artist);
+  if (rows.slice(1).some(same)) return { tab, added: false };
+
+  let urlCol = c.url;
+  const headerCells = [];
+  if (videoId && urlCol === -1) {
+    urlCol = header.length;
+    while (urlCol > 0 && !String(header[urlCol - 1] ?? '').trim()) urlCol--;
+    if (urlCol >= 26) throw new UserError('noteTabFull', { header: config.YT_LINK_HEADER }, `this tab uses all columns A–Z — add a "${config.YT_LINK_HEADER}" column header yourself`);
+    const columnCount = p.gridProperties?.columnCount ?? 26;
+    if (urlCol >= columnCount) {
+      await api.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [
+        { appendDimension: { sheetId: p.sheetId, dimension: 'COLUMNS', length: urlCol + 1 - columnCount } },
+      ] } });
+    }
+    headerCells.push({ range: `${quoteTab(tab)}!${columnLetter(urlCol)}1`, values: [[config.YT_LINK_HEADER]] });
+  }
+  const row = [];
+  row[c.title] = title;
+  if (c.artist !== -1) row[c.artist] = artist;
+  if (videoId && urlCol !== -1) row[urlCol] = `https://www.youtube.com/watch?v=${videoId}`;
+  const values = [Array.from(row, v => v ?? '')];
+  try {
+    if (headerCells.length) {
+      await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: headerCells } });
+    }
+    await api.spreadsheets.values.append({
+      spreadsheetId, range: `${quoteTab(tab)}!A1`, valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS',
+      requestBody: { values },
+    });
+  } catch (err) {
+    if (/protected/i.test(err.message)) {
+      throw new UserError('protectedRange', { email: serviceEmail() || 'the service account' }, 'Part of the sheet is protected (Data → Protect sheets and ranges). Let ' +
+        `${serviceEmail() || 'the service account'} edit it, or remove the protection, then save again.`);
+    }
+    throw err;
+  }
+  console.log(`[links] Added "${title}" to the ${tab} tab`);
+  return { tab, added: true };
+}
+
 module.exports = {
   start, stop, getJob, getView, decide, acceptConfident, save, check, checkAccess,
+  identify, addToSheet, practiceTab, guessTab,
   // for tests
-  rowKey, columnLetter, findColumns, _setState: s => { state = s; },
+  rowKey, columnLetter, findColumns, pickSong, _setState: s => { state = s; },
 };

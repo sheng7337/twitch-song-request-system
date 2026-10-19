@@ -1,6 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { stubModule } = require('./helpers');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+// Manual links go to a temp file, never the real song-links.json
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'leihu-test-'));
+process.env.LEIHU_LINKS_FILE = path.join(tmp, 'song-links.json');
+test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 // Fake Leihu Singsing API: GET returns `leihu`, POSTs are recorded.
 const leihu = { up: true, songs: [], jobs: [], remote: false, candidates: [], search: [] };
@@ -177,6 +185,28 @@ test("lyrics Leihu set, and songs we didn't import, are left alone", async () =>
   posts.length = 0;
   await L.fillMissingLyrics();
   assert.deepStrictEqual(posts, []);
+});
+
+test('an off-list song is imported once and linked by title + artist; a video Leihu has is only linked', async () => {
+  const links = () => JSON.parse(fs.readFileSync(process.env.LEIHU_LINKS_FILE, 'utf8'));
+  leihu.songs = [{ id: 'kkkkkkkkkk', title: 't', source_url: 'https://youtu.be/haveItAlr01', steps: done, lyrics_text: LYR }];
+  leihu.jobs = [];
+  posts.length = 0;
+  const id = await L.importForSong('jaychou0001', { title: '晴天', artist: '周杰倫' }, '');
+  assert.strictEqual(id, 'newsong001');
+  assert.deepStrictEqual(posts, [{ url: 'http://127.0.0.1:8765/api/youtube', body: { url: 'https://www.youtube.com/watch?v=jaychou0001' } }]);
+  assert.strictEqual(links()[L.songKey('晴天', '周杰倫')], 'newsong001');
+  // Leihu hasn't listed it yet: sending it again would make a duplicate
+  await assert.rejects(L.importForSong('jaychou0001', { title: '晴天', artist: '周杰倫' }, ''), e => e.messageCode === 'alreadyImporting');
+
+  posts.length = 0;
+  assert.strictEqual(await L.importForSong('haveItAlr01', { title: 'メリッサ', artist: 'Porno Graffitti' }, '日語'), 'kkkkkkkkkk');
+  assert.deepStrictEqual(posts, []);
+  assert.strictEqual(links()[L.songKey('メリッサ', 'Porno Graffitti')], 'kkkkkkkkkk');
+
+  leihu.up = false;
+  await assert.rejects(L.importForSong('other000001', { title: 'x', artist: '' }, ''), e => e.messageCode === 'leihuOffline');
+  leihu.up = true;
 });
 
 test('recognized lyrics Leihu flagged are replaced by a fitting online lyric, even in other character forms', async () => {

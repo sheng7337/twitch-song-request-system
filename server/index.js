@@ -9,7 +9,7 @@ const { isAllowedRequest } = require('./request-guard');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
+const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
 const { connect: connectTwitch, setEventHandler, setChatHandler } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const registerShoutout = require('./commands/shoutout');
@@ -481,6 +481,78 @@ app.post('/api/links/check', async (req, res) => {
   try {
     await linkFinder.check(key, videoId);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+// ── Songs not on the sheet (Pending Review → 🔍 Find) ────────────────────────
+// The pending entry at `index`; `addedAt` (when sent) must match, so a list that changed
+// since the page drew it never acts on another request.
+function pendingAt(index, addedAt) {
+  const entry = getState().pending[Number(index)];
+  return entry && (addedAt == null || entry.addedAt === Number(addedAt)) ? entry : null;
+}
+
+function youtubeId(link) {
+  return leihu.videoId(link) || (/^[A-Za-z0-9_-]{11}$/.test(link || '') ? link : null);
+}
+
+// Searches the lyric sites and YouTube for what the viewer typed (or `text`, the card's
+// edited title + artist). Answers at once; the result lands on the entry as `found`.
+app.post('/api/pending/identify', (req, res) => {
+  const entry = pendingAt(req.body.index, req.body.addedAt);
+  if (!entry) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  const text = String(req.body.text || entry.originalRequest || '').trim();
+  if (!text) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  updatePending(entry, { found: { state: 'searching', text, started: Date.now() } });
+  linkFinder.identify(text).then(r => {
+    updatePending(entry, {
+      title: r.title, artist: r.artist,
+      found: { state: 'done', text, ...r, practiceTab: linkFinder.practiceTab() },
+    });
+    console.log(`[pending] "${text}" → ${r.title} / ${r.artist || '?'} (${r.status}, ${r.candidates.length} videos)`);
+  }).catch(err => {
+    updatePending(entry, { found: { state: 'failed', text, ...errorBody(err) } });
+    console.error(`[pending] Search for "${text}" failed:`, err.message);
+  });
+  res.json({ ok: true });
+});
+
+// Queue the request as `title` / `artist` and prepare `videoId` in Leihu. The song is
+// queued even when Leihu can't take it; the reply then carries Leihu's error.
+app.post('/api/pending/queue-found', async (req, res) => {
+  const { index, addedAt, videoId } = req.body;
+  const title = String(req.body.title || '').trim();
+  const artist = String(req.body.artist || '').trim();
+  if (!pendingAt(index, addedAt)) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  const vid = youtubeId(videoId);
+  if (!vid) return res.status(400).json(message('notYouTube', {}, 'not a YouTube video link'));
+  acceptPending(Number(index), title, artist);
+  try {
+    await leihu.importForSong(vid, { title, artist }, linkFinder.guessTab(`${title} ${artist}`));
+    res.json({ ok: true, leihu: true });
+  } catch (err) {
+    res.json({ ok: true, leihu: false, ...errorBody(err) });
+  }
+});
+
+// Add the request to the practice tab (first of EXCLUDED_TABS) with its YouTube link.
+// The request stays pending, marked addedTo, so it can still be queued or dismissed.
+app.post('/api/pending/add-to-sheet', async (req, res) => {
+  const { index, addedAt, videoId } = req.body;
+  const title = String(req.body.title || '').trim();
+  const artist = String(req.body.artist || '').trim();
+  const entry = pendingAt(index, addedAt);
+  if (!entry) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  const vid = videoId ? youtubeId(videoId) : null;
+  if (videoId && !vid) return res.status(400).json(message('notYouTube', {}, 'not a YouTube video link'));
+  try {
+    const r = await linkFinder.addToSheet({ title, artist, videoId: vid });
+    updatePending(entry, { title, artist, addedTo: r.tab });
+    res.json({ ok: true, ...r });
   } catch (err) {
     res.status(400).json(errorBody(err));
   }

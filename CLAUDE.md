@@ -247,6 +247,24 @@ vtuber-song-queue/
   processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
   is unreliable (usual for 台語). Adds the song to Leihu's library
 
+### Songs not on the sheet (Pending Review → 🔍 Find)
+- Button only (no automatic search). `linkFinder.identify(text)` runs find-videos.py for the
+  viewer's text (or the card's edited title + artist), apart from the search job (`searchOne`).
+  `pickSong` groups lyric results whose title the text contains (or that contain the text) by
+  title + artist and scores text coverage, agreeing results and videos; display names prefer the
+  viewer's spelling, then LRCLIB, Kugou, NetEase. When the artist wasn't typed, a second search by
+  title + artist adds the official uploads a title-only search misses. Videos scored by link-score.js
+- Result stored on the pending entry as `found` (`searching` / `done` / `failed`; a restart turns
+  `searching` into failed), broadcast with the queue state; `updatePending` ignores entries no
+  longer pending. Routes check `addedAt` so a changed list never acts on another request
+- "Queue + prepare": queues the request, then `leihu.importForSong` imports the video (unless Leihu
+  has it) and saves a manual link (song-links.json) under title + artist. Language: kana → 日語
+  (`guessTab`); Chinese characters stay automatic (can't tell 國語 from 台語). Nothing is imported
+  before the streamer accepts
+- "Add to <tab>": `linkFinder.addToSheet` appends title, artist and YTLink to the first
+  `EXCLUDED_TABS` tab (creating YTLink there if missing); skips a song already in that tab; needs
+  Editor access. The request stays pending, marked `addedTo`
+
 ### Languages: English + 繁體中文 (shared/i18n.js)
 - Every web page is in English and Traditional Chinese (Taiwan). Strings live in tables:
   `shared/i18n-*.js`, `dashboard/i18n-*.js`, and the wizard's own `setup/i18n.js`. Each table file
@@ -316,6 +334,9 @@ register it in index.js.
 | POST | `/api/delete` | Delete song `{zone, index}` — zone: nowPlaying/queue/played/pending |
 | POST | `/api/move` | Move song `{fromZone, fromIndex, toZone, toIndex}` |
 | POST | `/api/accept-pending` | Accept pending entry `{index, title, artist}` or `{index, candidateIndex}` → queue |
+| POST | `/api/pending/identify` | Search lyric sites + YouTube for a pending request `{index, addedAt, text?}`; result lands in its `found` |
+| POST | `/api/pending/queue-found` | Queue it and prepare the video in Leihu `{index, addedAt, title, artist, videoId}` |
+| POST | `/api/pending/add-to-sheet` | Add it with its link to the first excluded tab `{index, addedAt, title, artist, videoId?}` |
 | POST | `/api/redraw` | Re-pick a random song in place `{zone, index}` (keeps its tab filter) |
 | POST | `/api/refresh-songs` | Force re-fetch song list from Google Sheets |
 | GET | `/api/songs` | Full song list (for dashboard autocomplete) |

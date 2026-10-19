@@ -19,7 +19,7 @@ const { getState } = require('./queue');
 const config = require('./config');
 const { UserError } = require('./messages');
 
-const LINKS_PATH = path.join(__dirname, '..', 'song-links.json');
+const LINKS_PATH = process.env.LEIHU_LINKS_FILE || path.join(__dirname, '..', 'song-links.json');   // tests use a temp file
 const POLL_MS = 5000;
 const OFFLINE_POLL_MS = 30000;
 
@@ -326,6 +326,32 @@ function findByVideo(vid) {
   return song ? { id: song.id, state: songState(song) } : null;
 }
 
+// A song that isn't on the sheet (a viewer's off-list request): imports its video unless
+// Leihu already has it, and links it by title + artist (song-links.json), so badges, key
+// renders, Sing and the lyric fill work as for sheet songs. `tab` only picks Leihu's
+// recognition language (tabLanguage). Returns Leihu's song ID.
+async function importForSong(vid, song, tab) {
+  await refresh();
+  if (!library) throw new UserError('leihuOffline', {}, 'Leihu Singsing is not running');
+  let id = findByVideo(vid)?.id;
+  if (!id) {
+    const tag = `import:${vid}`;
+    if (requested.get(tag) === 'sent') throw new UserError('alreadyImporting', {}, 'this video is already being imported');
+    requested.set(tag, 'sent');
+    try {
+      id = await importVideo(vid, tab, song);
+    } catch (err) {
+      requested.set(tag, 'failed');
+      throw err;
+    }
+    console.log(`[leihu] Importing "${song.title}" (not on the sheet) from YouTube`);
+  } else {
+    imported.set(vid, { title: song.title, artist: song.artist });
+  }
+  setLink(song.title, song.artist, id);
+  return id;
+}
+
 // Ask Leihu's practice window to open a ready song at its sheet key (0 if the key
 // can't be used). Needs Leihu's remote-open patch. Returns the key used.
 async function open(entry) {
@@ -341,6 +367,6 @@ async function open(entry) {
 }
 
 module.exports = {
-  start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, tabLanguage,
+  start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
   fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
 };

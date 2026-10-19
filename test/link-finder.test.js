@@ -21,6 +21,7 @@ Object.assign(process.env, {
 let sheet;
 const writes = [];
 const grows = [];
+const appends = [];
 let canWrite = true;
 let protectedRange = false;
 const tabOf = range => range.match(/^'(.*)'!/)[1].replace(/''/g, "'");
@@ -33,7 +34,12 @@ const google = {
     batchUpdate: async ({ requestBody }) => { grows.push(...requestBody.requests); return {}; },
     values: {
       batchGet: async ({ ranges }) => ({ data: { valueRanges: ranges.map(r => ({ values: sheet[tabOf(r)] })) } }),
-      get: async () => ({ data: { values: [['title']] } }),
+      get: async ({ range }) => ({ data: { values: range === 'A1' ? [['title']] : sheet[tabOf(range)] } }),
+      append: async ({ range, requestBody }) => {
+        appends.push({ range, values: requestBody.values });
+        sheet[tabOf(range)].push(...requestBody.values);
+        return {};
+      },
       update: async () => {
         if (!canWrite) { const e = new Error('The caller does not have permission'); e.code = 403; throw e; }
         return {};
@@ -199,6 +205,93 @@ test('a tab without the YTLink column gets one when its first links are saved', 
     { range: "'日語'!C1", values: [['YTLink']] },
     { range: "'日語'!C2", values: [['https://www.youtube.com/watch?v=eeeeeeeeeee']] },
   ]);
+});
+
+// ── Songs not on the sheet ──
+
+const lyricOf = (source, track, artist, duration, track_n, artist_n) =>
+  ({ source, track, artist, duration, synced: true, track_n, artist_n });
+results['晴天 周董'] = {
+  title_n: '晴天周董', artist_n: '',
+  lyrics: [
+    lyricOf('網易雲音樂', '晴天', '周杰伦', 269, '晴天', '周杰伦'),
+    lyricOf('LRCLIB', '晴天', '周杰倫', 269, '晴天', '周杰伦'),
+    lyricOf('網易雲音樂', '晴天', '某翻唱', 250, '晴天', '某翻唱'),
+    lyricOf('網易雲音樂', '晴天娃娃', '別人', 200, '晴天娃娃', '别人'),   // neither contains the other: ignored
+  ],
+  videos: [
+    { id: 'jaychou0001', title: '周杰倫 Jay Chou【晴天 Sunny Day】Official MV', channel: '周杰倫 Jay Chou', duration: 270, views: 5e8,
+      title_n: '周杰伦jaychou晴天sunnydayofficialmv', channel_n: '周杰伦jaychou' },
+    { id: 'cover000001', title: '晴天 cover', channel: 'fan', duration: 250, views: 10, title_n: '晴天cover', channel_n: 'fan' },
+  ],
+  errors: [],
+};
+// The second search, by the identified title + artist, finds the "- Topic" upload
+results['晴天'] = {
+  title_n: '晴天', artist_n: '周杰伦', lyrics: [], errors: [],
+  videos: [{ id: 'jaytopic001', title: '晴天', channel: '周杰倫 - Topic', duration: 269, views: 1e6, title_n: '晴天', channel_n: '周杰伦topic' }],
+};
+results['zzz'] = {
+  title_n: 'zzz', artist_n: '', lyrics: [], errors: [],
+  videos: [{ id: 'zzzzzzzzzzz', title: 'something', channel: 'c', duration: 200, views: 1, title_n: 'something', channel_n: 'c' }],
+};
+
+test('an off-list request is identified from the lyric sites, and its videos scored', async () => {
+  sent = [];
+  const r = await F.identify(' 晴天 周董 ');
+  // The viewer didn't type the artist's name: searched again by title + artist
+  assert.deepStrictEqual(sent, ['晴天 周董', '晴天']);
+  // The original singer's title wins over a cover's; LRCLIB's 繁體 spelling is shown
+  assert.strictEqual(r.title, '晴天');
+  assert.strictEqual(r.artist, '周杰倫');
+  assert.strictEqual(r.status, 'confident');
+  assert.deepStrictEqual(r.candidates.map(c => c.id).slice(0, 2), ['jaytopic001', 'jaychou0001']);
+  assert.strictEqual(r.tab, '');
+
+  results['晴天 周杰倫'] = { ...results['晴天 周董'], title_n: '晴天周杰伦' };
+  sent = [];
+  const typed = await F.identify('晴天 周杰倫');   // artist typed: one search is enough
+  assert.deepStrictEqual(sent, ['晴天 周杰倫']);
+  assert.strictEqual(typed.artist, '周杰倫');
+
+  const none = await F.identify('zzz');   // no lyric result fits: the text itself, nothing confident
+  assert.deepStrictEqual([none.title, none.artist, none.status], ['zzz', '', 'none']);
+  assert.strictEqual(none.candidates[0].id, 'zzzzzzzzzzz');
+});
+
+test('kana means a Japanese song; Chinese characters alone stay automatic', () => {
+  assert.strictEqual(F.guessTab('メリッサ Porno Graffitti'), '日語');
+  assert.strictEqual(F.guessTab('晴天 周杰倫'), '');
+});
+
+test('an off-list song is added to the practice tab with its link, once', async () => {
+  sheet = { '國語': [['title', 'artist', 'YTLink'], ['a', 'x', '']], '待練勿點': [['title', 'artist']] };
+  writes.length = grows.length = appends.length = 0;
+  canWrite = true;
+  let r = await F.addToSheet({ title: '晴天', artist: '周杰倫', videoId: 'jaychou0001' });
+  assert.deepStrictEqual(r, { tab: '待練勿點', added: true });
+  assert.deepStrictEqual(grows, [{ appendDimension: { sheetId: 101, dimension: 'COLUMNS', length: 1 } }]);
+  assert.deepStrictEqual(writes, [{ range: "'待練勿點'!C1", values: [['YTLink']] }]);
+  assert.deepStrictEqual(appends, [{ range: "'待練勿點'!A1", values: [['晴天', '周杰倫', 'https://www.youtube.com/watch?v=jaychou0001']] }]);
+
+  r = await F.addToSheet({ title: '晴天', artist: '周杰倫', videoId: 'jaychou0001' });
+  assert.deepStrictEqual(r, { tab: '待練勿點', added: false });
+  assert.strictEqual(appends.length, 1);
+});
+
+test('adding to the sheet explains a missing practice tab and needs Editor access', async () => {
+  const saved = process.env.EXCLUDED_TABS;
+  try {
+    process.env.EXCLUDED_TABS = '草稿';
+    await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'practiceTabMissing');
+    process.env.EXCLUDED_TABS = '';
+    await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'noPracticeTab');
+  } finally {
+    if (saved == null) delete process.env.EXCLUDED_TABS; else process.env.EXCLUDED_TABS = saved;
+  }
+  canWrite = false;
+  await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'noEditor');
+  canWrite = true;
 });
 
 test.after(() => {
