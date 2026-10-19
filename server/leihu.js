@@ -91,6 +91,8 @@ async function refresh() {
       complete: !!(m.steps && m.steps.import && m.steps.separate && m.steps.pitch && m.steps.lyrics),
       // Leihu 1.4.7+ finishes the lyrics step with blank lyrics when its recognition is unreliable
       hasLyrics: !!(m.lyrics_text && m.lyrics_text.trim()),
+      lyricsSource: m.lyrics_source || null,
+      lyricsPending: !!m.lyrics_pending,   // Leihu's "online lyrics available" chip
     }));
     canOpen = 'remote' in statusRes.data;
     activeJobs = new Set((statusRes.data.jobs || [])
@@ -164,21 +166,32 @@ function plainTitle(s) {
   return (s || '').replace(/[(（[【［].*?[)）\]】］]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 }
 
+// Same name, allowing one character written in another form (松任谷由實 / 松任谷由実)
+function sameName(a, b) {
+  if (a.includes(b) || b.includes(a)) return true;
+  const x = [...a], y = [...b];
+  return x.length >= 3 && x.length === y.length && x.filter((ch, i) => ch !== y[i]).length <= 1;
+}
+
 // A Leihu lyric candidate that is surely this song's recording: timed lyrics, the sheet's
 // title, the sheet's artist, and within 3 s of the audio (Leihu then uses its timing as-is).
-function lyricFits(c, song) {
+// Leihu converts lyrics to Taiwan characters (来 → 來), so its own title_match — every
+// character of the lyric's title found in the YouTube title, compared in one form — also counts.
+// Replacing lyrics Leihu recognized also needs the words to agree with that recognition.
+function lyricFits(c, song, replace = false) {
   const artist = plainTitle(song.artist);
   const cArtist = plainTitle(c.artist);
   return !!c.synced && c.diff != null && c.diff <= 3
-    && plainTitle(c.track) === plainTitle(song.title)
-    && !!artist && !!cArtist && (cArtist.includes(artist) || artist.includes(cArtist));
+    && (plainTitle(c.track) === plainTitle(song.title) || (c.title_match >= 1 && [...plainTitle(c.track)].length >= 2))
+    && !!artist && !!cArtist && sameName(artist, cArtist)
+    && (!replace || c.similarity >= 0.5);
 }
 
-// Fill blank lyrics with a fitting online lyric: first from the candidates Leihu saved while
+// Fill lyrics with a fitting online lyric: first from the candidates Leihu saved while
 // processing, else from Leihu's lyric search by the sheet's title + artist (Leihu's own search
 // used the YouTube title, which may be romanized). Returns true when lyrics were applied.
-async function fillLyrics(id, song) {
-  const pick = list => (list || []).filter(c => lyricFits(c, song)).sort((a, b) => a.diff - b.diff)[0];
+async function fillLyrics(id, song, replace = false) {
+  const pick = list => (list || []).filter(c => lyricFits(c, song, replace)).sort((a, b) => a.diff - b.diff)[0];
   let cand = pick((await axios.get(`${baseUrl()}/api/songs/${id}/lyrics/candidates`, { timeout: 60000 })).data.results);
   if (!cand) {
     const q = `${song.title} ${song.artist || ''}`.trim();
@@ -189,21 +202,27 @@ async function fillLyrics(id, song) {
     return false;
   }
   await axios.post(`${baseUrl()}/api/songs/${id}/lyrics/apply`, { candidate: cand }, { timeout: 60000 });
-  console.log(`[leihu] Filled the blank lyrics of "${song.title}" from ${cand.source} (${cand.track} / ${cand.artist})`);
+  console.log(`[leihu] ${replace ? 'Replaced the recognized' : 'Filled the blank'} lyrics of "${song.title}" from ${cand.source} (${cand.track} / ${cand.artist})`);
   return true;
 }
 
-// Songs we imported that Leihu finished with blank lyrics (its recognition was unreliable)
-// get fitting online lyrics. Lyrics Leihu did set are never replaced. Once per song per run.
+// Songs we imported, or whose video is the sheet's link, get fitting online lyrics when
+// Leihu finished with blank lyrics (its recognition was unreliable), or kept its own
+// recognition while flagging that online lyrics fit (its "有線上歌詞可選" chip). Lyrics picked
+// in Leihu — online, by hand, or "keep the recognized ones" — are never replaced. Once per song per run.
 async function fillMissingLyrics() {
   for (const s of library || []) {
-    const song = imported.get(s.videoId);
-    if (!song || songState(s) !== 'nolyrics') continue;
+    const state = songState(s);
+    const replace = state === 'ready' && s.lyricsPending && s.lyricsSource === 'whisper';
+    if (state !== 'nolyrics' && !replace) continue;
+    const sheetRow = s.videoId && getSongs().find(r => videoId(r.url) === s.videoId);
+    const song = imported.get(s.videoId) || (sheetRow && { title: sheetRow.title, artist: sheetRow.artist });
+    if (!song) continue;
     const tag = `lyrics:${s.id}`;
     if (requested.has(tag)) continue;
     requested.set(tag, 'sent');
     try {
-      await fillLyrics(s.id, song);
+      await fillLyrics(s.id, song, replace);
     } catch (err) {
       requested.set(tag, 'failed');
       console.error(`[leihu] Filling lyrics of "${song.title}" failed:`, err.response?.data?.error || err.message);

@@ -179,6 +179,33 @@ test("lyrics Leihu set, and songs we didn't import, are left alone", async () =>
   assert.deepStrictEqual(posts, []);
 });
 
+test('recognized lyrics Leihu flagged are replaced by a fitting online lyric, even in other character forms', async () => {
+  // The sheet writes 来/實, Leihu's lyric 來/実; Leihu found every title character in the YouTube title
+  sheet.push({ title: '春よ、来い', artist: '松任谷由實', key: '0', url: 'https://www.youtube.com/watch?v=qX7pFYH9O04', tab: '日語' });
+  const lyric = (similarity, diff = 0) => ({ source: 'LRCLIB', track: '春よ、來い', artist: '松任谷由実', diff, similarity, title_match: 1, synced: '[00:21.66]淡き光立つ', plain: '淡き光立つ' });
+  const song = (id, more) => ({ id, title: '松任谷由実 - 春よ、来い', source_url: 'https://www.youtube.com/watch?v=qX7pFYH9O04', steps: done, lyrics_text: LYR, ...more });
+  leihu.search = [];
+  leihu.candidates = [lyric(0.3), lyric(0.79, 0.1), lyric(0.79, 6.6)];
+  leihu.songs = [song('gggggggggg', { lyrics_source: 'whisper', lyrics_pending: true })];
+  await L.refresh();
+  posts.length = 0;
+  await L.fillMissingLyrics();
+  assert.deepStrictEqual(posts, [{ url: 'http://127.0.0.1:8765/api/songs/gggggggggg/lyrics/apply', body: { candidate: lyric(0.79, 0.1) } }]);
+
+  // Left alone: lyrics picked in Leihu, recognition kept by the streamer, or words that disagree
+  leihu.songs = [
+    song('hhhhhhhhhh', { lyrics_source: 'manual', lyrics_pending: false }),
+    song('iiiiiiiiii', { lyrics_source: 'whisper', lyrics_pending: false }),
+    song('jjjjjjjjjj', { lyrics_source: 'whisper', lyrics_pending: true }),
+  ];
+  leihu.candidates = [lyric(0.3)];
+  await L.refresh();
+  posts.length = 0;
+  await L.fillMissingLyrics();
+  assert.deepStrictEqual(posts, []);
+  sheet.pop();
+});
+
 test("a failed import shows Leihu's reason, and YouTube's bot check is recognized", async () => {
   queueState.queue = [entry(sheet[0])];
   leihu.songs = [{ id: 'gggggggggg', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: { import: false } }];
