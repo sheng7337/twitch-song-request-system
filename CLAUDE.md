@@ -130,7 +130,7 @@ vtuber-song-queue/
 - Cooldown uses live history; weighting uses the startup snapshot
 
 ### Google Sheets
-- Song list: read-only, all tabs loaded except `EXCLUDED_TABS` in config.js. Range strings
+- Song list: read-only, all tabs loaded except `EXCLUDED_TABS` (.env). Range strings
   quote the tab name (`'Rock ''n'' Roll'!A:Z`)
 - Column headers configurable in `.env`: `SHEET_SONG_COLUMN`, `SHEET_ARTIST_COLUMN`,
   `SHEET_KEY_COLUMN` (default `key`). Matching is case-insensitive
@@ -353,6 +353,8 @@ See `.env.example` for full descriptions.
 - `GOOGLE_SHEET_ID` — song list sheet
 - `SHEET_SONG_COLUMN` / `SHEET_ARTIST_COLUMN` / `SHEET_KEY_COLUMN` — column headers (e.g. `曲名`, `歌手名`, `key`)
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
+- `EXCLUDED_TABS` — tabs left out of requests, random picks and the link finder, comma-separated.
+  Unset = `待練勿點`; empty = none. Read through `config.EXCLUDED_TABS` (a getter, so it follows .env)
 - `PORT` — default 3000
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
 - `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS`, `OVERLAY_LANGUAGE` (`en` / `zh-TW`) — also adjustable from the dashboard
@@ -363,7 +365,6 @@ See `.env.example` for full descriptions.
 
 ## Tuneable settings (server/config.js)
 
-- `EXCLUDED_TABS` — sheet tabs to skip
 - `YT_LINK_HEADER` — header of the YouTube link column the link finder creates and fills (`YTLink`)
 - `LINK_CONFIDENT_FAN_VIEWS` — views a fan upload needs to count as a confident pick (1,000,000; 0 = never)
 - `SHEET_REFRESH_INTERVAL_MS` — how often to re-read the sheet (default 5min)

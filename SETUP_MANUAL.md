@@ -74,8 +74,9 @@ Your existing sheet with songs. The server reads it at startup and every 5 minut
 | ロキ | みきとP | -2 |
 | Ghost Rule | DECO*27 | 3 |
 
-**Tabs:** All tabs are included except those listed in `EXCLUDED_TABS` in `server/config.js`.
-The tab `待練勿點` is excluded by default — add others as needed.
+**Tabs:** All tabs are included except those listed in `EXCLUDED_TABS` in `.env`, comma-separated
+(`EXCLUDED_TABS=待練勿點,草稿`). When the line isn't there, the tab `待練勿點` is excluded;
+`EXCLUDED_TABS=` with nothing after it uses every tab.
 
 ### History sheet
 

@@ -8,8 +8,14 @@ module.exports = {
 
   // ── Google Sheets ──────────────────────────────────────────────────────────
 
-  // Tabs to exclude from the song list (e.g. practice/draft tabs)
-  EXCLUDED_TABS: ['待練勿點'],
+  // Tabs left out of requests, random picks and the link finder (e.g. practice/draft
+  // tabs): EXCLUDED_TABS in .env, comma-separated. Unset = the practice tab 待練勿點;
+  // set but empty = every tab is used. Read on each use, so .env changes apply at once.
+  get EXCLUDED_TABS() {
+    const v = process.env.EXCLUDED_TABS;
+    if (v == null) return ['待練勿點'];
+    return v.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  },
 
   // Header of the YouTube link column. It isn't set up by hand: the link finder
   // (dashboard → 🔗 links) creates it in a tab the first time it saves links

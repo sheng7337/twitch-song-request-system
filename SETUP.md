@@ -88,7 +88,7 @@ The overlay connects automatically when the server is running and updates live.
 ## Google Sheets setup
 
 ### Song list sheet
-Your existing sheet with songs. All tabs are included except those in `EXCLUDED_TABS` (`server/config.js`).
+Your existing sheet with songs. All tabs are included except those in `EXCLUDED_TABS` in `.env` (comma-separated; `待練勿點` when not set).
 
 Header row must have at minimum:
 
