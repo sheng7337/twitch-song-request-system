@@ -52,15 +52,31 @@ def search_lyrics(P, title, artist, errors):
     } for c in found.values()]
 
 
-def search_videos(P, ydl, title, artist, errors):
-    query = f"{title} {artist}".strip()
-    try:
-        info = ydl.extract_info(f"ytsearch{VIDEOS_PER_SEARCH}:{query}", download=False)
-    except Exception as e:
-        errors.append(f"youtube: {type(e).__name__}: {e}"[:300])
-        return []
+def video_queries(P, title, artist):
+    # YouTube sometimes returns nothing for an exact "title artist" search that works when
+    # reordered, simplified or shortened, so these are tried in turn until one has results
+    queries = [f"{title} {artist}", f"{artist} {title}", P.to_simplified(f"{title} {artist}"), title]
     out = []
-    for e in (info or {}).get("entries") or []:
+    for q in queries:
+        q = q.strip()
+        if q and q not in out:
+            out.append(q)
+    return out
+
+
+def search_videos(P, ydl, title, artist, errors):
+    entries = []
+    for query in video_queries(P, title, artist):
+        try:
+            info = ydl.extract_info(f"ytsearch{VIDEOS_PER_SEARCH}:{query}", download=False)
+        except Exception as e:
+            errors.append(f"youtube: {type(e).__name__}: {e}"[:300])
+            continue
+        entries = (info or {}).get("entries") or []
+        if entries:
+            break
+    out = []
+    for e in entries:
         if not e or not e.get("id"):
             continue
         channel = e.get("channel") or e.get("uploader") or ""
