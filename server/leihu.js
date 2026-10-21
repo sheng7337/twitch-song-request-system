@@ -26,7 +26,7 @@ const OFFLINE_POLL_MS = 30000;
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
 let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
-let canOpen = false;         // Leihu has the remote-open patch (/api/status reports `remote`)
+let canOpen = false;         // Leihu supports remote open, 1.5.2+ (/api/status reports `remote`)
 const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
 const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
 let links = loadLinks();
@@ -353,7 +353,7 @@ async function importForSong(vid, song, tab) {
 }
 
 // Ask Leihu's practice window to open a ready song at its sheet key (0 if the key
-// can't be used). Needs Leihu's remote-open patch. Returns the key used.
+// can't be used). Needs Leihu 1.5.2+. Returns the key used.
 async function open(entry) {
   if (!canOpen) throw new UserError('noRemoteOpen', {}, 'Leihu Singsing does not support remote open');
   const status = statusFor(entry.title, entry.artist);

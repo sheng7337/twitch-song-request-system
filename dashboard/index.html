@@ -1425,7 +1425,7 @@ function paintBadges() {
       + (st.leihuTitle ? '\n' + t('dash.bt.leihuTitle', { title: st.leihuTitle }) : '') + (st.manual ? '\n' + t('dash.bt.manual') : '');
     el.onclick = clickable ? () => onBadgeClick(entry, st) : null;
   }
-  // Sing needs Leihu's remote-open support and a ready backing track
+  // Sing needs Leihu 1.5.2+ (remote open) and a ready backing track
   const np = state.nowPlaying;
   const npSt = np && leihuStatus.songs[songKey(np.title, np.artist)];
   for (const btn of document.querySelectorAll('.sing-btn')) {

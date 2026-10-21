@@ -194,8 +194,8 @@ vtuber-song-queue/
 - Imports set Leihu's per-song recognition language from the sheet tab
   (`LEIHU_TAB_LANGUAGES` in config.js; 台語 stays automatic). Needs Leihu 1.4.7+
 - Sing button (Now Playing): asks Leihu's practice window to open the song at the sheet key.
-  Needs the remote-open patch (`/api/remote/open`, local branch `remote-open` in the Leihu
-  repo, not upstream yet); shown only when Leihu's `/api/status` has a `remote` field
+  Needs Leihu 1.5.2+ (`/api/remote/open`, upstreamed from our former `remote-open` branch);
+  shown only when Leihu's `/api/status` has a `remote` field
 - `LEIHU_AUTO_PREPARE=1` (dashboard toggle): imports missing queued songs via Leihu's
   `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
   request is sent once per server run. Keys outside whole semitones ±6 are skipped
