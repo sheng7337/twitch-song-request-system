@@ -9,7 +9,7 @@ const { isAllowedRequest } = require('./request-guard');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
+const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
 const { connect: connectTwitch, setEventHandler, setChatHandler } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const registerShoutout = require('./commands/shoutout');
@@ -22,6 +22,9 @@ const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
+const leihu = require('./leihu');
+const linkFinder = require('./link-finder');
+const { errorBody, message } = require('./messages');
 
 const app = express();
 const server = http.createServer(app);
@@ -53,6 +56,7 @@ app.use('/overlay', express.static(path.join(__dirname, '..', 'overlay')));
 app.use('/dashboard', express.static(path.join(__dirname, '..', 'dashboard')));
 app.use('/setup', express.static(path.join(__dirname, '..', 'setup')));
 app.use('/clip-player', express.static(path.join(__dirname, '..', 'clip-player')));
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));   // language helper + strings
 
 // ── Setup detection: redirect to wizard if not configured ─────────────────────
 function isSetupComplete() {
@@ -193,7 +197,7 @@ app.post('/api/clear', (req, res) => { clearQueue(); res.json({ ok: true }); });
 
 app.post('/api/add', (req, res) => {
   const { title, artist, key, requester } = req.body;
-  if (!title) return res.status(400).json({ error: 'title required' });
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
   const entry = addSong({ title: title.trim(), artist: artist || '', key: key || '', requester: requester || 'manual' });
   res.json({ ok: true, entry });
 });
@@ -250,10 +254,10 @@ app.post('/api/redraw', (req, res) => {
 
   const tabs = currentSong.tabs || [];
   const picked = pickRandom(excludeTitles, tabs);
-  if (!picked) return res.status(400).json({ error: 'no songs available to redraw' });
+  if (!picked) return res.status(400).json(message('noRedraw', {}, 'no songs available to redraw'));
 
   const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester, tabs });
-  if (!ok) return res.status(400).json({ error: 'redraw failed' });
+  if (!ok) return res.status(400).json(message('redrawFailed', {}, 'redraw failed'));
 
   console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);
   res.json({ ok: true });
@@ -402,6 +406,158 @@ app.get('/api/clip-stream', async (req, res) => {
   }
 });
 
+// ── Leihu Singsing (backing tracks + lyrics, optional) ───────────────────────
+app.get('/api/leihu/status', (req, res) => res.json(leihu.getStatus()));
+app.get('/api/leihu/library', (req, res) => res.json(leihu.getLibrary()));
+
+// Manual link for a song imported into Leihu as an audio file. id: null unlinks.
+app.post('/api/leihu/link', async (req, res) => {
+  const { title, artist, id } = req.body;
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  if (id != null && !/^[a-z0-9]{6,16}$/.test(id)) return res.status(400).json({ error: 'invalid id' });
+  leihu.setLink(title, artist, id || null);
+  res.json({ ok: true });
+});
+
+// Import / render the key of one song now, whether or not auto-prepare is on.
+app.post('/api/leihu/prepare', async (req, res) => {
+  const { title, artist, key } = req.body;
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  await leihu.prepare({ title, artist, key }, { retry: true });
+  await leihu.refresh();
+  res.json({ ok: true });
+});
+
+// Open a ready song in Leihu's practice window at its sheet key.
+app.post('/api/leihu/open', async (req, res) => {
+  const { title, artist, key } = req.body;
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  try {
+    res.json({ ok: true, key: await leihu.open({ title, artist, key }) });
+  } catch (err) {
+    res.status(400).json(err.messageCode ? errorBody(err) : { error: err.response?.data?.error || err.message });
+  }
+});
+
+// ── YouTube link finder (fills the YTLink column, see link-finder.js) ────────
+app.get('/api/links', (req, res) => res.json(linkFinder.getView()));
+app.post('/api/links/start', async (req, res) => res.json(await linkFinder.start({ limit: Number(req.body.limit) || 0 })));
+app.post('/api/links/stop', (req, res) => res.json(linkFinder.stop()));
+app.post('/api/links/accept-confident', (req, res) => res.json({ ok: true, accepted: linkFinder.acceptConfident() }));
+
+// decision: 'accepted' (with videoId: an ID or any YouTube link), 'skipped', or null to undo
+app.post('/api/links/decide', (req, res) => {
+  const { key, decision, videoId } = req.body;
+  if (![null, 'accepted', 'skipped'].includes(decision ?? null)) return res.status(400).json({ error: 'invalid decision' });
+  try {
+    linkFinder.decide(key, decision ?? null, videoId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+// Can the server edit the song sheet? (a write that changes nothing)
+app.post('/api/links/access', async (req, res) => {
+  try {
+    res.json(await linkFinder.checkAccess());
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+app.post('/api/links/save', async (req, res) => {
+  try {
+    const result = await linkFinder.save();
+    if (result.written) require('./sheets').fetchSongs().catch(() => {});
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+app.post('/api/links/check', async (req, res) => {
+  const { key, videoId } = req.body;
+  try {
+    await linkFinder.check(key, videoId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+// ── Songs not on the sheet (Pending Review → 🔍 Find) ────────────────────────
+// The pending entry at `index`; `addedAt` (when sent) must match, so a list that changed
+// since the page drew it never acts on another request.
+function pendingAt(index, addedAt) {
+  const entry = getState().pending[Number(index)];
+  return entry && (addedAt == null || entry.addedAt === Number(addedAt)) ? entry : null;
+}
+
+function youtubeId(link) {
+  return leihu.videoId(link) || (/^[A-Za-z0-9_-]{11}$/.test(link || '') ? link : null);
+}
+
+// Searches the lyric sites and YouTube for what the viewer typed (or `text`, the card's
+// edited title + artist). Answers at once; the result lands on the entry as `found`.
+app.post('/api/pending/identify', (req, res) => {
+  const entry = pendingAt(req.body.index, req.body.addedAt);
+  if (!entry) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  const text = String(req.body.text || entry.originalRequest || '').trim();
+  if (!text) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  updatePending(entry, { found: { state: 'searching', text, started: Date.now() } });
+  linkFinder.identify(text).then(r => {
+    updatePending(entry, {
+      title: r.title, artist: r.artist,
+      found: { state: 'done', text, ...r, practiceTab: linkFinder.practiceTab() },
+    });
+    console.log(`[pending] "${text}" → ${r.title} / ${r.artist || '?'} (${r.status}, ${r.candidates.length} videos)`);
+  }).catch(err => {
+    updatePending(entry, { found: { state: 'failed', text, ...errorBody(err) } });
+    console.error(`[pending] Search for "${text}" failed:`, err.message);
+  });
+  res.json({ ok: true });
+});
+
+// Queue the request as `title` / `artist` and prepare `videoId` in Leihu. The song is
+// queued even when Leihu can't take it; the reply then carries Leihu's error.
+app.post('/api/pending/queue-found', async (req, res) => {
+  const { index, addedAt, videoId } = req.body;
+  const title = String(req.body.title || '').trim();
+  const artist = String(req.body.artist || '').trim();
+  if (!pendingAt(index, addedAt)) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  const vid = youtubeId(videoId);
+  if (!vid) return res.status(400).json(message('notYouTube', {}, 'not a YouTube video link'));
+  acceptPending(Number(index), title, artist);
+  try {
+    await leihu.importForSong(vid, { title, artist }, linkFinder.guessTab(`${title} ${artist}`));
+    res.json({ ok: true, leihu: true });
+  } catch (err) {
+    res.json({ ok: true, leihu: false, ...errorBody(err) });
+  }
+});
+
+// Add the request to the practice tab (first of EXCLUDED_TABS) with its YouTube link.
+// The request stays pending, marked addedTo, so it can still be queued or dismissed.
+app.post('/api/pending/add-to-sheet', async (req, res) => {
+  const { index, addedAt, videoId } = req.body;
+  const title = String(req.body.title || '').trim();
+  const artist = String(req.body.artist || '').trim();
+  const entry = pendingAt(index, addedAt);
+  if (!entry) return res.status(400).json(message('pendingGone', {}, 'this request is no longer pending — reload the page'));
+  if (!title) return res.status(400).json(message('titleRequired', {}, 'title required'));
+  const vid = videoId ? youtubeId(videoId) : null;
+  if (videoId && !vid) return res.status(400).json(message('notYouTube', {}, 'not a YouTube video link'));
+  try {
+    const r = await linkFinder.addToSheet({ title, artist, videoId: vid });
+    updatePending(entry, { title, artist, addedTo: r.tab });
+    res.json({ ok: true, ...r });
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
 app.get('/api/history', (req, res) => res.json(getHistory()));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');
@@ -415,6 +571,11 @@ const PANEL_BG_ALPHA_DEFAULT = 0.92;
 const TEXT_BRIGHTNESS_DEFAULT = 1;
 const TEXT_BRIGHTNESS_MIN = 0.5;
 const TEXT_BRIGHTNESS_MAX = 2;
+const OVERLAY_LANGUAGES = ['en', 'zh-TW'];   // what viewers see on the overlay and clip player
+
+function overlayLanguage() {
+  return OVERLAY_LANGUAGES.includes(process.env.OVERLAY_LANGUAGE) ? process.env.OVERLAY_LANGUAGE : 'en';
+}
 
 app.get('/api/settings', (req, res) => {
   const rawDays = process.env.RANDOM_COOLDOWN_DAYS;
@@ -430,6 +591,8 @@ app.get('/api/settings', (req, res) => {
     randomCooldownDays: Number.isFinite(days) && days >= 0 ? days : RANDOM_COOLDOWN_DEFAULT_DAYS,
     panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
     textBrightness: Number.isFinite(brightness) && brightness >= TEXT_BRIGHTNESS_MIN && brightness <= TEXT_BRIGHTNESS_MAX ? brightness : TEXT_BRIGHTNESS_DEFAULT,
+    leihuAutoPrepare: process.env.LEIHU_AUTO_PREPARE === '1',
+    overlayLanguage: overlayLanguage(),
   });
 });
 
@@ -465,6 +628,20 @@ app.post('/api/settings', (req, res) => {
     broadcastSettings({ textBrightness: brightness });
   }
 
+  if (req.body.overlayLanguage !== undefined) {
+    if (!OVERLAY_LANGUAGES.includes(req.body.overlayLanguage)) {
+      return res.status(400).json({ error: `overlayLanguage must be one of ${OVERLAY_LANGUAGES.join(', ')}` });
+    }
+    updates.overlayLanguage = req.body.overlayLanguage;
+    setupRouter.writeEnvValues({ OVERLAY_LANGUAGE: updates.overlayLanguage });
+    broadcastSettings({ overlayLanguage: updates.overlayLanguage });
+  }
+
+  if (req.body.leihuAutoPrepare !== undefined) {
+    updates.leihuAutoPrepare = !!req.body.leihuAutoPrepare;
+    setupRouter.writeEnvValues({ LEIHU_AUTO_PREPARE: updates.leihuAutoPrepare ? '1' : '0' });
+  }
+
   res.json({ ok: true, ...updates });
 });
 
@@ -494,6 +671,7 @@ async function start() {
   }
 
   generateSponsorVoice();
+  leihu.start();
 
   server.listen(PORT, () => {
     console.log(`\n✅ Server running at http://localhost:${PORT}`);

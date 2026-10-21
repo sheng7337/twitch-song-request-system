@@ -24,6 +24,9 @@ function restoreState() {
   queue = saved.queue || [];
   playedSongs = saved.playedSongs || [];
   pending = saved.pending || [];
+  for (const p of pending) {
+    if (p.found && p.found.state === 'searching') p.found = { state: 'failed', code: 'searchInterrupted', error: 'interrupted by a server restart' };
+  }
   console.log(`[queue] Restored from before restart: ${queue.length + (nowPlaying ? 1 : 0)} queued, ${pending.length} pending, ${playedSongs.length} played`);
 }
 restoreState();
@@ -90,6 +93,15 @@ function addPending({ title, artist, requester, originalRequest, confidence, can
   pending.push(entry);
   broadcastState();
   return entry;
+}
+
+// Merge `patch` into a pending entry, if it's still pending (a search finishing after the
+// streamer accepted or dismissed the request changes nothing). Returns true if updated.
+function updatePending(entry, patch) {
+  if (!pending.includes(entry)) return false;
+  Object.assign(entry, patch);
+  broadcastState();
+  return true;
 }
 
 // Accept a pending entry → move to queue.
@@ -238,7 +250,7 @@ function redrawSong(zone, index, newSong) {
 }
 
 module.exports = {
-  registerClient, addSong, addPending, acceptPending,
+  registerClient, addSong, addPending, updatePending, acceptPending,
   skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong,
   broadcastSettings, broadcastRaw,
 };

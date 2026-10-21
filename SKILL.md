@@ -60,7 +60,14 @@ WRONG:    /helix/channel-points/custom-rewards
 
 ### Message types
 ```js
-{ type: 'state', nowPlaying, queue, playedSongs, pending }  // full state broadcast
+// server → pages
+{ type: 'state', nowPlaying, queue, playedSongs, pending }  // full queue state broadcast
+{ type: 'settings', ... }          // overlay opacity / brightness / language
+{ type: 'media', ... }             // clip player: play a clip, video or the !tk roll
+{ type: 'media-stop' }             // clip player: stop now
+{ type: 'preload-avatar', ... }    // clip player: cache a !so avatar for !tk
+// clip player → server
+{ type: 'media-ended', mediaId }   // finished; the media queue moves on
 ```
 
 ---
@@ -265,7 +272,7 @@ function connectEventSub() {
     // 'session_keepalive' — no action needed
   });
 
-  ws.on('close', () => setTimeout(connectEventSub, 3000));
+  ws.on('close', () => setTimeout(connectEventSub, 5000));
 }
 
 async function subscribeToRedemptions(sessionId) {

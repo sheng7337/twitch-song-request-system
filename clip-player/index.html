@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <title>Clip Player</title>
+<script src="/shared/i18n.js"></script>
+<script src="/shared/i18n-viewer.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -375,7 +377,8 @@
     iframeEl.src = '';
     videoEl.src  = '';
 
-    badgeEl.textContent  = msg.label  || 'Shoutout';
+    // labelKey in the overlay language; older servers only send the English label
+    badgeEl.textContent  = msg.labelKey && I18N.has('clip.' + msg.labelKey) ? I18N.t('clip.' + msg.labelKey) : (msg.label || I18N.t('clip.shoutout'));
     creditEl.textContent = msg.credit || '';
     titleEl.textContent  = msg.title  || '';
 
@@ -586,10 +589,15 @@
       }
       if (msg.type === 'media-stop') { hideSponsorRoll(); hideMedia(false); }
       if (msg.type === 'preload-avatar' && msg.url) { new Image().src = msg.url; }
+      if (msg.type === 'settings' && msg.overlayLanguage) I18N.setLang(msg.overlayLanguage, { save: false, tagPage: false });
     };
     ws.onclose = () => { ws = null; setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
   }
+
+  // Labels follow the dashboard's overlay-language setting (English until it arrives)
+  I18N.setLang('en', { save: false, tagPage: false });
+  fetch('/api/settings').then(r => r.json()).then(s => s.overlayLanguage && I18N.setLang(s.overlayLanguage, { save: false, tagPage: false })).catch(() => {});
 
   connect();
 </script>

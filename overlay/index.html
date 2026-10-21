@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline'">
 <title>Song Queue Overlay</title>
+<script src="/shared/i18n.js"></script>
+<script src="/shared/i18n-viewer.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -119,8 +121,7 @@
   .section-header {
     font-size: 8px; letter-spacing: 3px; margin-bottom: 6px; flex-shrink: 0;
   }
-  .section-header.purple { color: var(--text-muted); }
-  .section-header.green  { color: rgba(42,154,90,0.7); margin-top: 10px; }
+  .section-header.purple { color: var(--text-muted); }  .section-header.green  { color: rgba(42,154,90,0.7); margin-top: 10px; }
 
   /* ── Auto-scrolling ticker lists ── */
   .scroll-list {
@@ -189,24 +190,24 @@
 <div class="panel">
   <div class="header">
     <span class="status-dot disconnected" id="dot"></span>
-    <span class="header-title">Song Queue</span>
+    <span class="header-title" data-i18n="overlay.title">Song Queue</span>
     <span class="badge" id="queue-badge">0 waiting</span>
   </div>
 
   <!-- Now Playing -->
   <div class="now-playing">
-    <p class="np-label">NOW PLAYING</p>
-    <p class="np-empty"    id="np-empty"     >no song loaded</p>
+    <p class="np-label" data-i18n="overlay.nowPlaying">NOW PLAYING</p>
+    <p class="np-empty"    id="np-empty"      data-i18n="overlay.noSong">no song loaded</p>
     <p class="np-title"    id="np-title"      style="display:none"><span class="np-title-inner" id="np-title-inner"></span></p>
     <p class="np-artist"   id="np-artist"     style="display:none"></p>
     <p class="np-requester"id="np-requester"  style="display:none"></p>
   </div>
 
   <!-- Up Next -->
-  <p class="section-header purple">// UP NEXT</p>
+  <p class="section-header purple" data-i18n="overlay.upNext">// UP NEXT</p>
   <div class="scroll-list queue-scroll" id="queue-list">
     <div class="scroll-inner" id="queue-inner">
-      <p class="list-empty">no requests yet...</p>
+      <p class="list-empty" data-i18n="overlay.noRequests">no requests yet…</p>
     </div>
   </div>
 
@@ -214,18 +215,20 @@
 
   <!-- Played -->
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-shrink:0;">
-    <p class="section-header green" style="margin:0;flex:1;">// PLAYED</p>
+    <p class="section-header green" style="margin:0;flex:1;" data-i18n="overlay.played">// PLAYED</p>
     <span class="played-badge" id="played-badge">0 songs</span>
   </div>
   <div class="scroll-list played-scroll" id="played-list">
     <div class="scroll-inner" id="played-inner">
-      <p class="list-empty">nothing played yet...</p>
+      <p class="list-empty" data-i18n="overlay.nothingPlayed">nothing played yet…</p>
     </div>
   </div>
 </div>
 
 
 <script>
+const t = I18N.t;
+let lastState = null;   // redrawn when the overlay language changes
 const WS_URL = `ws://${location.host}`;
 let ws, reconnectTimer;
 
@@ -248,7 +251,8 @@ function connect() {
   };
 }
 
-function applySettings({ panelBgAlpha, textBrightness }) {
+function applySettings({ panelBgAlpha, textBrightness, overlayLanguage }) {
+  if (overlayLanguage) I18N.setLang(overlayLanguage, { save: false, tagPage: false });
   if (panelBgAlpha != null) {
     document.documentElement.style.setProperty('--panel-bg-alpha', panelBgAlpha);
   }
@@ -264,7 +268,9 @@ async function loadSettings() {
   } catch(_) {}
 }
 
-function renderState({ nowPlaying, queue, playedSongs }) {
+function renderState(stateMsg) {
+  lastState = stateMsg;
+  const { nowPlaying, queue, playedSongs } = stateMsg;
   // ── Now Playing ──
   const empty = document.getElementById('np-empty');
   const title = document.getElementById('np-title');
@@ -279,7 +285,7 @@ function renderState({ nowPlaying, queue, playedSongs }) {
     inner.style.removeProperty('--scroll-dist');
     inner.style.removeProperty('--scroll-duration');
     artist.style.display = nowPlaying.artist ? 'block' : 'none'; artist.textContent = nowPlaying.artist;
-    req.style.display = 'block'; req.textContent = `> requested by @${nowPlaying.requester}`;
+    req.style.display = 'block'; req.textContent = t('overlay.requestedBy', { name: nowPlaying.requester });
     requestAnimationFrame(() => {
       const overflow = inner.scrollWidth - title.clientWidth;
       if (overflow > 10) {
@@ -296,10 +302,10 @@ function renderState({ nowPlaying, queue, playedSongs }) {
   }
 
   // ── Queue list ──
-  document.getElementById('queue-badge').textContent = `${queue.length} waiting`;
+  document.getElementById('queue-badge').textContent = t('overlay.waiting', { n: queue.length });
   const qInner = document.getElementById('queue-inner');
   qInner.innerHTML = queue.length === 0
-    ? '<p class="list-empty">no requests yet...</p>'
+    ? `<p class="list-empty">${esc(t('overlay.noRequests'))}</p>`
     : queue.map((item, i) => `
         <div class="queue-item">
           <span class="q-num">${String(i+1).padStart(2,'0')}</span>
@@ -310,10 +316,10 @@ function renderState({ nowPlaying, queue, playedSongs }) {
 
   // ── Played list ──
   const played = playedSongs || [];
-  document.getElementById('played-badge').textContent = `${played.length} song${played.length !== 1 ? 's' : ''}`;
+  document.getElementById('played-badge').textContent = t('overlay.playedCount', { n: played.length });
   const pInner = document.getElementById('played-inner');
   pInner.innerHTML = played.length === 0
-    ? '<p class="list-empty">nothing played yet...</p>'
+    ? `<p class="list-empty">${esc(t('overlay.nothingPlayed'))}</p>`
     : played.map((item, i) => `
         <div class="played-item">
           <span class="p-num">${String(i+1).padStart(2,'0')}</span>
@@ -374,6 +380,10 @@ function startTicker(key) {
 function esc(s) {
   return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// The language is the server's overlay setting; English until it arrives
+I18N.setLang('en', { save: false, tagPage: false });
+I18N.onChange(() => { if (lastState) renderState(lastState); });
 
 connect();
 loadSettings();

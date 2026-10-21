@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 const { ensureFreshToken } = require('./twitch');
+const { message } = require('./messages');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
 const PROGRESS_PATH = path.join(__dirname, '..', 'setup-progress.json');
@@ -115,7 +116,7 @@ router.post('/validate-client-id', async (req, res) => {
     });
   } catch (err) {
     if (err.response?.status === 400) return res.status(400).json({ error: 'invalid_client' });
-    return res.status(502).json({ error: `Could not reach Twitch: ${err.message}` });
+    return res.status(502).json(message('twitchUnreachable', { message: err.message }, `Could not reach Twitch: ${err.message}`));
   }
   writeEnvValues({ TWITCH_CLIENT_ID: clientId });
   res.json({ ok: true });
@@ -124,7 +125,7 @@ router.post('/validate-client-id', async (req, res) => {
 // POST /setup/api/start-device-auth
 router.post('/start-device-auth', async (req, res) => {
   const clientId = process.env.TWITCH_CLIENT_ID || readEnv().TWITCH_CLIENT_ID;
-  if (!clientId) return res.status(400).json({ error: 'Client ID not set' });
+  if (!clientId) return res.status(400).json(message('clientIdMissing', {}, 'Client ID not set'));
 
   try {
     const response = await axios.post('https://id.twitch.tv/oauth2/device', null, {
@@ -152,7 +153,7 @@ router.post('/start-device-auth', async (req, res) => {
 
 // GET /setup/api/poll-device-auth
 router.get('/poll-device-auth', async (req, res) => {
-  if (!deviceAuthState) return res.status(400).json({ error: 'No active device auth' });
+  if (!deviceAuthState) return res.status(400).json(message('noDeviceAuth', {}, 'No active device auth'));
 
   const clientId = process.env.TWITCH_CLIENT_ID || readEnv().TWITCH_CLIENT_ID;
   const { device_code, startedAt, expires_in } = deviceAuthState;
@@ -222,7 +223,7 @@ async function helixAuth() {
 router.get('/rewards', async (req, res) => {
   try {
     const auth = await helixAuth();
-    if (!auth) return res.status(400).json({ error: 'Twitch not configured yet — please complete Step 2 first' });
+    if (!auth) return res.status(400).json(message('twitchNotConfigured', {}, 'Twitch not configured yet — please complete Step 2 first'));
     const r = await axios.get(
       `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
       { headers: auth.headers }
@@ -263,7 +264,7 @@ router.post('/create-rewards', async (req, res) => {
     const requireText = rewardType === 'song';
     try {
       const auth = await helixAuth();
-      if (!auth) return res.status(400).json({ error: 'Twitch not configured yet' });
+      if (!auth) return res.status(400).json(message('twitchNotConfigured', {}, 'Twitch not configured yet'));
       const r = await axios.post(
         `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
         { title, cost: parseInt(cost) || 500, is_user_input_required: requireText },
@@ -294,14 +295,14 @@ router.post('/upload-credentials', (req, res) => {
       : JSON.parse(req.rawBody || '{}');
   } catch (e) {
     console.error('[setup] upload-credentials parse error:', e.message, 'rawBody length:', req.rawBody?.length);
-    return res.status(400).json({ error: 'Invalid JSON — please upload the credentials .json file from Google Cloud Console' });
+    return res.status(400).json(message('credsInvalidJson', {}, 'Invalid JSON — please upload the credentials .json file from Google Cloud Console'));
   }
   const required = ['type', 'client_email', 'private_key', 'project_id'];
   for (const field of required) {
-    if (!creds[field]) return res.status(400).json({ error: `Missing field: ${field}` });
+    if (!creds[field]) return res.status(400).json(message('credsMissingField', { field }, `Missing field: ${field}`));
   }
   if (creds.type !== 'service_account') {
-    return res.status(400).json({ error: 'Not a service account key file' });
+    return res.status(400).json(message('credsNotServiceAccount', {}, 'Not a service account key file'));
   }
   fs.writeFileSync(CREDS_PATH, JSON.stringify(creds, null, 2), { encoding: 'utf8' });
   res.json({ ok: true, clientEmail: creds.client_email });
@@ -314,11 +315,11 @@ router.post('/validate-sheet', async (req, res) => {
 
   // Extract sheet ID from URL
   const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  if (!match) return res.status(400).json({ error: 'Could not find Sheet ID in URL — please paste the full URL from your browser' });
+  if (!match) return res.status(400).json(message('sheetIdNotFound', {}, 'Could not find Sheet ID in URL — please paste the full URL from your browser'));
   const sheetId = match[1];
 
   if (!fs.existsSync(CREDS_PATH)) {
-    return res.status(400).json({ error: 'Google credentials not uploaded yet' });
+    return res.status(400).json(message('credsNotUploaded', {}, 'Google credentials not uploaded yet'));
   }
 
   try {
@@ -351,16 +352,14 @@ router.post('/validate-sheet', async (req, res) => {
       range: 'A1:Z5', // headers + first 4 data rows
     });
     const rows = r.data.values || [];
-    if (rows.length === 0) return res.status(400).json({ error: 'Sheet appears to be empty' });
+    if (rows.length === 0) return res.status(400).json(message('sheetEmpty', {}, 'Sheet appears to be empty'));
     res.json({ ok: true, sheetId, headers: rows[0], preview: rows.slice(1, 5) });
   } catch (err) {
     const msg = err.message || '';
     if (msg.includes('403') || msg.includes('permission')) {
-      return res.status(400).json({
-        error: historyMode
-          ? 'Access denied. Share the sheet with the service account email shown above as an Editor (not Viewer).'
-          : 'Access denied. Make sure you shared the sheet with the service account email shown above.',
-      });
+      return res.status(400).json(historyMode
+        ? message('sheetDeniedEditor', {}, 'Access denied. Share the sheet with the service account email shown above as an Editor (not Viewer).')
+        : message('sheetDenied', {}, 'Access denied. Make sure you shared the sheet with the service account email shown above.'));
     }
     res.status(400).json({ error: err.message });
   }
@@ -406,7 +405,7 @@ router.post('/save-random-rewards', async (req, res) => {
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
-    if (!auth) return res.status(400).json({ error: 'Twitch not configured' });
+    if (!auth) return res.status(400).json(message('twitchNotConfigured', {}, 'Twitch not configured'));
   }
 
   const results = [];

@@ -33,6 +33,7 @@ async function fetchSongs() {
   const songCol = process.env.SHEET_SONG_COLUMN || 'title';
   const artistCol = process.env.SHEET_ARTIST_COLUMN || 'artist';
   const keyCol = process.env.SHEET_KEY_COLUMN || 'key';
+  const urlCol = config.YT_LINK_HEADER;   // filled by the link finder
 
   if (!sheetId) {
     console.warn('[sheets] GOOGLE_SHEET_ID not set — using empty song list');
@@ -69,6 +70,7 @@ async function fetchSongs() {
       const titleIdx = headers.indexOf(songCol.toLowerCase());
       const artistIdx = headers.indexOf(artistCol.toLowerCase());
       const keyIdx = headers.indexOf(keyCol.toLowerCase().trim());
+      const urlIdx = headers.indexOf(urlCol.toLowerCase().trim());
 
       if (titleIdx === -1) {
         console.warn(
@@ -88,6 +90,7 @@ async function fetchSongs() {
             title: row[titleIdx].trim(),
             artist: artistIdx !== -1 ? (row[artistIdx] || '').trim() : '',
             key,
+            url: urlIdx !== -1 ? String(row[urlIdx] ?? '').trim() : '',
             tab: tabName,
           };
         });

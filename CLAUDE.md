@@ -55,21 +55,33 @@ vtuber-song-queue/
 │   ├── matcher.js         Fuse.js fuzzy matching with AUTO_ACCEPT_THRESHOLD
 │   ├── queue.js           Queue state, broadcast to clients, persisted to queue-state.json
 │   ├── random.js          Weighted/pure random picker with tab filter and cooldown
+│   ├── leihu.js           Optional link to Leihu Singsing (backing tracks + lyrics), song-links.json
+│   ├── link-finder.js     Finds YouTube links for the sheet (search job, review, writes the sheet)
+│   ├── link-score.js      Scores YouTube candidates against the lyric version (pure functions)
+│   ├── romaji.js          Matches romanized video titles to 漢字/かな song titles
+│   ├── data/han-readings.json  Pinyin + Japanese readings per 漢字 (generated from Unicode's Unihan)
 │   ├── history.js         Request history sheet (debounced 1.5s), startup snapshot
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
 │   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
 │   ├── media-history.js   Last played media, for !replay
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
+│   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk)
+├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
+│                          messages), i18n-viewer.js (overlay + clip player strings)
+├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
-├── dashboard/index.html   Streamer control panel — 4 columns, drag/drop, history, manual add, settings
+├── dashboard/index.html   Streamer control panel — 2×2 panels, drag/drop, history, manual add, ⚙ settings popover
+├── dashboard/links.html   YouTube link finder review page
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)
 │   ├── hls.min.js
 │   └── sponsor-bgs/       !tk background images (one picked at random each time)
 ├── test/                  node:test suite (`npm test`), stubs Google Sheets
+├── tools/find-videos.py   Lyric-site + YouTube search, run with Leihu Singsing's bundled Python
+├── tools/build-han-readings.js  Rebuilds server/data/han-readings.json from Unihan_Readings.txt
 ├── setup.ps1 / setup_zh.ps1   Terminal setup wizard (alternative to the web wizard)
 ├── start.ps1 / start_zh.ps1   Every-stream startup: starts server, opens browser when ready
 ├── *.bat                  Double-click launchers (avoid PowerShell execution-policy issues)
@@ -79,7 +91,8 @@ vtuber-song-queue/
 ```
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
-`setup-progress.json`, `queue-state.json`, `package-lock.json`, `.env` backups.
+`setup-progress.json`, `queue-state.json`, `song-links.json`, `link-search.json`, `package-lock.json`,
+`.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -117,7 +130,7 @@ vtuber-song-queue/
 - Cooldown uses live history; weighting uses the startup snapshot
 
 ### Google Sheets
-- Song list: read-only, all tabs loaded except `EXCLUDED_TABS` in config.js. Range strings
+- Song list: read-only, all tabs loaded except `EXCLUDED_TABS` (.env). Range strings
   quote the tab name (`'Rock ''n'' Roll'!A:Z`)
 - Column headers configurable in `.env`: `SHEET_SONG_COLUMN`, `SHEET_ARTIST_COLUMN`,
   `SHEET_KEY_COLUMN` (default `key`). Matching is case-insensitive
@@ -159,6 +172,131 @@ vtuber-song-queue/
   player can't skip the next item
 - Watchdog: if no end signal arrives within the expected length + 15s (e.g. no clip player
   open), the queue moves on by itself
+
+### Leihu Singsing integration (leihu.js) — optional
+- Leihu Singsing (雷虎練唱台, github.com/LeihuTW/Leihu-singsing) is a separate local app that
+  splits songs into backing tracks, transposes them and runs an OBS lyrics overlay. It's
+  third-party: we only call its existing API at `LEIHU_URL` (default `http://127.0.0.1:8765`)
+  and keep changes to it minimal
+- Polls its `/api/songs` + `/api/status` every 5s (30s while unreachable). Offline = no badges,
+  the queue works as before
+- A queue entry links to a Leihu song by **YouTube video ID** (sheet column `YTLink`
+  vs Leihu's `source_url`), or by a manual link picked on the dashboard and saved in
+  `song-links.json` (key `title|artist` lowercased → Leihu song ID), for audio-file imports
+- Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
+  Leihu) / link broken / link. "No lyrics": Leihu 1.4.7+ finishes processing with blank lyrics
+  when its recognition is unreliable — the streamer picks online lyrics in Leihu
+- Online lyrics for songs **we** imported (Prepare, auto-prepare, "Check with Leihu", Queue +
+  prepare) or whose video is a sheet `YTLink`, once per song per server run (`fillMissingLyrics`):
+  - when Leihu left the lyrics blank (`nolyrics`), or
+  - when Leihu kept its own recognition but flags online lyrics (`lyricsSource` `whisper` +
+    `lyricsPending`, Leihu's "有線上歌詞可選") — then the candidate's `similarity` to the
+    recognition must also be ≥ 0.5
+  - The candidate (`lyricFits`): timed lyrics, ≤ 3 s from the audio, the sheet's title (brackets
+    ignored; Leihu's `title_match` also counts, as it converts 来 → 來), the sheet's artist (one
+    character may differ: 松任谷由實 / 松任谷由実). First from the candidates Leihu saved
+    (`/lyrics/candidates`), else Leihu's search by sheet title + artist (`/lyrics/search?q=`),
+    applied with `POST /lyrics/apply`. Lyrics picked in Leihu are never replaced
+- Imports set Leihu's per-song recognition language from the sheet tab
+  (`LEIHU_TAB_LANGUAGES` in config.js; 台語 stays automatic). Needs Leihu 1.4.7+
+- Sing button (Now Playing): asks Leihu's practice window to open the song at the sheet key.
+  Needs Leihu 1.5.2+ (`/api/remote/open`, upstreamed from our former `remote-open` branch);
+  shown only when Leihu's `/api/status` has a `remote` field
+- `LEIHU_AUTO_PREPARE=1` (dashboard toggle): imports missing queued songs via Leihu's
+  `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
+  request is sent once per server run. Keys outside whole semitones ±6 are skipped
+- Failed Leihu jobs: `/api/status` keeps each job's `error` for ~10 min; leihu.js passes it on as
+  `failure: { reason, blocked }` (dashboard badge tooltip, "Check with Leihu" result). `blocked` =
+  YouTube's "confirm you're not a bot" refusal of yt-dlp — a temporary block on the PC's
+  connection; Leihu cuts the message, so `youtubeBlocked()` matches any part. Fix for users is in
+  SETUP ("YouTube blocks downloads": wait, or `--cookies-from-browser firefox` in yt-dlp's own
+  config file — no Leihu change)
+- Leihu's import returns an error for duplicates only after the download step — never send
+  the same video twice; the `requested` map in leihu.js prevents it
+
+### YouTube link finder (link-finder.js, link-score.js, tools/find-videos.py)
+- Owns the sheet's YouTube link column: header `YTLink` (`YT_LINK_HEADER` in config.js), never
+  configured in `.env` or the wizard. Fills it for songs without a link; a tab without the
+  column is still searched, and gets the column (right after its last used header, growing
+  the grid if needed) the first time links are saved there. Review page: `/dashboard/links.html`
+- Search: `tools/find-videos.py` runs with **Leihu's bundled Python** (`<root>/python/python.exe`,
+  root from Leihu's `/api/status`, so Leihu must be running) and calls Leihu's own
+  `search_lrclib/netease/kugou`, `_norm`, `to_simplified` and yt-dlp (`ytsearch10`, metadata
+  only). Zero changes to Leihu; the helper refuses to run if those functions are missing.
+  JSON lines in/out. ~7.5 s per song (LRCLIB often errors from here; NetEase/Kugou carry 中文).
+  A YouTube search that comes back empty is retried as artist + title, then simplified Chinese,
+  then the title alone (YouTube sometimes finds nothing for the exact "title artist")
+- Scoring (link-score.js): reference length = the lyric-result length (exact title, artist
+  preferred) with the most support from other lyric results and videos. Tiers match Leihu:
+  ≤3 s exact (timed lyrics used as-is), ≤25 s and 0.8–1.25 ratio workable (Leihu re-times),
+  else off. Bonuses: "- Topic" channels, official/label channels, artist spelled as on the lyric
+  sites. Penalties: live, TV show, cover, instrumental/伴奏, remix, compilation, fan edit,
+  karaoke, other-language version (allowed when it is the tab's language; never offered otherwise)
+- Romanized titles (romaji.js): a run of whole Latin words in the video title that spells the
+  sheet title counts as a title match — each 漢字 by pinyin or any Japanese reading (一青窈's
+  四照花 is "Shishouka"), かな as written, loosely (Hepburn/Kunrei, long vowels, doubling,
+  rendaku, okurigana, particles は/へ). Needs ≥ 2 漢字/かな. Tagged "romanized title", so it is
+  offered but never confident (a 國語 song's Japanese original can spell the same 漢字)
+- Groups: confident (top pick is exact length, no penalties, artist matches, and official —
+  or a fan upload with ≥ `LINK_CONFIDENT_FAN_VIEWS` views) / needs a look / nothing found
+- State in `link-search.json` (raw search results + decisions): restarts resume, and scoring
+  is recomputed from the raw results, so scoring changes need no new search
+- Editor access is asked for on the review page, not in the wizard (the song list itself only
+  needs view access, and finished setups never see the wizard again): a "Step 1" card shows
+  the service-account email (copy button) and a link to the sheet; "Check access" runs the
+  no-op A1 write and keeps the result in `link-search.json` (per sheet ID), after which the card
+  shrinks to one line. Never checked on page load — even a no-op write can appear in the sheet's
+  version history. Searching and reviewing work without access; Save is disabled until checked
+- Saving: proves Editor access again with a no-op write of A1 (a protected tab/range gets its
+  own readable error), re-reads the sheet, finds each row
+  again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW).
+  Songs skipped for a filled cell (`noteCellFilled`) are tried again on every save, so clearing
+  the cell in the sheet is enough; the Save button counts them.
+  Songs are read from A:Z, so a tab already using all 26 columns can't get the column added
+- "Check with Leihu": imports the video into Leihu (language from the tab), waits for
+  processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
+  is unreliable (usual for 台語). Adds the song to Leihu's library
+
+### Songs not on the sheet (Pending Review → 🔍 Find)
+- Button only (no automatic search). `linkFinder.identify(text)` runs find-videos.py for the
+  viewer's text (or the card's edited title + artist), apart from the search job (`searchOne`).
+  `pickSong` groups lyric results whose title the text contains (or that contain the text) by
+  title + artist and scores text coverage, agreeing results and videos; display names prefer the
+  viewer's spelling, then LRCLIB, Kugou, NetEase. When the artist wasn't typed, a second search by
+  title + artist adds the official uploads a title-only search misses. Videos scored by link-score.js
+- Result stored on the pending entry as `found` (`searching` / `done` / `failed`; a restart turns
+  `searching` into failed), broadcast with the queue state; `updatePending` ignores entries no
+  longer pending. Routes check `addedAt` so a changed list never acts on another request
+- "Queue + prepare": queues the request, then `leihu.importForSong` imports the video (unless Leihu
+  has it) and saves a manual link (song-links.json) under title + artist. Language: kana → 日語
+  (`guessTab`); Chinese characters stay automatic (can't tell 國語 from 台語). Nothing is imported
+  before the streamer accepts
+- "Add to <tab>": `linkFinder.addToSheet` appends title, artist and YTLink to the first
+  `EXCLUDED_TABS` tab (creating YTLink there if missing); skips a song already in that tab; needs
+  Editor access. The request stays pending, marked `addedTo`
+
+### Languages: English + 繁體中文 (shared/i18n.js)
+- Every web page is in English and Traditional Chinese (Taiwan). Strings live in tables:
+  `shared/i18n-*.js`, `dashboard/i18n-*.js`, and the wizard's own `setup/i18n.js`. Each table file
+  registers itself in the browser and `module.exports` itself in Node, for the tests
+- Look-ups: `I18N.t(key, params)` (`{name}` placeholders, or a function for plurals),
+  `I18N.tHtml` (escapes params for innerHTML), `data-i18n` / `data-i18n-html` / `-title` /
+  `-placeholder` / `-aria-label` attributes for fixed markup, `I18N.onChange` to redraw
+- Streamer pages (dashboard, links, wizard): EN / 中文 switch; one saved choice
+  (localStorage `ui_lang`, the wizard's old `setup_lang` is read once); first visit follows the
+  browser language (zh* → zh-TW, else en); `?lang=` overrides
+- Viewer pages (overlay, clip player in OBS): no switch — the dashboard's ⚙ "Overlay language"
+  setting (`OVERLAY_LANGUAGE` in `.env`, default `en`), pushed live over the WebSocket. Clip labels
+  are sent as `labelKey` (`shoutout` / `watching`) next to the English `label`. The `!tk`
+  sponsor roll stays Japanese by design
+- Server messages: user-facing errors and notes carry a `code` (+ `params`) from
+  `server/messages.js` (`UserError`, `message()`, `errorBody()`); pages show
+  `I18N.server(body)` — the translation from `shared/i18n-server.js`, else the English text.
+  Stored notes keep `noteCode` / `errorCode` next to the text. Console logs stay English
+- `test/i18n.test.js` fails when a key or placeholder is missing in one language, a page
+  uses an unknown key, or the server sends a code without a translation
+- zh-TW terms (match the wizard and SETUP_zh_TW.md): 正在演唱 / 待唱歌單 / 已唱歌單 / 待審核,
+  唱完了, 雷虎練唱台 for Leihu Singsing, KEY for the key
 
 ---
 
@@ -206,12 +344,28 @@ register it in index.js.
 | POST | `/api/delete` | Delete song `{zone, index}` — zone: nowPlaying/queue/played/pending |
 | POST | `/api/move` | Move song `{fromZone, fromIndex, toZone, toIndex}` |
 | POST | `/api/accept-pending` | Accept pending entry `{index, title, artist}` or `{index, candidateIndex}` → queue |
+| POST | `/api/pending/identify` | Search lyric sites + YouTube for a pending request `{index, addedAt, text?}`; result lands in its `found` |
+| POST | `/api/pending/queue-found` | Queue it and prepare the video in Leihu `{index, addedAt, title, artist, videoId}` |
+| POST | `/api/pending/add-to-sheet` | Add it with its link to the first excluded tab `{index, addedAt, title, artist, videoId?}` |
 | POST | `/api/redraw` | Re-pick a random song in place `{zone, index}` (keeps its tab filter) |
 | POST | `/api/refresh-songs` | Force re-fetch song list from Google Sheets |
 | GET | `/api/songs` | Full song list (for dashboard autocomplete) |
 | GET | `/api/history` | Request history snapshot (startup state) |
-| GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness |
+| GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness, overlay language, Leihu auto-prepare |
 | GET | `/api/hls`, `/api/clip-stream` | Proxies for Twitch clip playback (Twitch hosts only) |
+| GET | `/api/leihu/status` | Leihu state of nowPlaying + queue, keyed by title + artist |
+| GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
+| POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
+| POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
+| POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
+| GET | `/api/links` | Link finder: job progress + scored songs for review |
+| POST | `/api/links/start` | Search songs without a link `{limit?}` (resumes) |
+| POST | `/api/links/stop` | Stop the search |
+| POST | `/api/links/decide` | `{key, decision: 'accepted' \| 'skipped' \| null, videoId}` (videoId: ID or any YouTube link) |
+| POST | `/api/links/accept-confident` | Accept every confident pick |
+| POST | `/api/links/access` | Check Editor access to the song sheet (no-op write) → `{canEdit, checked, error}` |
+| POST | `/api/links/save` | Write accepted links into empty sheet cells |
+| POST | `/api/links/check` | Verify a candidate with Leihu `{key, videoId}` (imports it) |
 
 Setup wizard (`/setup/api/*`): `status`, `validate-client-id`, `start-device-auth`,
 `poll-device-auth`, `rewards`, `create-rewards`, `upload-credentials`, `validate-sheet`,
@@ -230,21 +384,27 @@ See `.env.example` for full descriptions.
 - `GOOGLE_SHEET_ID` — song list sheet
 - `SHEET_SONG_COLUMN` / `SHEET_ARTIST_COLUMN` / `SHEET_KEY_COLUMN` — column headers (e.g. `曲名`, `歌手名`, `key`)
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
+- `EXCLUDED_TABS` — tabs left out of requests, random picks and the link finder, comma-separated.
+  Unset = `待練勿點`; empty = none. Read through `config.EXCLUDED_TABS` (a getter, so it follows .env)
 - `PORT` — default 3000
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
-- `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS` — also adjustable from the dashboard
+- `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS`, `OVERLAY_LANGUAGE` (`en` / `zh-TW`) — also adjustable from the dashboard
+- `LEIHU_URL` — Leihu Singsing address (default `http://127.0.0.1:8765`)
+- `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
 
 ---
 
 ## Tuneable settings (server/config.js)
 
-- `EXCLUDED_TABS` — sheet tabs to skip
+- `YT_LINK_HEADER` — header of the YouTube link column the link finder creates and fills (`YTLink`)
+- `LINK_CONFIDENT_FAN_VIEWS` — views a fan upload needs to count as a confident pick (1,000,000; 0 = never)
 - `SHEET_REFRESH_INTERVAL_MS` — how often to re-read the sheet (default 5min)
 - `AUTO_ACCEPT_THRESHOLD` — confidence % for auto-queue vs pending (default 80)
 - `MATCH_THRESHOLD` — fuse.js strictness 0-1 (default 0.4)
 - `MATCH_TITLE_WEIGHT` / `MATCH_ARTIST_WEIGHT` — matching weights
 - `RANDOM_NEVER_REQUESTED_WEIGHT` — weight for songs never requested (default 365)
 - `RANDOM_MAX_DAYS_WEIGHT` — weight cap for old songs (default 180)
+- `LEIHU_TAB_LANGUAGES` — Leihu recognition language per sheet tab
 
 ---
 
@@ -263,7 +423,8 @@ See `.env.example` for full descriptions.
 - Tests stub `sheets.js` / `history.js` through `test/helpers.js` so they never touch Google,
   Twitch or the real `.env`
 - Don't add tests that load `queue.js` or `sheets.js` unstubbed from the repo root: they write
-  `queue-state.json` / `song-cache.json` there
+  `queue-state.json` / `song-cache.json` there. Tests point `LEIHU_LINKS_FILE` at a temp file so
+  `song-links.json` is never touched
 
 ---
 
