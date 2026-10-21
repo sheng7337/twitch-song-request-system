@@ -186,11 +186,17 @@ vtuber-song-queue/
 - Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
   Leihu) / link broken / link. "No lyrics": Leihu 1.4.7+ finishes processing with blank lyrics
   when its recognition is unreliable — the streamer picks online lyrics in Leihu
-- Blank lyrics on songs **we** imported (Prepare, auto-prepare, "Check with Leihu"; tracked
-  per server run) are filled once: a Leihu lyric candidate with timed lyrics, the sheet's title
-  (brackets ignored), the sheet's artist and ≤ 3 s from the audio — first from the candidates
-  Leihu saved (`/lyrics/candidates`), else Leihu's search by sheet title + artist
-  (`/lyrics/search?q=`), applied with `POST /lyrics/apply`. Lyrics Leihu set are never replaced
+- Online lyrics for songs **we** imported (Prepare, auto-prepare, "Check with Leihu", Queue +
+  prepare) or whose video is a sheet `YTLink`, once per song per server run (`fillMissingLyrics`):
+  - when Leihu left the lyrics blank (`nolyrics`), or
+  - when Leihu kept its own recognition but flags online lyrics (`lyricsSource` `whisper` +
+    `lyricsPending`, Leihu's "有線上歌詞可選") — then the candidate's `similarity` to the
+    recognition must also be ≥ 0.5
+  - The candidate (`lyricFits`): timed lyrics, ≤ 3 s from the audio, the sheet's title (brackets
+    ignored; Leihu's `title_match` also counts, as it converts 来 → 來), the sheet's artist (one
+    character may differ: 松任谷由實 / 松任谷由実). First from the candidates Leihu saved
+    (`/lyrics/candidates`), else Leihu's search by sheet title + artist (`/lyrics/search?q=`),
+    applied with `POST /lyrics/apply`. Lyrics picked in Leihu are never replaced
 - Imports set Leihu's per-song recognition language from the sheet tab
   (`LEIHU_TAB_LANGUAGES` in config.js; 台語 stays automatic). Needs Leihu 1.4.7+
 - Sing button (Now Playing): asks Leihu's practice window to open the song at the sheet key.
@@ -217,7 +223,9 @@ vtuber-song-queue/
   root from Leihu's `/api/status`, so Leihu must be running) and calls Leihu's own
   `search_lrclib/netease/kugou`, `_norm`, `to_simplified` and yt-dlp (`ytsearch10`, metadata
   only). Zero changes to Leihu; the helper refuses to run if those functions are missing.
-  JSON lines in/out. ~7.5 s per song (LRCLIB often errors from here; NetEase/Kugou carry 中文)
+  JSON lines in/out. ~7.5 s per song (LRCLIB often errors from here; NetEase/Kugou carry 中文).
+  A YouTube search that comes back empty is retried as artist + title, then simplified Chinese,
+  then the title alone (YouTube sometimes finds nothing for the exact "title artist")
 - Scoring (link-score.js): reference length = the lyric-result length (exact title, artist
   preferred) with the most support from other lyric results and videos. Tiers match Leihu:
   ≤3 s exact (timed lyrics used as-is), ≤25 s and 0.8–1.25 ratio workable (Leihu re-times),
@@ -242,6 +250,8 @@ vtuber-song-queue/
 - Saving: proves Editor access again with a no-op write of A1 (a protected tab/range gets its
   own readable error), re-reads the sheet, finds each row
   again by tab + title + artist, writes only **empty** link cells (`values.batchUpdate`, RAW).
+  Songs skipped for a filled cell (`noteCellFilled`) are tried again on every save, so clearing
+  the cell in the sheet is enough; the Save button counts them.
   Songs are read from A:Z, so a tab already using all 26 columns can't get the column added
 - "Check with Leihu": imports the video into Leihu (language from the tab), waits for
   processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
@@ -413,7 +423,8 @@ See `.env.example` for full descriptions.
 - Tests stub `sheets.js` / `history.js` through `test/helpers.js` so they never touch Google,
   Twitch or the real `.env`
 - Don't add tests that load `queue.js` or `sheets.js` unstubbed from the repo root: they write
-  `queue-state.json` / `song-cache.json` there
+  `queue-state.json` / `song-cache.json` there. Tests point `LEIHU_LINKS_FILE` at a temp file so
+  `song-links.json` is never touched
 
 ---
 

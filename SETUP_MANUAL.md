@@ -64,7 +64,8 @@ Your existing sheet with songs. The server reads it at startup and every 5 minut
 - Must have a header row with at least a title column and an artist column
 - Column names must match `SHEET_SONG_COLUMN` and `SHEET_ARTIST_COLUMN` in `.env`
 - Optional: a `key` column with numeric values (e.g. `3`, `-2`) for key transposition display
-- Share the sheet with your service account email → **Viewer** access
+- Share the sheet with your service account email → **Viewer** access (**Editor** if you want the
+  dashboard's YouTube link finder to save links into it — see `SETUP.md`)
 
 **Example sheet layout:**
 
@@ -120,7 +121,7 @@ authorize it from any browser:
 ```powershell
 $res = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
   client_id = "YOUR_CLIENT_ID"
-  scopes    = "channel:read:redemptions channel:manage:redemptions"
+  scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat"
 }
 $res.user_code        # e.g. ABCD-1234
 ```
@@ -205,6 +206,10 @@ a WebSocket, so nothing needs to be publicly reachable.
 6. In your scene, select the source and resize it down to `480 x 681` (50%) —
    this is what makes the 2× render look sharper instead of just bigger
 
+For the chat commands (`!so`, `!watch`, `!tk`), add a second Browser source:
+`http://localhost:3000/clip-player/index.html`, `1920 x 1080`, on top of the scene. It stays
+transparent until something plays.
+
 ---
 
 ## Step 7 — Run it
@@ -216,14 +221,20 @@ npm start
 Expected output:
 ```
 🎵 VTuber Song Queue starting...
-[sheets] Loaded 180 songs from Google Sheet (3 tabs)
+
+[sheets] Loaded 180 songs from 國語, 台語, 日語 (120 with key)
 [history] Loaded 42 songs from history sheet
-[twitch] EventSub WebSocket connected — session established
-[twitch] Subscribed to channel point redemptions
+
 ✅ Server running at http://localhost:3000
-   Overlay URL:  http://localhost:3000/overlay/index.html
-   Dashboard:    http://localhost:3000/dashboard
+   Dashboard:  http://localhost:3000/dashboard
+   Overlay:    http://localhost:3000/overlay/index.html
+
+[twitch] EventSub WebSocket connected
+[twitch] Subscribed to Channel Points redemptions
+[twitch] Subscribed to chat messages
 ```
+
+(The order of the lines may differ a little.)
 
 ---
 
@@ -266,8 +277,8 @@ Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/refresh-songs
 | File | What to change |
 |---|---|
 | `.env` | Credentials, IDs, URLs — see `.env.example` for descriptions |
-| `server/config.js` | Matching thresholds, excluded tabs, scroll speed, random weights |
-| `overlay/index.html` | CSS variables at top — font sizes, list height |
+| `server/config.js` | Matching thresholds, random weights, Leihu recognition language per tab |
+| `overlay/index.html` | CSS variables at top — font sizes, list height; `SCROLL_PX_PER_SEC` — scroll speed |
 
 ---
 
@@ -293,33 +304,10 @@ Fine-tune weights in `server/config.js` (`RANDOM_NEVER_REQUESTED_WEIGHT`, `RANDO
 
 ---
 
-## File structure
+## More
 
-```
-vtuber-song-queue/
-├── setup/                    ← browser-based setup wizard (served at /setup)
-├── setup.ps1                 ← automated terminal setup wizard
-├── start.ps1                 ← automated stream startup
-├── start.bat / setup.bat     ← double-click launchers (avoid PowerShell execution policy issues)
-├── .env                      ← secrets (never commit!)
-├── .env.example              ← template with descriptions
-├── google-credentials.json   ← service account key (never commit!)
-├── song-cache.json           ← auto-generated, safe to delete
-├── server/
-│   ├── index.js              ← main server
-│   ├── config.js             ← tuneable behaviour settings
-│   ├── sheets.js             ← song list reader
-│   ├── matcher.js            ← fuzzy matching
-│   ├── queue.js              ← queue state + WebSocket
-│   ├── twitch.js             ← EventSub WebSocket client + Device Auth token handling
-│   ├── setup-routes.js       ← API endpoints behind the setup wizard
-│   ├── history.js            ← request history writer
-│   └── random.js             ← random song picker
-├── overlay/
-│   └── index.html            ← OBS browser source
-└── dashboard/
-    └── index.html            ← streamer control panel
-```
+The dashboard, chat commands, Leihu Singsing integration, YouTube link finder and file
+structure are described in `SETUP.md`.
 
 ---
 
@@ -329,4 +317,3 @@ vtuber-song-queue/
 - History sheet **updates within ~2 seconds** of each request
 - The user access token **refreshes itself automatically** and rewrites `.env` — you
   should never need to repeat the Device Authorization step
-- Want it running 24/7 without your PC on? Deploy to Railway or Render
