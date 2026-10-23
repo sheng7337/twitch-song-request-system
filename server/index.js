@@ -440,6 +440,15 @@ app.post('/api/leihu/open', async (req, res) => {
   }
 });
 
+// Prepare every sheet song with a YouTube link in Leihu, one at a time (leihu.js startBulk)
+app.post('/api/leihu/bulk', async (req, res) => {
+  try {
+    res.json(req.body.action === 'stop' ? leihu.stopBulk() : await leihu.startBulk());
+  } catch (err) {
+    res.status(400).json(err.messageCode ? errorBody(err) : { error: err.response?.data?.error || err.message });
+  }
+});
+
 // ── YouTube link finder (fills the YTLink column, see link-finder.js) ────────
 app.get('/api/links', (req, res) => res.json(linkFinder.getView()));
 app.post('/api/links/start', async (req, res) => res.json(await linkFinder.start({ limit: Number(req.body.limit) || 0 })));

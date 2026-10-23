@@ -217,6 +217,15 @@ vtuber-song-queue/
   limit) is failed with `failure.paused` and the pause reason. Clicking a failed badge
   (`/api/leihu/prepare`, retry) calls `POST /api/songs/<id>/redownload` for an unfinished
   download, so Leihu retries the same song instead of adding a new one
+- Dashboard settings → "Get your song list ready in Leihu": step ① links to the link finder
+  (links.html), step ② "Prepare songs in Leihu" (`startBulk` in leihu.js); each shows counts from
+  `sheet: { songs, linked, todo }` in `/api/leihu/status` (`sheetCounts`). Step ② sends every
+  sheet song with a YouTube link that Leihu hasn't finished (not manually linked; failed /
+  cancelled / paused downloads are retried in place). One song at a time from `tick()`: the next
+  only when Leihu has no queued/running job (stream songs go first) and `LEIHU_BULK_GAP_MS`
+  (default 30 s) after the last finished. Stops as `paused` when Leihu reports `yt_pause.on`;
+  starting again calls Leihu's `POST /api/youtube/resume` and carries on. Progress is
+  `bulk` in `/api/leihu/status`; it lives in memory only, so a restart ends the run
 - Leihu's import returns an error for duplicates only after the download step — never send
   the same video twice; the `requested` map in leihu.js prevents it
 
@@ -366,6 +375,7 @@ register it in index.js.
 | GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
 | POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
+| POST | `/api/leihu/bulk` | Prepare all sheet songs in Leihu `{action: 'start' \| 'stop'}` → bulk status |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
 | GET | `/api/links` | Link finder: job progress + scored songs for review |
 | POST | `/api/links/start` | Search songs without a link `{limit?}` (resumes) |

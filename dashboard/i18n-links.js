@@ -18,7 +18,9 @@
         'lyrics Leihu Singsing can find — so its backing track and timed lyrics line up. Nothing is written ' +
         'to your sheet until you accept a video and press <b>Save to sheet</b>. Links go into a <b>YTLink</b> column, ' +
         'which is added to a tab the first time you save links there; filled cells are never changed. ' +
-        'Leihu Singsing must be running.',
+        'Leihu Singsing must be running.' +
+        '<br><b>Next step:</b> after saving, go back to the dashboard → ⚙ Settings → ' +
+        '<b>② Prepare the songs in Leihu</b> to download them all.',
       job: {
         searching: ({ done, total, current, min }) => `Searching ${done} / ${total}${current ? ' — ' + current : ''} (about ${min} min left)`,
         found: ({ n }) => `${n} songs found so far`,
@@ -105,7 +107,8 @@
       intro: '幫試算表裡沒有 YouTube 連結的歌曲，找出錄音版本和雷虎練唱台找得到的歌詞相符的影片，' +
         '讓伴奏和同步歌詞對得上。在你接受影片並按下<b>存入試算表</b>之前，不會寫入任何東西。' +
         '連結會寫進 <b>YTLink</b> 欄位，第一次在某個分頁儲存時會自動新增這個欄位；已經有內容的格子不會被更改。' +
-        '需要先開啟雷虎練唱台。',
+        '需要先開啟雷虎練唱台。' +
+        '<br><b>下一步：</b>儲存後回到控制台 → ⚙ 設定 → <b>② 在雷虎練唱台準備這些歌</b>，把它們全部下載下來。',
       job: {
         searching: ({ done, total, current, min }) => `搜尋中 ${done} / ${total}${current ? ' — ' + current : ''}（大約還要 ${min} 分鐘）`,
         found: ({ n }) => `目前找到 ${n} 首`,

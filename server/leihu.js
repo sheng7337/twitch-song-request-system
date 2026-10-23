@@ -22,6 +22,7 @@ const { UserError } = require('./messages');
 const LINKS_PATH = process.env.LEIHU_LINKS_FILE || path.join(__dirname, '..', 'song-links.json');   // tests use a temp file
 const POLL_MS = 5000;
 const OFFLINE_POLL_MS = 30000;
+const BULK_GAP_MS = Number(process.env.LEIHU_BULK_GAP_MS || 30000);   // pause between bulk downloads
 
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
@@ -310,9 +311,118 @@ async function prepare(entry, { retry = false } = {}) {
   }
 }
 
+// ── Prepare the whole sheet ("Prepare all" in the dashboard's Leihu settings) ──
+// Sends the sheet's songs that Leihu doesn't have yet one at a time: the next one only
+// when Leihu has no job queued or running and BULK_GAP_MS after the last one finished,
+// so songs queued on stream never wait behind a long batch and YouTube sees a slow,
+// steady trickle. Stops when Leihu pauses its downloads for a YouTube limit.
+const bulk = { state: 'idle', total: 0, done: 0, failed: 0, todo: [], current: null, reason: '', nextAt: 0 };
+
+// Sheet songs with a YouTube link that Leihu hasn't finished: { vid, title, artist, tab, retryId }
+function bulkTodo() {
+  const seen = new Set();
+  const out = [];
+  for (const s of getSongs()) {
+    const vid = videoId(s.url);
+    if (!vid || seen.has(vid) || links[songKey(s.title, s.artist)]) continue;
+    seen.add(vid);
+    const song = (library || []).find(m => m.videoId === vid);
+    if (song && !song.dlState) continue;                                   // imported (or being processed)
+    if (song && (song.dlState === 'queued' || activeJobs.has(song.id))) continue;   // already waiting in Leihu
+    out.push({ vid, title: s.title, artist: s.artist, tab: s.tab, retryId: song ? song.id : null });
+  }
+  return out;
+}
+
+// For the dashboard's two "get your song list ready" steps: sheet songs, how many have a
+// YouTube link, and how many of those Leihu still needs (null while Leihu is offline).
+function sheetCounts() {
+  const songs = getSongs();
+  const linked = songs.filter(s => videoId(s.url)).length;
+  return { songs: songs.length, linked, todo: library ? bulkTodo().length : null };
+}
+
+async function startBulk() {
+  await refresh();
+  if (!library) throw new UserError('leihuOffline', {}, 'Leihu Singsing is not running');
+  if (bulk.state === 'running') return bulkStatus();
+  // Starting again after a YouTube pause is the streamer saying the limit has cleared
+  if (ytPause && ytPause.on) {
+    await axios.post(`${baseUrl()}/api/youtube/resume`, {}, { timeout: 10000 })
+      .catch(err => console.error('[leihu] Could not resume YouTube downloads:', err.message));
+  }
+  const todo = bulkTodo();
+  Object.assign(bulk, { state: todo.length ? 'running' : 'done', total: todo.length, done: 0, failed: 0,
+    todo, current: null, reason: '', nextAt: 0 });
+  console.log(`[leihu] Preparing ${todo.length} sheet songs in Leihu, one at a time`);
+  return bulkStatus();
+}
+
+function stopBulk() {
+  if (bulk.state === 'running' || bulk.state === 'paused') {
+    bulk.state = 'stopped';
+    bulk.todo = [];
+    console.log('[leihu] Stopped preparing the sheet');
+  }
+  return bulkStatus();
+}
+
+function bulkStatus() {
+  const { state, total, done, failed, reason } = bulk;
+  return { state, total, done, failed, left: bulk.todo.length + (bulk.current ? 1 : 0), reason,
+    current: bulk.current ? bulk.current.title : null };
+}
+
+async function bulkStep() {
+  if (bulk.state !== 'running' || !library) return;
+  const cur = bulk.current;
+  if (cur) {
+    const song = library.find(m => m.videoId === cur.vid);
+    const st = song ? songState(song) : (Date.now() - cur.sentAt > 60000 ? 'failed' : 'processing');
+    if (st === 'processing') return;
+    if (song && song.dlState === 'paused') {
+      bulk.todo.unshift({ ...cur, retryId: song.id });   // Leihu keeps it paused; try it first next time
+    } else if (st === 'failed') {
+      bulk.failed++;
+      console.log(`[leihu] Preparing "${cur.title}" failed — moving on`);
+    } else {
+      bulk.done++;
+    }
+    bulk.current = null;
+    bulk.nextAt = Date.now() + BULK_GAP_MS;
+  }
+  if (ytPause && ytPause.on) {
+    bulk.state = 'paused';
+    bulk.reason = ytPause.reason || '';
+    console.log('[leihu] YouTube is limiting downloads — stopped preparing the sheet');
+    return;
+  }
+  if (activeJobs.size || Date.now() < bulk.nextAt) return;   // Leihu busy (stream songs go first) or resting
+  const next = bulk.todo.shift();
+  if (!next) {
+    bulk.state = 'done';
+    console.log(`[leihu] Finished preparing the sheet: ${bulk.done} ready, ${bulk.failed} failed`);
+    return;
+  }
+  bulk.current = { ...next, sentAt: Date.now() };
+  try {
+    if (next.retryId) {
+      await axios.post(`${baseUrl()}/api/songs/${next.retryId}/redownload`, {}, { timeout: 10000 });
+    } else {
+      await importVideo(next.vid, next.tab, next);
+    }
+    console.log(`[leihu] Preparing "${next.title}" (${bulk.total - bulk.todo.length}/${bulk.total})`);
+  } catch (err) {
+    console.error(`[leihu] Could not send "${next.title}" to Leihu:`, err.response?.data?.error || err.message);
+    bulk.failed++;
+    bulk.current = null;
+  }
+}
+
 async function tick() {
   await refresh();
   await fillMissingLyrics();
+  await bulkStep().catch(err => console.error('[leihu] Preparing the sheet:', err.message));
   if (library && autoPrepareEnabled()) {
     const { nowPlaying, queue } = getState();
     for (const entry of [nowPlaying, ...queue]) {
@@ -333,7 +443,7 @@ function getStatus() {
   for (const entry of [nowPlaying, ...queue]) {
     if (entry && entry.title) songs[songKey(entry.title, entry.artist)] = statusFor(entry.title, entry.artist);
   }
-  return { online: !!library, canOpen, autoPrepare: autoPrepareEnabled(), songs };
+  return { online: !!library, canOpen, autoPrepare: autoPrepareEnabled(), songs, bulk: bulkStatus(), sheet: sheetCounts() };
 }
 
 function getLibrary() {
@@ -389,4 +499,5 @@ async function open(entry) {
 module.exports = {
   start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
   fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
+  startBulk, stopBulk, bulkStatus, bulkStep, sheetCounts,
 };

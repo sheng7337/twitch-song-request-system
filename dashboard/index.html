@@ -119,6 +119,11 @@
   .setting-name { width: 120px; flex-shrink: 0; }
   .setting input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--purple); }
   .setting-hint { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .step { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .step-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .step-status { font-size: 13px; color: var(--amber); }
+  .step-status.ok { color: var(--green); }
+  .step-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
   .link-btn {
     align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer;
     font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--purple); text-decoration: underline;
@@ -636,9 +641,28 @@
         </label>
         <p class="setting-hint" data-i18n="dash.set.autoPrepareHint">Imports queued songs from the sheet's YouTube link and renders their key ahead of time. Uses the GPU during stream.</p>
       </section>
-      <section>
-        <h3 data-i18n="dash.set.toolsTitle">Tools</h3>
-        <a class="btn" style="text-decoration:none; align-self:flex-start" href="/dashboard/links.html" data-i18n="dash.set.links">🔗 Find YouTube links for the sheet</a>
+      <section id="settings-ready">
+        <h3 data-i18n="dash.set.readyTitle">Get your song list ready in Leihu</h3>
+        <p class="setting-hint" data-i18n="dash.set.readyIntro">Leihu Singsing makes a backing track and timed lyrics from each song's YouTube video. Do these two steps once (and again after adding songs to the sheet), so requested songs are ready to sing right away.</p>
+        <div class="step">
+          <div class="step-title" data-i18n="dash.set.step1Title">① Find a YouTube link for each song</div>
+          <div class="step-status" id="step1-status" hidden></div>
+          <p class="setting-hint" data-i18n="dash.set.step1Hint">On that page press “Search songs without a link”: it finds the right video for each song that has no link yet, lets you check the picks, and saves them in the sheet's YTLink column. Songs that already have a link are left as they are.</p>
+          <div class="step-buttons">
+            <a class="btn" style="text-decoration:none" href="/dashboard/links.html" data-i18n="dash.set.links">🔗 Find YouTube links</a>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-title" data-i18n="dash.set.step2Title">② Prepare the songs in Leihu</div>
+          <div class="step-status" id="step2-status" hidden></div>
+          <p class="setting-hint" data-i18n="dash.set.bulkHint">Downloads each linked song Leihu doesn't have yet and makes its backing track and lyrics. Songs without a link are skipped, so do step ① first. It takes a few minutes per song and uses the GPU, so it's best started when you're not streaming.</p>
+          <div class="step-buttons">
+            <button class="btn" id="bulk-start" onclick="bulkAction('start')" data-i18n="dash.set.bulkStart">⬇ Prepare songs in Leihu</button>
+            <button class="btn" id="bulk-stop" onclick="bulkAction('stop')" hidden data-i18n="dash.set.bulkStop">■ Stop</button>
+          </div>
+          <p class="setting-hint" id="bulk-progress" hidden></p>
+          <p class="setting-hint" data-i18n="dash.set.bulkSafe">Safe to leave running: one song at a time and only while Leihu is idle, so requested songs go first. If YouTube starts limiting downloads it stops by itself; press the button again a few hours later to continue.</p>
+        </div>
       </section>
     </div>
   </div>
@@ -1489,6 +1513,53 @@ async function pollLeihu() {
     leihuStatus = { online: false, songs: {} };
   }
   paintBadges();
+  paintBulk();
+}
+
+// "Get your song list ready" steps: sheet counts (leihu.js sheetCounts) and progress (bulkStatus)
+function paintBulk() {
+  const b = leihuStatus.bulk || { state: 'idle' };
+  const c = leihuStatus.sheet || null;
+  const running = b.state === 'running';
+  const step = (id, key, p, ok) => {
+    const el = document.getElementById(id);
+    el.hidden = !key;
+    el.textContent = key ? t(key, p) : '';
+    el.classList.toggle('ok', !!ok);
+  };
+  if (!c || !c.songs) step('step1-status', c ? 'dash.set.step1.empty' : null, {});
+  else if (c.linked < c.songs) step('step1-status', 'dash.set.step1.some', { linked: c.linked, songs: c.songs, missing: c.songs - c.linked });
+  else step('step1-status', 'dash.set.step1.all', { songs: c.songs }, true);
+  if (!leihuStatus.online) step('step2-status', 'dash.set.step2.offline', {});
+  else if (!c || c.todo == null) step('step2-status', null, {});
+  else if (!c.linked) step('step2-status', 'dash.set.step2.noLinks', {});
+  else if (c.todo) step('step2-status', 'dash.set.step2.todo', { todo: c.todo, ready: c.linked - c.todo, linked: c.linked });
+  else step('step2-status', 'dash.set.step2.all', { linked: c.linked }, true);
+  document.getElementById('bulk-start').hidden = running;
+  document.getElementById('bulk-start').disabled = !leihuStatus.online || !(c && c.todo);
+  document.getElementById('bulk-stop').hidden = !running;
+  const el = document.getElementById('bulk-progress');
+  const p = { done: b.done, failed: b.failed, total: b.total, current: b.current, reason: b.reason };
+  const key = running ? (b.current ? 'running' : 'waiting')
+    : b.state === 'done' ? (b.total ? 'done' : 'nothing')
+    : b.state === 'paused' || b.state === 'stopped' ? b.state : null;
+  el.hidden = !key;
+  el.textContent = key ? t('dash.set.bulk.' + key, p) : '';
+}
+
+async function bulkAction(action) {
+  try {
+    const res = await fetch('/api/leihu/bulk', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(I18N.server(data, 'dash.toast.requestFailed'));
+    if (action === 'start' && data.state === 'running') showToast(t('dash.toast.bulkStarted', { total: data.total }));
+  } catch (err) {
+    showToast(t('dash.toast.leihuError', { message: err.message }), true);
+  }
+  pollLeihu();
 }
 
 async function onBadgeClick(entry, st) {
@@ -1577,6 +1648,7 @@ I18N.onChange(() => {
   document.title = t('dash.pageTitle');
   render();
   paintBadges();
+  paintBulk();
   if (filteredSongs.length) renderSuggest();
   if (!document.getElementById('node-warn').hidden) paintNodeWarning();
 });

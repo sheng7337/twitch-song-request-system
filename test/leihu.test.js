@@ -8,6 +8,7 @@ const path = require('path');
 // Manual links go to a temp file, never the real song-links.json
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'leihu-test-'));
 process.env.LEIHU_LINKS_FILE = path.join(tmp, 'song-links.json');
+process.env.LEIHU_BULK_GAP_MS = '0';
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 // Fake Leihu Singsing API: GET returns `leihu`, POSTs are recorded.
@@ -282,4 +283,56 @@ test('Leihu 1.6 download states: queued is preparing, paused says why, retry dow
   assert.strictEqual(statusOf(sheet[0]).state, 'ready');
   posts.length = 0;
   leihu.songs = [];
+});
+
+test('preparing the whole sheet sends one song at a time, only while Leihu is idle, and stops for a YouTube limit', async () => {
+  const URL0 = 'https://www.youtube.com/watch?v=3znMCsScCxo';
+  sheet.push({ title: '舊的失敗', artist: 'y', key: '', url: 'https://youtu.be/failedVid01', tab: '國語' });
+  const failedSong = (dl_state) => ({ id: 'ffffffffff', title: 't', source_url: 'https://www.youtube.com/watch?v=failedVid01', steps: { import: false }, dl_state });
+  const sent = () => posts.filter(p => !p.method).map(p => p.url.replace('http://127.0.0.1:8765', ''));
+  // sheet[1] is already in Leihu, sheet[2] has no link
+  leihu.songs = [{ id: 'aaaaaaaaaa', title: 'x', source_url: 'https://www.youtube.com/watch?v=vVGa8I0Atcg', steps: done, lyrics_text: LYR }, failedSong('failed')];
+  leihu.jobs = [{ song: 'zzzzzzzzzz', status: 'running' }];   // Leihu busy with a stream song
+  posts.length = 0;
+
+  assert.deepStrictEqual(await L.startBulk(), { state: 'running', total: 2, done: 0, failed: 0, left: 2, reason: '', current: null });
+  assert.deepStrictEqual(L.getStatus().sheet, { songs: 4, linked: 3, todo: 2 });
+  await L.bulkStep();
+  assert.deepStrictEqual(sent(), [], 'nothing is sent while Leihu is busy');
+
+  leihu.jobs = [];
+  await L.refresh();
+  await L.bulkStep();
+  assert.deepStrictEqual(sent(), ['/api/youtube']);
+  assert.strictEqual(L.bulkStatus().current, sheet[0].title);
+  await L.bulkStep();
+  assert.strictEqual(sent().length, 1, 'the next one waits until this one is done');
+
+  // First one finished; the earlier failed download is retried in place
+  leihu.songs.push({ id: 'newsong001', title: 't', source_url: URL0, steps: done, lyrics_text: LYR });
+  await L.refresh();
+  await L.bulkStep();
+  assert.deepStrictEqual(sent(), ['/api/youtube', '/api/songs/ffffffffff/redownload']);
+  assert.strictEqual(L.bulkStatus().done, 1);
+
+  // YouTube limits the PC: Leihu pauses the download and the bulk run stops
+  leihu.songs[1] = failedSong('paused');
+  leihu.ytPause = { on: true, reason: 'HTTP Error 429' };
+  await L.refresh();
+  await L.bulkStep();
+  assert.deepStrictEqual(L.bulkStatus(), { state: 'paused', total: 2, done: 1, failed: 0, left: 1, reason: 'HTTP Error 429', current: null });
+  await L.bulkStep();
+  assert.strictEqual(sent().length, 2, 'nothing more goes to YouTube while paused');
+
+  // Starting again lifts Leihu's pause and carries on with what's left
+  const again = await L.startBulk();
+  assert.strictEqual(sent()[2], '/api/youtube/resume');
+  assert.strictEqual(again.total, 1);
+  assert.strictEqual(L.stopBulk().state, 'stopped');
+  assert.strictEqual(L.bulkStatus().left, 0);
+
+  sheet.pop();
+  leihu.songs = [];
+  leihu.ytPause = null;
+  posts.length = 0;
 });
