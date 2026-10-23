@@ -226,11 +226,13 @@ vtuber-song-queue/
   next two queued YouTube jobs) overlaps downloading with GPU work; a new one goes in at most every
   `LEIHU_BULK_GAP_MS` (default 30 s) and none while Leihu already has that many YouTube imports
   queued/running. Stream imports and retries (`importVideo`, `prepare`) call `toFront()`, which
-  moves their job (`POST /api/jobs/<jid>/move`) ahead of bulk songs and Leihu's `fine` /
-  `compact` jobs, but not ahead of other stream songs. Stops as `paused` when Leihu reports
-  `yt_pause.on`; Leihu's `redownload` lifts that pause, so a bulk retry re-reads `/api/status`
-  first. Starting again calls Leihu's `POST /api/youtube/resume`; the songs Leihu queues again join
-  the run as already sent.
+  moves their job (`POST /api/jobs/<jid>/move`, once per place) ahead of everything queued in Leihu
+  — bulk songs, the streamer's own Leihu imports, `fine` / `compact` jobs — but behind earlier stream
+  songs (`streamJobs`, all at the front). Leihu 1.6.3+ lists only the first 30 queued jobs in
+  `/api/status` (`queued_total` has the count), so the distance is `ahead` from `GET /api/jobs/<jid>`.
+  Stops as `paused` when Leihu reports `yt_pause.on`; Leihu's `redownload` lifts that pause, so a
+  bulk retry re-reads `/api/status` first. Starting again calls Leihu's `POST /api/youtube/resume`;
+  the songs Leihu queues again join the run as already sent.
 - Leihu 1.6.1 runs a `fine` clean-up pass (label `fine`) after songs with heavy backing vocals,
   and key renders after processing: a song whose steps are all done counts as ready/nolyrics even
   while such a job runs. Progress is

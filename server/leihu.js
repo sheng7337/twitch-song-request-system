@@ -184,17 +184,24 @@ async function importVideo(vid, tab, song = null, { bulk: fromBulk = false } = {
   return id;
 }
 
-// Leihu works through its queue in order. A job for the stream moves ahead of the sheet songs
-// "Prepare all" queued and of Leihu's clean-up passes, but stays behind other stream songs.
-// Leihu's download-ahead takes the first queued YouTube jobs, so it downloads this one next.
+// Leihu works through its queue in order. A job for the stream moves ahead of everything else
+// waiting there — the sheet songs "Prepare all" queued, songs the streamer queued in Leihu
+// (its sheet import takes up to 1000), clean-up passes — but stays behind earlier stream songs,
+// which are all at the front. Leihu's download-ahead takes the first queued YouTube jobs, so
+// it downloads this one next. Leihu 1.6.3+ lists only the first 30 queued jobs in /api/status,
+// so the distance comes from the job itself (`ahead`).
+const streamJobs = new Set();   // Leihu job IDs of songs sent for the stream
+
 async function toFront(jid) {
   if (!jid) return;
-  const behind = j => j.label === 'fine' || j.label === 'compact' || bulk.inFlight.some(f => f.id === j.song);
+  streamJobs.add(jid);
   try {
-    const { data } = await axios.get(`${baseUrl()}/api/status`, { timeout: 3000 });
-    const queued = (data.jobs || []).filter(j => j.kind === 'process' && j.status === 'queued' && j.order != null)
-      .sort((a, b) => a.order - b.order);
-    for (let i = queued.findIndex(j => j.id === jid); i > 0 && behind(queued[i - 1]); i--) {
+    const [{ data: job }, { data: st }] = await Promise.all([
+      axios.get(`${baseUrl()}/api/jobs/${jid}`, { timeout: 3000 }),
+      axios.get(`${baseUrl()}/api/status`, { timeout: 3000 }),
+    ]);
+    const streamAhead = (st.jobs || []).filter(j => j.id !== jid && j.status === 'queued' && streamJobs.has(j.id)).length;
+    for (let n = (job.ahead || 0) - streamAhead; n > 0; n--) {
       await axios.post(`${baseUrl()}/api/jobs/${jid}/move`, { delta: -1 }, { timeout: 5000 });
     }
   } catch (err) {

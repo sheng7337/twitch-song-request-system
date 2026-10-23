@@ -20,6 +20,8 @@ const axiosStub = {
     if (!leihu.up) throw new Error('connect ECONNREFUSED');
     if (url.endsWith('/api/songs')) return { data: leihu.songs };
     if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}), ...(leihu.ytPause ? { yt_pause: leihu.ytPause } : {}) } };
+    const job = url.match(/\/api\/jobs\/(\w+)$/);
+    if (job) return { data: { id: job[1], ahead: (leihu.ahead || {})[job[1]] || 0 } };
     if (url.endsWith('/lyrics/candidates')) return { data: { results: leihu.candidates } };
     if (url.endsWith('/lyrics/search')) { searches.push(opts.params.q); return { data: { results: leihu.search } }; }
     throw new Error('unexpected GET ' + url);
@@ -33,7 +35,7 @@ const axiosStub = {
     const redo = url.match(/\/api\/songs\/(\w+)\/redownload$/);
     const song = redo && leihu.songs.find(s => s.id === redo[1]);
     if (song) song.dl_state = 'queued';
-    return { data: url.endsWith('/api/youtube') ? { id: 'newsong001', job: 'jobnew0001' } : {} };
+    return { data: url.endsWith('/api/youtube') ? { id: 'newsong001', job: leihu.nextJob || 'jobnew0001' } : {} };
   },
   patch: async (url, body) => { posts.push({ url, body, method: 'PATCH' }); return { data: {} }; },
 };
@@ -295,25 +297,38 @@ test('Leihu 1.6 download states: queued is preparing, paused says why, retry dow
   leihu.songs = [];
 });
 
-test('a song in Leihu 1.6.1 clean-up pass can be sung; stream imports skip ahead of clean-up passes only', async () => {
+test('a song in Leihu 1.6.1 clean-up pass can be sung; stream imports go ahead of everything but earlier stream songs', async () => {
   leihu.songs = [{ id: 'aaaaaaaaaa', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: done, lyrics_text: LYR, fine_queued: true }];
   leihu.jobs = [{ id: 'jfine00001', song: 'aaaaaaaaaa', status: 'running', kind: 'process', label: 'fine' }];
   await L.refresh();
   assert.strictEqual(statusOf(sheet[0]).state, 'ready');
 
-  // Queue: a stream song, a clean-up pass, then the import just sent
-  leihu.jobs = [
-    { id: 'jstream001', song: 'ssssssssss', status: 'queued', kind: 'process', label: 'youtube', order: 0 },
-    { id: 'jfine00002', song: 'aaaaaaaaaa', status: 'queued', kind: 'process', label: 'fine', order: 1 },
-    { id: 'jobnew0001', song: 'newsong001', status: 'queued', kind: 'process', label: 'youtube', order: 2 },
-  ];
+  const q = (id, label, order) => ({ id, song: id, status: 'queued', kind: 'process', label, order });
+  const moves = () => posts.filter(p => p.url.endsWith('/move')).map(p => p.url.replace('http://127.0.0.1:8765', ''));
+
+  // Queue: a song the streamer queued in Leihu, a clean-up pass, then the import just sent
+  leihu.jobs = [q('jbatch0001', 'youtube', 0), q('jfine00002', 'fine', 1), q('jobnew0001', 'youtube', 2)];
+  leihu.ahead = { jobnew0001: 2 };
   await L.refresh();
   posts.length = 0;
   await L.importForSong('streamVid01', { title: '新歌', artist: 'q' }, '');
-  assert.deepStrictEqual(posts.map(p => p.url.replace('http://127.0.0.1:8765', '')), ['/api/youtube', '/api/jobs/jobnew0001/move']);
+  assert.deepStrictEqual(moves(), ['/api/jobs/jobnew0001/move', '/api/jobs/jobnew0001/move']);
   assert.deepStrictEqual(posts[1].body, { delta: -1 });
+
+  // A long Leihu queue (1.6.3 lists only the first 30): the next stream song goes right
+  // behind the first one, past all the rest
+  leihu.jobs = [q('jobnew0001', 'youtube', 0), ...Array.from({ length: 29 }, (_, i) => q(`jbatch${String(i).padStart(4, '0')}`, 'youtube', i + 1))];
+  leihu.ahead = { jobnew0002: 40 };
+  leihu.nextJob = 'jobnew0002';
+  posts.length = 0;
+  await L.importForSong('streamVid02', { title: '又一首', artist: 'q' }, '');
+  assert.strictEqual(moves().length, 39);
+  assert.ok(moves().every(u => u === '/api/jobs/jobnew0002/move'));
+
   leihu.jobs = [];
   leihu.songs = [];
+  leihu.ahead = {};
+  leihu.nextJob = null;
   posts.length = 0;
 });
 
