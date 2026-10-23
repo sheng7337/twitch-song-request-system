@@ -221,10 +221,19 @@ vtuber-song-queue/
   (links.html), step ② "Prepare songs in Leihu" (`startBulk` in leihu.js); each shows counts from
   `sheet: { songs, linked, todo }` in `/api/leihu/status` (`sheetCounts`). Step ② sends every
   sheet song with a YouTube link that Leihu hasn't finished (not manually linked; failed /
-  cancelled / paused downloads are retried in place). One song at a time from `tick()`: the next
-  only when Leihu has no queued/running job (stream songs go first) and `LEIHU_BULK_GAP_MS`
-  (default 30 s) after the last finished. Stops as `paused` when Leihu reports `yt_pause.on`;
-  starting again calls Leihu's `POST /api/youtube/resume` and carries on. Progress is
+  cancelled / paused downloads are retried in place). From `tick()` it keeps up to
+  `LEIHU_BULK_AHEAD` (default 3) of them in Leihu's queue, so Leihu 1.6.1's download-ahead (the
+  next two queued YouTube jobs) overlaps downloading with GPU work; a new one goes in at most every
+  `LEIHU_BULK_GAP_MS` (default 30 s) and none while Leihu already has that many YouTube imports
+  queued/running. Stream imports and retries (`importVideo`, `prepare`) call `toFront()`, which
+  moves their job (`POST /api/jobs/<jid>/move`) ahead of bulk songs and Leihu's `fine` /
+  `compact` jobs, but not ahead of other stream songs. Stops as `paused` when Leihu reports
+  `yt_pause.on`; Leihu's `redownload` lifts that pause, so a bulk retry re-reads `/api/status`
+  first. Starting again calls Leihu's `POST /api/youtube/resume`; the songs Leihu queues again join
+  the run as already sent.
+- Leihu 1.6.1 runs a `fine` clean-up pass (label `fine`) after songs with heavy backing vocals,
+  and key renders after processing: a song whose steps are all done counts as ready/nolyrics even
+  while such a job runs. Progress is
   `bulk` in `/api/leihu/status`; it lives in memory only, so a restart ends the run
 - Leihu's import returns an error for duplicates only after the download step — never send
   the same video twice; the `requested` map in leihu.js prevents it

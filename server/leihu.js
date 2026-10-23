@@ -23,9 +23,12 @@ const LINKS_PATH = process.env.LEIHU_LINKS_FILE || path.join(__dirname, '..', 's
 const POLL_MS = 5000;
 const OFFLINE_POLL_MS = 30000;
 const BULK_GAP_MS = Number(process.env.LEIHU_BULK_GAP_MS || 30000);   // pause between bulk downloads
+const BULK_AHEAD = Number(process.env.LEIHU_BULK_AHEAD || 3);   // Leihu 1.6.1 processes one song and downloads the next two
 
 let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
+let runningJobs = new Set(); // Leihu song IDs with a running job
+let ytJobs = 0;              // Leihu's queued/running YouTube imports, from any source
 let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
 let canOpen = false;         // Leihu supports remote open, 1.5.2+ (/api/status reports `remote`)
 let ytPause = null;          // Leihu 1.6+: { on, reason } while it has paused YouTube downloads
@@ -103,6 +106,9 @@ async function refresh() {
     activeJobs = new Set((statusRes.data.jobs || [])
       .filter(j => j.status === 'queued' || j.status === 'running')
       .map(j => j.song));
+    runningJobs = new Set((statusRes.data.jobs || []).filter(j => j.status === 'running').map(j => j.song));
+    ytJobs = (statusRes.data.jobs || [])
+      .filter(j => j.label === 'youtube' && (j.status === 'queued' || j.status === 'running')).length;
     jobErrors = new Map((statusRes.data.jobs || [])
       .filter(j => j.status === 'error' && j.error)
       .map(j => [j.song, j.error]));
@@ -110,6 +116,8 @@ async function refresh() {
   } catch (err) {
     library = null;
     activeJobs = new Set();
+    runningJobs = new Set();
+    ytJobs = 0;
     jobErrors = new Map();
     canOpen = false;
     ytPause = null;
@@ -147,9 +155,10 @@ function failure(id) {
 }
 
 function songState(song) {
-  if (activeJobs.has(song.id) || song.dlState === 'queued') return 'processing';
-  if (!song.complete) return 'failed';
-  return song.hasLyrics ? 'ready' : 'nolyrics';
+  // A finished song can be sung while Leihu still works on it: a key render, or Leihu 1.6.1's
+  // clean-up pass for songs with heavy backing vocals (lyrics stay as they are)
+  if (song.complete) return song.hasLyrics ? 'ready' : 'nolyrics';
+  return activeJobs.has(song.id) || song.dlState === 'queued' ? 'processing' : 'failed';
 }
 
 // Leihu's recognition language for a sheet tab (config.LEIHU_TAB_LANGUAGES), or null = automatic.
@@ -160,17 +169,37 @@ function tabLanguage(tab) {
 // Import a YouTube video into Leihu and set its recognition language from the sheet tab.
 // Returns Leihu's new song ID. Setting the language needs Leihu 1.4.7+ (older versions ignore it).
 // `song` (the sheet's { title, artist }) lets fillMissingLyrics() fill the lyrics if Leihu
-// leaves them blank.
-async function importVideo(vid, tab, song = null) {
+// leaves them blank. Imports for the stream move ahead of the sheet songs "Prepare all" queued;
+// `bulk` (from bulkStep) leaves the song at the back.
+async function importVideo(vid, tab, song = null, { bulk: fromBulk = false } = {}) {
   const res = await axios.post(`${baseUrl()}/api/youtube`, { url: `https://www.youtube.com/watch?v=${vid}` }, { timeout: 10000 });
   const id = res.data && res.data.id;
   if (song) imported.set(vid, { title: song.title, artist: song.artist });
+  if (!fromBulk) await toFront(res.data && res.data.job);
   const lang = tabLanguage(tab);
   if (id && lang) {
     await axios.patch(`${baseUrl()}/api/songs/${id}`, { lyrics_language: lang }, { timeout: 5000 })
       .catch(err => console.error(`[leihu] Could not set language for ${id}:`, err.message));
   }
   return id;
+}
+
+// Leihu works through its queue in order. A job for the stream moves ahead of the sheet songs
+// "Prepare all" queued and of Leihu's clean-up passes, but stays behind other stream songs.
+// Leihu's download-ahead takes the first queued YouTube jobs, so it downloads this one next.
+async function toFront(jid) {
+  if (!jid) return;
+  const behind = j => j.label === 'fine' || j.label === 'compact' || bulk.inFlight.some(f => f.id === j.song);
+  try {
+    const { data } = await axios.get(`${baseUrl()}/api/status`, { timeout: 3000 });
+    const queued = (data.jobs || []).filter(j => j.kind === 'process' && j.status === 'queued' && j.order != null)
+      .sort((a, b) => a.order - b.order);
+    for (let i = queued.findIndex(j => j.id === jid); i > 0 && behind(queued[i - 1]); i--) {
+      await axios.post(`${baseUrl()}/api/jobs/${jid}/move`, { delta: -1 }, { timeout: 5000 });
+    }
+  } catch (err) {
+    console.error('[leihu] Could not move a stream song ahead in Leihu:', err.response?.data?.error || err.message);
+  }
 }
 
 // Letters and digits only, lowercase; brackets dropped ("四照花 (Chinese Ver.)" → "四照花").
@@ -280,7 +309,8 @@ async function prepare(entry, { retry = false } = {}) {
   const song = status.id && library.find(s => s.id === status.id);
   if (retry && status.state === 'failed' && song && song.dlState) {
     try {
-      await axios.post(`${baseUrl()}/api/songs/${song.id}/redownload`, {}, { timeout: 10000 });
+      const res = await axios.post(`${baseUrl()}/api/songs/${song.id}/redownload`, {}, { timeout: 10000 });
+      await toFront(res.data && res.data.job);
       console.log(`[leihu] Downloading "${entry.title}" again`);
     } catch (err) {
       console.error(`[leihu] Download retry of "${entry.title}" failed:`, err.response?.data?.error || err.message);
@@ -312,26 +342,33 @@ async function prepare(entry, { retry = false } = {}) {
 }
 
 // ── Prepare the whole sheet ("Prepare all" in the dashboard's Leihu settings) ──
-// Sends the sheet's songs that Leihu doesn't have yet one at a time: the next one only
-// when Leihu has no job queued or running and BULK_GAP_MS after the last one finished,
-// so songs queued on stream never wait behind a long batch and YouTube sees a slow,
-// steady trickle. Stops when Leihu pauses its downloads for a YouTube limit.
-const bulk = { state: 'idle', total: 0, done: 0, failed: 0, todo: [], current: null, reason: '', nextAt: 0 };
+// Keeps up to BULK_AHEAD of the sheet's songs in Leihu's queue, so Leihu 1.6.1 downloads the
+// next ones while the GPU works on the current one. A new one goes in at most every BULK_GAP_MS,
+// so YouTube sees a slow, steady trickle, and none while Leihu already has BULK_AHEAD YouTube
+// imports waiting. Songs for the stream move ahead of them (toFront). Stops when Leihu pauses
+// its downloads for a YouTube limit.
+const bulk = { state: 'idle', total: 0, done: 0, failed: 0, todo: [], inFlight: [], reason: '', nextAt: 0 };
 
-// Sheet songs with a YouTube link that Leihu hasn't finished: { vid, title, artist, tab, retryId }
-function bulkTodo() {
+// Sheet songs with a YouTube link that Leihu hasn't finished: { vid, title, artist, tab, retryId }.
+// `todo` still needs sending; `waiting` is already queued in Leihu, with its Leihu `id`.
+function bulkScan() {
   const seen = new Set();
-  const out = [];
+  const todo = [], waiting = [];
   for (const s of getSongs()) {
     const vid = videoId(s.url);
     if (!vid || seen.has(vid) || links[songKey(s.title, s.artist)]) continue;
     seen.add(vid);
     const song = (library || []).find(m => m.videoId === vid);
+    const item = { vid, title: s.title, artist: s.artist, tab: s.tab, retryId: song ? song.id : null };
     if (song && !song.dlState) continue;                                   // imported (or being processed)
-    if (song && (song.dlState === 'queued' || activeJobs.has(song.id))) continue;   // already waiting in Leihu
-    out.push({ vid, title: s.title, artist: s.artist, tab: s.tab, retryId: song ? song.id : null });
+    if (song && (song.dlState === 'queued' || activeJobs.has(song.id))) waiting.push({ ...item, id: song.id });
+    else todo.push(item);
   }
-  return out;
+  return { todo, waiting };
+}
+
+function bulkTodo() {
+  return bulkScan().todo;
 }
 
 // For the dashboard's two "get your song list ready" steps: sheet songs, how many have a
@@ -350,36 +387,43 @@ async function startBulk() {
   if (ytPause && ytPause.on) {
     await axios.post(`${baseUrl()}/api/youtube/resume`, {}, { timeout: 10000 })
       .catch(err => console.error('[leihu] Could not resume YouTube downloads:', err.message));
+    await refresh();   // Leihu queued its paused songs again: they count as sent, not to send
   }
-  const todo = bulkTodo();
-  Object.assign(bulk, { state: todo.length ? 'running' : 'done', total: todo.length, done: 0, failed: 0,
-    todo, current: null, reason: '', nextAt: 0 });
-  console.log(`[leihu] Preparing ${todo.length} sheet songs in Leihu, one at a time`);
+  // Sheet songs already waiting in Leihu (resumed just now, or sent before a restart) are part of the run
+  const { todo, waiting } = bulkScan();
+  const total = todo.length + waiting.length;
+  Object.assign(bulk, { state: total ? 'running' : 'done', total, done: 0, failed: 0,
+    todo, inFlight: waiting.map(w => ({ ...w, sentAt: Date.now() })), reason: '', nextAt: 0 });
+  console.log(`[leihu] Preparing ${total} sheet songs in Leihu, up to ${BULK_AHEAD} queued at a time`);
   return bulkStatus();
 }
 
+// Songs already sent stay in Leihu's queue and finish there.
 function stopBulk() {
   if (bulk.state === 'running' || bulk.state === 'paused') {
     bulk.state = 'stopped';
     bulk.todo = [];
+    bulk.inFlight = [];
     console.log('[leihu] Stopped preparing the sheet');
   }
   return bulkStatus();
 }
 
+// `current` is the sheet song Leihu is working on now, null while it works on something else.
 function bulkStatus() {
   const { state, total, done, failed, reason } = bulk;
-  return { state, total, done, failed, left: bulk.todo.length + (bulk.current ? 1 : 0), reason,
-    current: bulk.current ? bulk.current.title : null };
+  const cur = bulk.inFlight.find(f => runningJobs.has(f.id));
+  return { state, total, done, failed, left: bulk.todo.length + bulk.inFlight.length, reason,
+    current: cur ? cur.title : null };
 }
 
 async function bulkStep() {
   if (bulk.state !== 'running' || !library) return;
-  const cur = bulk.current;
-  if (cur) {
+  for (const cur of [...bulk.inFlight]) {
     const song = library.find(m => m.videoId === cur.vid);
     const st = song ? songState(song) : (Date.now() - cur.sentAt > 60000 ? 'failed' : 'processing');
-    if (st === 'processing') return;
+    if (st === 'processing') continue;
+    bulk.inFlight.splice(bulk.inFlight.indexOf(cur), 1);
     if (song && song.dlState === 'paused') {
       bulk.todo.unshift({ ...cur, retryId: song.id });   // Leihu keeps it paused; try it first next time
     } else if (st === 'failed') {
@@ -388,8 +432,6 @@ async function bulkStep() {
     } else {
       bulk.done++;
     }
-    bulk.current = null;
-    bulk.nextAt = Date.now() + BULK_GAP_MS;
   }
   if (ytPause && ytPause.on) {
     bulk.state = 'paused';
@@ -397,25 +439,36 @@ async function bulkStep() {
     console.log('[leihu] YouTube is limiting downloads — stopped preparing the sheet');
     return;
   }
-  if (activeJobs.size || Date.now() < bulk.nextAt) return;   // Leihu busy (stream songs go first) or resting
-  const next = bulk.todo.shift();
-  if (!next) {
-    bulk.state = 'done';
-    console.log(`[leihu] Finished preparing the sheet: ${bulk.done} ready, ${bulk.failed} failed`);
+  if (!bulk.todo.length) {
+    if (!bulk.inFlight.length) {
+      bulk.state = 'done';
+      console.log(`[leihu] Finished preparing the sheet: ${bulk.done} ready, ${bulk.failed} failed`);
+    }
     return;
   }
-  bulk.current = { ...next, sentAt: Date.now() };
+  // Enough waiting in Leihu to keep it busy, or resting between downloads
+  if (bulk.inFlight.length >= BULK_AHEAD || ytJobs >= BULK_AHEAD || Date.now() < bulk.nextAt) return;
+  const next = bulk.todo.shift();
+  bulk.nextAt = Date.now() + BULK_GAP_MS;
   try {
-    if (next.retryId) {
-      await axios.post(`${baseUrl()}/api/songs/${next.retryId}/redownload`, {}, { timeout: 10000 });
+    let id = next.retryId;
+    if (id) {
+      // Leihu's redownload also lifts its YouTube pause: make sure there is none right now
+      const { data } = await axios.get(`${baseUrl()}/api/status`, { timeout: 3000 });
+      if (data.yt_pause && data.yt_pause.on) {
+        ytPause = data.yt_pause;
+        bulk.todo.unshift(next);
+        return;   // the next step stops the run as paused
+      }
+      await axios.post(`${baseUrl()}/api/songs/${id}/redownload`, {}, { timeout: 10000 });
     } else {
-      await importVideo(next.vid, next.tab, next);
+      id = await importVideo(next.vid, next.tab, next, { bulk: true });
     }
+    bulk.inFlight.push({ ...next, id, sentAt: Date.now() });
     console.log(`[leihu] Preparing "${next.title}" (${bulk.total - bulk.todo.length}/${bulk.total})`);
   } catch (err) {
     console.error(`[leihu] Could not send "${next.title}" to Leihu:`, err.response?.data?.error || err.message);
     bulk.failed++;
-    bulk.current = null;
   }
 }
 
