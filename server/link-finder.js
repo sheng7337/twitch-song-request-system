@@ -162,6 +162,13 @@ async function start({ limit } = {}) {
     for (const r of rows) {
       const k = rowKey(r.tab, r.title, r.artist);
       state.songs[k] = { ...(state.songs[k] || { decision: null, written: false }), ...r };
+      // A link we saved has been cleared from the sheet since: back up for review (the old pick
+      // may be why it was removed). Cells skipped for being filled stay accepted, so Save retries them.
+      const s = state.songs[k];
+      if (s.written && !cellWasFilled(s)) {
+        Object.assign(s, { decision: null, written: false });
+        setNote(s, 'noteLinkCleared', {}, 'the saved link was removed from the sheet — pick again');
+      }
     }
     const todo = rows.filter(r => !state.songs[rowKey(r.tab, r.title, r.artist)].raw)
       .slice(0, limit > 0 ? limit : undefined);

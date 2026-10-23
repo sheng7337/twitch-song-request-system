@@ -179,6 +179,22 @@ test('a skipped filled cell is written on a later save once the streamer clears 
   assert.strictEqual(F.getView().filled, 0);
 });
 
+test('a saved link that was later cleared from the sheet comes back for review', async () => {
+  sheet['國語'][2][2] = 'https://www.youtube.com/watch?v=aaaaaaaaaaa';   // what the saves wrote
+  sheet['國語'][4][2] = 'https://www.youtube.com/watch?v=ccccccccccc';
+  sheet['國語'][2][2] = '';   // then the streamer cleared "a"
+  sent = [];
+  await F.start();
+  await waitForJob();
+  assert.ok(!sent.includes('a'), 'its earlier search results are reused');
+  const a = F.getView().songs.find(s => s.title === 'a');
+  assert.ok(a, '"a" is listed again');
+  assert.strictEqual(a.decision, null);
+  assert.strictEqual(a.status, 'confident');
+  assert.strictEqual(a.noteCode, 'noteLinkCleared');
+  assert.ok(!F.getView().songs.some(s => s.title === 'c'), 'links still in the sheet stay done');
+});
+
 test('pasted links are accepted in any form, other text is refused', () => {
   sheet = { '國語': [['title', 'artist', 'YTLink'], ['d', 'x', '']] };
   F._setState({ songs: { k: { tab: '國語', row: 2, title: 'd', artist: 'x', raw: raw('d', 'fan'), decision: null, written: false } } });
