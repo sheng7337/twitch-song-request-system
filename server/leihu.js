@@ -18,6 +18,7 @@ const { getSongs } = require('./sheets');
 const { getState } = require('./queue');
 const config = require('./config');
 const { UserError } = require('./messages');
+const launcher = require('./leihu-launcher');
 
 const LINKS_PATH = process.env.LEIHU_LINKS_FILE || path.join(__dirname, '..', 'song-links.json');   // tests use a temp file
 const POLL_MS = 5000;
@@ -42,6 +43,24 @@ function baseUrl() {
 
 function autoPrepareEnabled() {
   return process.env.LEIHU_AUTO_PREPARE === '1';
+}
+
+// Start Leihu (without its window) together with the song queue
+function autoStartEnabled() {
+  return process.env.LEIHU_AUTOSTART === '1';
+}
+
+// Starts Leihu without its window (unless it runs) and reads its library right away.
+async function launch() {
+  const result = await launcher.start(baseUrl());
+  await refresh();
+  return result;
+}
+
+function closeLeihu() {
+  const closed = launcher.stop();
+  if (closed) library = null;   // shows offline at once; the next poll confirms
+  return closed;
 }
 
 // Title + artist identify a song (same rule as the sheet dedupe in sheets.js).
@@ -103,6 +122,7 @@ async function refresh() {
     }));
     ytPause = statusRes.data.yt_pause || null;
     canOpen = 'remote' in statusRes.data;
+    launcher.remember(statusRes.data.root);   // so the dashboard can start Leihu next time
     activeJobs = new Set((statusRes.data.jobs || [])
       .filter(j => j.status === 'queued' || j.status === 'running')
       .map(j => j.song));
@@ -493,6 +513,9 @@ async function tick() {
 }
 
 function start() {
+  if (autoStartEnabled()) {
+    launch().catch(err => console.error('[leihu] Could not start Leihu Singsing:', err.message));
+  }
   tick().catch(() => {});
 }
 
@@ -503,7 +526,10 @@ function getStatus() {
   for (const entry of [nowPlaying, ...queue]) {
     if (entry && entry.title) songs[songKey(entry.title, entry.artist)] = statusFor(entry.title, entry.artist);
   }
-  return { online: !!library, canOpen, autoPrepare: autoPrepareEnabled(), songs, bulk: bulkStatus(), sheet: sheetCounts() };
+  // `url`: Leihu's own screen, shown in the dashboard's Leihu tab; `launched`/`starting`: the
+  // song queue started Leihu without its window (leihu-launcher.js)
+  return { online: !!library, url: baseUrl(), ...launcher.status(), autoStart: autoStartEnabled(), canOpen,
+    autoPrepare: autoPrepareEnabled(), songs, bulk: bulkStatus(), sheet: sheetCounts() };
 }
 
 function getLibrary() {
@@ -559,5 +585,5 @@ async function open(entry) {
 module.exports = {
   start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
   fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
-  startBulk, stopBulk, bulkStatus, bulkStep, sheetCounts,
+  startBulk, stopBulk, bulkStatus, bulkStep, sheetCounts, launch, closeLeihu,
 };

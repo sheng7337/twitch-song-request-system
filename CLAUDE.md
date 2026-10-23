@@ -56,6 +56,7 @@ vtuber-song-queue/
 │   ├── queue.js           Queue state, broadcast to clients, persisted to queue-state.json
 │   ├── random.js          Weighted/pure random picker with tab filter and cooldown
 │   ├── leihu.js           Optional link to Leihu Singsing (backing tracks + lyrics), song-links.json
+│   ├── leihu-launcher.js  Starts Leihu without its window (dashboard Leihu tab), leihu-home.json
 │   ├── link-finder.js     Finds YouTube links for the sheet (search job, review, writes the sheet)
 │   ├── link-score.js      Scores YouTube candidates against the lyric version (pure functions)
 │   ├── romaji.js          Matches romanized video titles to 漢字/かな song titles
@@ -74,7 +75,7 @@ vtuber-song-queue/
 ├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
-├── dashboard/index.html   Streamer control panel — 2×2 panels, drag/drop, history, manual add, ⚙ settings popover
+├── dashboard/index.html   Streamer control panel — tabs (Song Queue: 2×2 panels, drag/drop, history, manual add; Leihu), ⚙ settings popover
 ├── dashboard/links.html   YouTube link finder review page
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)
@@ -92,7 +93,7 @@ vtuber-song-queue/
 ```
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
-`setup-progress.json`, `queue-state.json`, `song-links.json`, `link-search.json`, `package-lock.json`,
+`setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `link-search.json`, `package-lock.json`,
 `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
@@ -217,7 +218,20 @@ vtuber-song-queue/
   limit) is failed with `failure.paused` and the pause reason. Clicking a failed badge
   (`/api/leihu/prepare`, retry) calls `POST /api/songs/<id>/redownload` for an unfinished
   download, so Leihu retries the same song instead of adding a new one
-- Dashboard settings → "Get your song list ready in Leihu": step ① links to the link finder
+- Dashboard tabs: `TABS` in dashboard/index.html, each a `.tabs` button + `.tab-page`; `#leihu` in the URL selects
+  the tab. Planned tabs: chat room, rewards, OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
+  with Leihu's settings (auto-prepare, auto-start, the two steps below) in a panel over it (`#leihu-side`,
+  ⚙ in the header; bulk progress also shows in the header), the UI in an iframe from `url` in `/api/leihu/status`
+  (Leihu sends no frame-blocking headers; only its `/api/remote/open` rejects browser requests). It loads
+  on first view and again when Leihu comes back; a dashboard opened from another device shows a note
+  instead, since Leihu listens on 127.0.0.1 only
+- Leihu without its window (leihu-launcher.js, `POST /api/leihu/launch {action: 'start'|'stop'}`, ▶/■ in the
+  Leihu tab, `LEIHU_AUTOSTART`): runs Leihu's `app.py --no-browser --parent-pid <this pid>` with its`pythonw`,
+  `LIANTAI_PORT` from `LEIHU_URL`, output appended to Leihu's `logs/app.log` — like Leihu's desktop.py minus
+  the window, so Leihu closes with the song queue. Folder: `LEIHU_ROOT`, else `leihu-home.json` (`remember()`,
+  called from `refresh()` with Leihu's `root`), else `%LOCALAPPDATA%\LeihuLiantai`. ■ closes only a Leihu the
+  song queue started (`launched` in `/api/leihu/status`); Leihu's own shortcut reuses a running server
+- Dashboard Leihu tab → "Get your song list ready in Leihu": step ① links to the link finder
   (links.html), step ② "Prepare songs in Leihu" (`startBulk` in leihu.js); each shows counts from
   `sheet: { songs, linked, todo }` in `/api/leihu/status` (`sheetCounts`). Step ② sends every
   sheet song with a YouTube link that Leihu hasn't finished (not manually linked; failed /
@@ -386,6 +400,7 @@ register it in index.js.
 | GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
 | POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
+| POST | `/api/leihu/launch` | Start Leihu without its window, or close one the song queue started `{action: 'start' \| 'stop'}` |
 | POST | `/api/leihu/bulk` | Prepare all sheet songs in Leihu `{action: 'start' \| 'stop'}` → bulk status |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
 | GET | `/api/links` | Link finder: job progress + scored songs for review |
@@ -422,6 +437,8 @@ See `.env.example` for full descriptions.
 - `LEIHU_URL` — Leihu Singsing address (default `http://127.0.0.1:8765`)
 - `LEIHU_PYTHON` — optional: the Python the link finder runs; unset = found in Leihu's folder
 - `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
+- `LEIHU_AUTOSTART` — `1` = start Leihu without its window when the song queue starts (dashboard toggle)
+- `LEIHU_ROOT` — optional: Leihu's folder for starting it; unset = remembered from Leihu's `/api/status` `root`
 
 ---
 

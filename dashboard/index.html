@@ -109,9 +109,9 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.7);
   }
   .settings[hidden] { display: none; }
-  .settings section { display: flex; flex-direction: column; gap: 8px; border-radius: 6px; transition: background .4s; }
+  .settings section, .leihu-side section { display: flex; flex-direction: column; gap: 8px; border-radius: 6px; transition: background .4s; }
   .settings section.flash { background: rgba(176,106,255,0.12); }
-  .settings h3 {
+  .settings h3, .leihu-side h3 {
     font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 2px;
     text-transform: uppercase; color: var(--purple);
   }
@@ -142,6 +142,41 @@
   .btn.skip { color: var(--amber); border-color: var(--border-amber); }
   .btn.skip:hover { background: rgba(255,184,74,0.1); }
 
+  /* ── Tabs: one page each (later also chat room, rewards, OBS / Streamlabs control) ── */
+  .tabs { display: flex; gap: 4px; padding: 0 16px; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+  .tab {
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; padding: 9px 16px; cursor: pointer;
+    background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-dim);
+  }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
+  .tab-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tab-page[hidden] { display: none; }
+
+  /* ── Leihu tab: Leihu's own screen; its settings open as a panel over it (⚙ in the header) ── */
+  .leihu-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
+  .leihu-view { flex: 1; background: var(--bg-panel); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+  .leihu-view .col-header { gap: 10px; }
+  .leihu-view .btn { font-size: 13px; padding: 4px 10px; text-decoration: none; }
+  .leihu-view .btn[aria-expanded="true"] { background: rgba(176,106,255,0.15); }
+  .leihu-bulk { font-size: 13px; color: var(--amber); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .leihu-bulk[hidden] { display: none; }
+  .leihu-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .leihu-side {
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 10; width: min(420px, 100%);
+    background: var(--bg-panel); border-right: 1px solid var(--border); box-shadow: 10px 0 40px rgba(0,0,0,0.6);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
+  }
+  .leihu-side[hidden] { display: none; }
+  .leihu-side-close { position: absolute; top: 10px; right: 10px; }
+  .leihu-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: var(--bg); }
+  .leihu-frame[hidden] { display: none; }
+  .leihu-placeholder {
+    flex: 1; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; text-align: center;
+    padding: 24px; color: var(--text-dim); font-size: 14px; line-height: 1.6;
+  }
+  .leihu-placeholder[hidden] { display: none; }
+
   /* ── Layout: 2×2 — left: Now Playing over Up Next, right: Pending Review over Played ── */
   .board {
     flex: 1; min-height: 0;
@@ -159,6 +194,7 @@
     .board { grid-template-columns: 1fr; }
     .col-panel.grow { min-height: 320px; }
     .pending-panel { max-height: none; }
+    .leihu-frame { flex: none; height: 85vh; }
   }
 
   /* ── Column panels ── */
@@ -591,7 +627,7 @@
   <span class="topbar-title" data-i18n="dash.title">Song Queue Dashboard</span>
   <span class="topbar-spacer"></span>
   <span class="lang-switch" role="group" data-i18n-aria-label="dash.set.language"></span>
-  <button class="chip" id="leihu-chip" onclick="toggleSettings('settings-leihu')" data-i18n-title="dash.leihuChipTitle">
+  <button class="chip" id="leihu-chip" onclick="showTab('leihu')" data-i18n-title="dash.leihuChipTitle">
     🎤 <span id="leihu-state" data-i18n="dash.leihuOffline">Leihu offline</span>
   </button>
   <div class="settings-wrap">
@@ -632,6 +668,43 @@
         </label>
         <p class="setting-hint" data-i18n="dash.set.overlayLangHint">Language viewers see on the song overlay and clip player in OBS.</p>
       </section>
+    </div>
+  </div>
+  <button class="btn skip" onclick="api('skip')" data-i18n="dash.skip">⏭ Skip</button>
+  <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
+</div>
+
+<!-- Tabs: a button here and a .tab-page below (TABS in the script). Planned: chat room, rewards, OBS / Streamlabs control -->
+<nav class="tabs" role="tablist" data-i18n-aria-label="dash.tabs" onkeydown="onTabKey(event)">
+  <button class="tab" role="tab" id="tabbtn-queue" data-tab="queue" aria-controls="tab-queue" onclick="showTab('queue')" data-i18n="dash.tab.queue">🎵 Song Queue</button>
+  <button class="tab" role="tab" id="tabbtn-leihu" data-tab="leihu" aria-controls="tab-leihu" onclick="showTab('leihu')" data-i18n="dash.tab.leihu">🎤 Leihu Singsing</button>
+</nav>
+
+<!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
+<div class="node-warn" id="node-warn" role="alert" hidden>
+  <span id="node-warn-text"></span>
+  <button class="btn" onclick="document.getElementById('node-warn').hidden = true" data-i18n="dash.nodeWarnClose">Close</button>
+</div>
+
+<span class="toast" id="toast"></span>
+
+<div class="tab-page" id="tab-leihu" role="tabpanel" aria-labelledby="tabbtn-leihu" hidden>
+  <div class="leihu-page">
+   <!-- Leihu's own screen. Microphone and autoplay are passed on for its practice and recording. -->
+   <div class="leihu-view">
+    <div class="col-header">
+      <span class="col-title purple" data-i18n="dash.leihu.title">Leihu Singsing</span>
+      <button class="btn" id="leihu-side-btn" onclick="toggleLeihuSide()" aria-expanded="false" aria-controls="leihu-side" data-i18n="dash.leihu.settings">⚙ Leihu settings</button>
+      <button class="link-btn leihu-bulk" id="leihu-bulk-mini" onclick="toggleLeihuSide(true)" hidden></button>
+      <span class="topbar-spacer"></span>
+      <button class="btn" id="leihu-reload" onclick="reloadLeihu()" hidden data-i18n="dash.leihu.reload">↻ Reload</button>
+      <a class="btn" id="leihu-window" target="_blank" rel="noopener" hidden data-i18n="dash.leihu.newWindow">↗ Open in its own window</a>
+      <button class="btn danger" id="leihu-close" onclick="launchLeihu('stop')" hidden data-i18n="dash.leihu.close">■ Close Leihu</button>
+    </div>
+    <div class="leihu-body">
+     <!-- Leihu settings and the "get your song list ready" steps: a panel over Leihu's screen, opened from ⚙ -->
+     <div class="leihu-side" id="leihu-side" hidden>
+      <button class="btn leihu-side-close" onclick="toggleLeihuSide(false)" data-i18n-aria-label="dash.leihu.closeSettings">✕</button>
       <section id="settings-leihu">
         <h3 data-i18n="dash.set.leihuTitle">Leihu Singsing</h3>
         <p class="setting-hint" id="leihu-detail"></p>
@@ -640,6 +713,11 @@
           <span data-i18n="dash.set.autoPrepare">Auto-prepare queued songs</span>
         </label>
         <p class="setting-hint" data-i18n="dash.set.autoPrepareHint">Imports queued songs from the sheet's YouTube link and renders their key ahead of time. Uses the GPU during stream.</p>
+        <label class="setting">
+          <input type="checkbox" id="leihu-autostart" onchange="saveLeihuAutoStart()" />
+          <span data-i18n="dash.set.autoStart">Start Leihu with the song queue</span>
+        </label>
+        <p class="setting-hint" data-i18n="dash.set.autoStartHint">Leihu then runs without its own window and shows only in this tab. It closes when the song queue closes.</p>
       </section>
       <section id="settings-ready">
         <h3 data-i18n="dash.set.readyTitle">Get your song list ready in Leihu</h3>
@@ -664,18 +742,19 @@
           <p class="setting-hint" data-i18n="dash.set.bulkSafe">Safe to leave running: one song at a time and only while Leihu is idle, so requested songs go first. If YouTube starts limiting downloads it stops by itself; press the button again a few hours later to continue.</p>
         </div>
       </section>
+     </div>
+     <div class="leihu-placeholder" id="leihu-placeholder">
+       <p id="leihu-placeholder-text"></p>
+       <button class="btn add" id="leihu-start" onclick="launchLeihu('start')" hidden data-i18n="dash.leihu.start">▶ Start Leihu</button>
+     </div>
+     <iframe class="leihu-frame" id="leihu-frame" hidden data-i18n-title="dash.leihu.title"
+             allow="microphone; autoplay; fullscreen; clipboard-write"></iframe>
     </div>
+   </div>
   </div>
-  <button class="btn skip" onclick="api('skip')" data-i18n="dash.skip">⏭ Skip</button>
-  <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
 </div>
 
-<!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
-<div class="node-warn" id="node-warn" role="alert" hidden>
-  <span id="node-warn-text"></span>
-  <button class="btn" onclick="document.getElementById('node-warn').hidden = true" data-i18n="dash.nodeWarnClose">Close</button>
-</div>
-
+<div class="tab-page" id="tab-queue" role="tabpanel" aria-labelledby="tabbtn-queue">
 <div class="request-bar">
   <span class="request-label" data-i18n="dash.manual.label">+ Manual</span>
   <div class="request-input-wrap">
@@ -686,7 +765,6 @@
   <input class="requester-input" type="text" id="requester-input" placeholder="requester ID" data-i18n-placeholder="dash.manual.requesterPlaceholder"
          onkeydown="if(event.key==='Enter') submitRequest()" />
   <button class="btn add" id="add-btn" onclick="submitRequest()" data-i18n="dash.manual.add">+ Add to Queue</button>
-  <span class="toast" id="toast"></span>
 </div>
 
 <div class="board">
@@ -745,6 +823,7 @@
     </div>
   </div>
  </div>
+</div>
 </div>
 
 <script>
@@ -1176,6 +1255,7 @@ async function loadSettings() {
     document.getElementById('brightness-input').value = settings.textBrightness;
     document.getElementById('brightness-value').textContent = settings.textBrightness;
     document.getElementById('leihu-auto').checked = settings.leihuAutoPrepare;
+  document.getElementById('leihu-autostart').checked = settings.leihuAutoStart;
     document.getElementById('overlay-lang').value = settings.overlayLanguage || 'en';
   } catch(_) {}
 }
@@ -1201,7 +1281,7 @@ function closeSettings() {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.settings-wrap, #leihu-chip')) closeSettings();
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); toggleLeihuSide(false); } });
 
 function resetOverlay() {
   document.getElementById('opacity-input').value = 0.92;
@@ -1514,6 +1594,108 @@ async function pollLeihu() {
   }
   paintBadges();
   paintBulk();
+  paintLeihuView();
+}
+
+// ── Tabs ── Each tab is a button in .tabs and a .tab-page; #leihu in the address keeps the tab
+// on reload. Planned: chat room, rewards, OBS / Streamlabs control — add them here and in the markup.
+const TABS = ['queue', 'leihu'];
+let currentTab = 'queue';
+
+function showTab(name) {
+  if (!TABS.includes(name)) name = 'queue';
+  currentTab = name;
+  for (const tab of TABS) {
+    document.getElementById('tab-' + tab).hidden = tab !== name;
+    const btn = document.getElementById('tabbtn-' + tab);
+    btn.setAttribute('aria-selected', String(tab === name));
+    btn.tabIndex = tab === name ? 0 : -1;
+  }
+  const hash = name === 'queue' ? '' : '#' + name;
+  if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+  closeSettings();
+  paintLeihuView();
+}
+
+// Arrow keys move between tabs (the usual tab-list keys)
+function onTabKey(e) {
+  const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (!step) return;
+  const next = TABS[(TABS.indexOf(currentTab) + step + TABS.length) % TABS.length];
+  showTab(next);
+  document.getElementById('tabbtn-' + next).focus();
+}
+
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+
+// Leihu's own screen in the Leihu tab: loaded the first time the tab is shown while Leihu runs,
+// and again when Leihu comes back after being closed. Leihu only listens on its own PC, so a
+// dashboard opened from another device (phone, second PC) can't show it.
+const isLoopback = (host) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host);
+let leihuViewOnline = false;
+
+function paintLeihuView() {
+  const frame = document.getElementById('leihu-frame');
+  const msg = document.getElementById('leihu-placeholder');
+  const url = leihuStatus.url;
+  let otherDevice = false;
+  try { otherDevice = !!url && isLoopback(new URL(url).hostname) && !isLoopback(location.hostname); } catch(_) {}
+  const online = !!leihuStatus.online && !!url && !otherDevice;
+  if (online && currentTab === 'leihu' && (!frame.getAttribute('src') || !leihuViewOnline)) frame.src = url;
+  if (online) leihuViewOnline = !!frame.getAttribute('src');
+  else leihuViewOnline = false;
+  frame.hidden = !leihuViewOnline;
+  msg.hidden = leihuViewOnline;
+  const starting = leihuStarting || !!leihuStatus.starting;
+  document.getElementById('leihu-placeholder-text').textContent = !url ? '' : t(otherDevice ? 'dash.leihu.otherDevice'
+    : online ? 'dash.leihu.loading' : starting ? 'dash.leihu.starting' : 'dash.leihu.notRunning');
+  const startBtn = document.getElementById('leihu-start');
+  startBtn.hidden = !url || online || otherDevice;
+  startBtn.disabled = starting;
+  document.getElementById('leihu-reload').hidden = !leihuViewOnline;
+  // Close only a Leihu the song queue started; one opened from its own shortcut closes with its window
+  document.getElementById('leihu-close').hidden = !(online && leihuStatus.launched);
+  const win = document.getElementById('leihu-window');
+  win.hidden = !online;
+  if (url) win.href = url;
+}
+
+function reloadLeihu() {
+  const frame = document.getElementById('leihu-frame');
+  frame.src = leihuStatus.url;
+}
+
+// Start Leihu without its own window (the server runs it, leihu-launcher.js), or close it
+let leihuStarting = false;
+async function launchLeihu(action) {
+  if (action === 'stop' && !confirm(t('dash.leihu.closeConfirm'))) return;
+  if (action === 'start') { leihuStarting = true; paintLeihuView(); }
+  try {
+    const res = await fetch('/api/leihu/launch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(I18N.server(data, 'dash.toast.requestFailed'));
+  } catch (err) {
+    showToast(t('dash.toast.leihuError', { message: err.message }), true);
+  }
+  leihuStarting = false;
+  pollLeihu();
+}
+
+async function saveLeihuAutoStart() {
+  const on = document.getElementById('leihu-autostart').checked;
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leihuAutoStart: on }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(t(on ? 'dash.toast.autoStartOn' : 'dash.toast.autoStartOff'));
+  } catch(_) {
+    showToast(t('dash.toast.autoFailed'), true);
+  }
 }
 
 // "Get your song list ready" steps: sheet counts (leihu.js sheetCounts) and progress (bulkStatus)
@@ -1545,6 +1727,18 @@ function paintBulk() {
     : b.state === 'paused' || b.state === 'stopped' ? b.state : null;
   el.hidden = !key;
   el.textContent = key ? t('dash.set.bulk.' + key, p) : '';
+  // While preparing runs (or stopped for YouTube), its progress also shows in the Leihu tab's header
+  const mini = document.getElementById('leihu-bulk-mini');
+  mini.hidden = !(running || b.state === 'paused');
+  mini.textContent = mini.hidden ? '' : el.textContent;
+  mini.title = mini.textContent;
+}
+
+// The Leihu settings panel over Leihu's screen: ⚙ toggles it, ✕ / Esc close it
+function toggleLeihuSide(open) {
+  const side = document.getElementById('leihu-side');
+  side.hidden = open === undefined ? !side.hidden : !open;
+  document.getElementById('leihu-side-btn').setAttribute('aria-expanded', String(!side.hidden));
 }
 
 async function bulkAction(action) {
@@ -1649,10 +1843,12 @@ I18N.onChange(() => {
   render();
   paintBadges();
   paintBulk();
+  paintLeihuView();
   if (filteredSongs.length) renderSuggest();
   if (!document.getElementById('node-warn').hidden) paintNodeWarning();
 });
 
+showTab(location.hash.slice(1));
 connect();
 loadSongList();
 loadHistory();

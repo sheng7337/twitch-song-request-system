@@ -440,7 +440,18 @@ app.post('/api/leihu/open', async (req, res) => {
   }
 });
 
-// Prepare every sheet song with a YouTube link in Leihu, one at a time (leihu.js startBulk)
+// Start Leihu without its window (it then shows only in the dashboard's Leihu tab), or close
+// it when the song queue started it (leihu-launcher.js)
+app.post('/api/leihu/launch', async (req, res) => {
+  try {
+    if (req.body.action === 'stop') return res.json({ closed: leihu.closeLeihu() });
+    res.json(await leihu.launch());
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+// Prepare every sheet song with a YouTube link in Leihu, a few at a time (leihu.js startBulk)
 app.post('/api/leihu/bulk', async (req, res) => {
   try {
     res.json(req.body.action === 'stop' ? leihu.stopBulk() : await leihu.startBulk());
@@ -603,6 +614,7 @@ app.get('/api/settings', (req, res) => {
     panelBgAlpha: Number.isFinite(alpha) && alpha >= 0 && alpha <= 1 ? alpha : PANEL_BG_ALPHA_DEFAULT,
     textBrightness: Number.isFinite(brightness) && brightness >= TEXT_BRIGHTNESS_MIN && brightness <= TEXT_BRIGHTNESS_MAX ? brightness : TEXT_BRIGHTNESS_DEFAULT,
     leihuAutoPrepare: process.env.LEIHU_AUTO_PREPARE === '1',
+    leihuAutoStart: process.env.LEIHU_AUTOSTART === '1',
     overlayLanguage: overlayLanguage(),
   });
 });
@@ -651,6 +663,11 @@ app.post('/api/settings', (req, res) => {
   if (req.body.leihuAutoPrepare !== undefined) {
     updates.leihuAutoPrepare = !!req.body.leihuAutoPrepare;
     setupRouter.writeEnvValues({ LEIHU_AUTO_PREPARE: updates.leihuAutoPrepare ? '1' : '0' });
+  }
+
+  if (req.body.leihuAutoStart !== undefined) {
+    updates.leihuAutoStart = !!req.body.leihuAutoStart;
+    setupRouter.writeEnvValues({ LEIHU_AUTOSTART: updates.leihuAutoStart ? '1' : '0' });
   }
 
   res.json({ ok: true, ...updates });

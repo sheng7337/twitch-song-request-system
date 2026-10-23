@@ -154,9 +154,10 @@ Open `http://localhost:3000/dashboard` during streams.
 
 | Feature | Description |
 |---|---|
+| Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Leihu settings** in its header opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Random cooldown, overlay opacity / brightness / language, Leihu auto-prepare, YouTube link finder — each saves on its own |
+| ⚙ Settings | Random cooldown, overlay opacity / brightness / language — each saves on its own (Leihu's settings are in its tab) |
 | EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlay and clip player follow the ⚙ "Overlay language" setting |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
 | Pending column | Weak/unmatched requests — edit and accept manually |
