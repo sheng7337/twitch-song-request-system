@@ -5,7 +5,8 @@
 // accepted links into the sheet — only into empty cells, creating the column in
 // a tab the first time links are saved there.
 //
-// Searching runs tools/find-videos.py with Leihu Singsing's bundled Python, so it
+// Searching runs tools/find-videos.py with Leihu Singsing's own Python (bundled, or
+// its .venv when run from source), so it
 // uses Leihu's own lyric sites and yt-dlp; Leihu must be running so we can find its
 // install folder. Everything found is kept in link-search.json (gitignored): a
 // restart resumes where it stopped, and scoring is redone from the saved results.
@@ -131,8 +132,19 @@ async function leihuPython() {
   } catch {
     throw new UserError('leihuNotRunning', {}, 'Leihu Singsing is not running — start it first, the search uses its lyric sites and YouTube tools.');
   }
-  const python = path.join(root || '', 'python', 'python.exe');
-  if (!root || !fs.existsSync(python)) throw new UserError('leihuPythonMissing', { root }, `Leihu Singsing's Python was not found in ${root}`);
+  // LEIHU_PYTHON in .env replaces the search, and a wrong one is reported as such rather than
+  // quietly falling back. Otherwise: packaged Leihu ships python\python.exe; a source install
+  // runs from .venv (or venv). The helper still needs Leihu's folder for its code either way.
+  const override = (process.env.LEIHU_PYTHON || '').trim();
+  if (override && !fs.existsSync(override)) {
+    throw new UserError('leihuPythonEnvMissing', { path: override }, `LEIHU_PYTHON in .env points to ${override}, which does not exist`);
+  }
+  const python = override || [
+    path.join(root || '', 'python', 'python.exe'),
+    path.join(root || '', '.venv', 'Scripts', 'python.exe'),
+    path.join(root || '', 'venv', 'Scripts', 'python.exe'),
+  ].find(p => fs.existsSync(p));
+  if (!root || !python) throw new UserError('leihuPythonMissing', { root }, `Leihu Singsing's Python was not found in ${root}`);
   return { root, python };
 }
 
@@ -628,5 +640,5 @@ module.exports = {
   start, stop, getJob, getView, decide, acceptConfident, save, check, checkAccess,
   identify, addToSheet, practiceTab, guessTab,
   // for tests
-  rowKey, columnLetter, findColumns, pickSong, _setState: s => { state = s; },
+  rowKey, columnLetter, findColumns, pickSong, leihuPython, _setState: s => { state = s; },
 };

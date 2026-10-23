@@ -16,6 +16,7 @@
       // link finder
       leihuNotRunning: 'Leihu Singsing is not running — start it first, the search uses its lyric sites and YouTube tools.',
       leihuPythonMissing: "Leihu Singsing's Python was not found in {root}",
+      leihuPythonEnvMissing: 'LEIHU_PYTHON in .env points to {path}, which does not exist. Fix the path, or remove the line to find Leihu’s Python automatically.',
       searchStopped: 'the search stopped ({detail})',
       unknownSong: 'this song is no longer in the list — reload the page',
       notYouTube: 'not a YouTube video link',
@@ -64,6 +65,7 @@
       notReady: '這首歌在雷虎練唱台還沒準備好',
       leihuNotRunning: '雷虎練唱台沒有開啟 — 請先開啟它，搜尋會用到它的歌詞網站和 YouTube 工具。',
       leihuPythonMissing: '在 {root} 找不到雷虎練唱台的 Python',
+      leihuPythonEnvMissing: '.env 裡的 LEIHU_PYTHON 指向 {path}，但這個檔案不存在。請修正路徑，或刪掉這一行，讓系統自動尋找雷虎練唱台的 Python。',
       searchStopped: '搜尋中斷了（{detail}）',
       unknownSong: '這首歌已經不在清單裡 — 請重新整理頁面',
       notYouTube: '這不是 YouTube 影片連結',

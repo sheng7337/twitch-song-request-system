@@ -220,8 +220,10 @@ vtuber-song-queue/
   configured in `.env` or the wizard. Fills it for songs without a link; a tab without the
   column is still searched, and gets the column (right after its last used header, growing
   the grid if needed) the first time links are saved there. Review page: `/dashboard/links.html`
-- Search: `tools/find-videos.py` runs with **Leihu's bundled Python** (`<root>/python/python.exe`,
-  root from Leihu's `/api/status`, so Leihu must be running) and calls Leihu's own
+- Search: `tools/find-videos.py` runs with **Leihu's own Python** (root from Leihu's
+  `/api/status`, so Leihu must be running): `<root>/python/python.exe` in the packaged app, else
+  `<root>/.venv` or `<root>/venv` `Scripts/python.exe` for a source install; `LEIHU_PYTHON` in
+  `.env` replaces the search (a wrong path is an error, not a fallback). It calls Leihu's own
   `search_lrclib/netease/kugou`, `_norm`, `to_simplified` and yt-dlp (`ytsearch10`, metadata
   only). Zero changes to Leihu; the helper refuses to run if those functions are missing.
   JSON lines in/out. ~7.5 s per song (LRCLIB often errors from here; NetEase/Kugou carry 中文).
@@ -392,6 +394,7 @@ See `.env.example` for full descriptions.
 - `RANDOM_PICK_MODE` — `weighted` or `pure`
 - `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS`, `OVERLAY_LANGUAGE` (`en` / `zh-TW`) — also adjustable from the dashboard
 - `LEIHU_URL` — Leihu Singsing address (default `http://127.0.0.1:8765`)
+- `LEIHU_PYTHON` — optional: the Python the link finder runs; unset = found in Leihu's folder
 - `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
 
 ---

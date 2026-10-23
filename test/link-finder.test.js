@@ -294,6 +294,33 @@ test('adding to the sheet explains a missing practice tab and needs Editor acces
   canWrite = true;
 });
 
+test("Leihu's Python: packaged app first, then a source install's .venv; LEIHU_PYTHON replaces the search", async () => {
+  const packaged = path.join(tmp, 'python', 'python.exe');
+  const venv = path.join(tmp, '.venv', 'Scripts', 'python.exe');
+  const saved = process.env.LEIHU_PYTHON;
+  delete process.env.LEIHU_PYTHON;
+  fs.mkdirSync(path.dirname(venv), { recursive: true });
+  fs.writeFileSync(venv, '');
+  try {
+    assert.deepStrictEqual(await F.leihuPython(), { root: tmp, python: packaged });
+    fs.renameSync(path.join(tmp, 'python'), path.join(tmp, 'python-off'));
+    assert.deepStrictEqual(await F.leihuPython(), { root: tmp, python: venv });
+    fs.rmSync(path.join(tmp, '.venv'), { recursive: true });
+    await assert.rejects(F.leihuPython(), e => e.messageCode === 'leihuPythonMissing');
+
+    process.env.LEIHU_PYTHON = path.join(tmp, 'python-off', 'python.exe');
+    assert.deepStrictEqual(await F.leihuPython(), { root: tmp, python: process.env.LEIHU_PYTHON });
+    process.env.LEIHU_PYTHON = path.join(tmp, 'no-such', 'python.exe');
+    fs.renameSync(path.join(tmp, 'python-off'), path.join(tmp, 'python'));
+    // a wrong LEIHU_PYTHON is reported, even though the packaged Python exists
+    await assert.rejects(F.leihuPython(), e => e.messageCode === 'leihuPythonEnvMissing' && e.messageParams.path === process.env.LEIHU_PYTHON);
+  } finally {
+    if (saved == null) delete process.env.LEIHU_PYTHON; else process.env.LEIHU_PYTHON = saved;
+    if (!fs.existsSync(path.join(tmp, 'python'))) fs.renameSync(path.join(tmp, 'python-off'), path.join(tmp, 'python'));
+    fs.rmSync(path.join(tmp, '.venv'), { recursive: true, force: true });
+  }
+});
+
 test.after(() => {
   spawnMock.mock.restore();
   fs.rmSync(tmp, { recursive: true, force: true });
