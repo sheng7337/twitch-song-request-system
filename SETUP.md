@@ -154,10 +154,11 @@ Open `http://localhost:3000/dashboard` during streams.
 
 | Feature | Description |
 |---|---|
+| 💬 Chat | Live chat with search and filters — songs mentioned (♪ adds one to the queue; it shows when the song was last sung, amber within the random cooldown — and the song overlay briefly lists songs named in chat as "title - 99 days ago" since last sung, coming up from the bottom of the overlay, over its Played list (up to 4 at a time, a new one replaces the oldest; amber within the cooldown; switch "📺 Song notes on overlay"), 📺), commands, mods & VIPs, subscribers, @mentions, first-time chatters, highlighted messages & bits, redemptions, one viewer (click a name); bots hidden. Messages mods delete show struck through. Earlier days: pick a date (logs kept on this PC for `CHAT_LOG_DAYS`, default 30). To type in chat, **↗ Twitch chat** opens Twitch's own chat window |
 | Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Leihu settings** in its header opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Random cooldown, overlay opacity / brightness / language — each saves on its own (Leihu's settings are in its tab) |
+| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — random cooldown, overlay opacity / brightness / language; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay. Each saves on its own |
 | EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlay and clip player follow the ⚙ "Overlay language" setting |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
 | Pending column | Weak/unmatched requests — edit and accept manually |

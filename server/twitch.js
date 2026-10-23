@@ -15,6 +15,7 @@ let ws = null;
 let sessionId = null;
 let redemptionHandler = null; // set by index.js via setEventHandler
 let chatHandler = null;       // set by index.js via setChatHandler
+let moderationHandler = null; // set by index.js via setModerationHandler (deleted / cleared chat)
 
 // Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
 // so the same message_id can arrive more than once after reconnects.
@@ -131,7 +132,23 @@ async function subscribeToEvents(sid) {
     transport: { method: 'websocket', session_id: sid },
   }, { headers });
   console.log('[twitch] Subscribed to chat messages');
+
+  // Messages mods delete, and chat cleared by a timeout / ban or /clear: the dashboard's chat
+  // log marks them. Same scope as chat messages; a failure here leaves the rest working.
+  for (const type of MODERATION_TYPES) {
+    try {
+      await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+        type, version: '1',
+        condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId },
+        transport: { method: 'websocket', session_id: sid },
+      }, { headers });
+    } catch (err) {
+      console.warn(`[twitch] Could not subscribe to ${type}:`, err.response?.data?.message || err.message);
+    }
+  }
 }
+
+const MODERATION_TYPES = ['channel.chat.message_delete', 'channel.chat.clear_user_messages', 'channel.chat.clear'];
 
 function connectEventSub(url) {
   const wsUrl = url || EVENTSUB_WS_URL;
@@ -188,6 +205,8 @@ function connectEventSub(url) {
         if (redemptionHandler) redemptionHandler(msg.payload.event);
       } else if (subType === 'channel.chat.message') {
         if (chatHandler) chatHandler(msg.payload.event);
+      } else if (MODERATION_TYPES.includes(subType)) {
+        if (moderationHandler) moderationHandler(subType, msg.payload.event);
       }
     }
 
@@ -222,6 +241,10 @@ function setChatHandler(fn) {
   chatHandler = fn;
 }
 
+function setModerationHandler(fn) {
+  moderationHandler = fn;
+}
+
 async function connect() {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const token = process.env.TWITCH_USER_ACCESS_TOKEN;
@@ -249,4 +272,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, setEventHandler, setChatHandler, ensureFreshToken, setEnvValue };
+module.exports = { connect, setEventHandler, setChatHandler, setModerationHandler, ensureFreshToken, setEnvValue };

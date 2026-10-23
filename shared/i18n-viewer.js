@@ -16,6 +16,9 @@
       playedCount: ({ n }) => `${n} song${n === 1 ? '' : 's'}`,
       noRequests: 'no requests yet…',
       nothingPlayed: 'nothing played yet…',
+      // Songs named in chat, floating over the Played section: "title - 99 days" since last sung (server/song-notes.js)
+      days: ({ n }) => n === 0 ? 'today' : n === 1 ? '1 day ago' : `${n} days ago`,
+      never: 'never',
     },
     clip: {
       shoutout: 'Shoutout',
@@ -34,6 +37,8 @@
       playedCount: ({ n }) => `${n} 首`,
       noRequests: '還沒有人點歌…',
       nothingPlayed: '還沒有唱過的歌…',
+      days: ({ n }) => n === 0 ? '今天' : `${n} 天前`,
+      never: '未唱過',
     },
     clip: {
       shoutout: '推薦頻道',

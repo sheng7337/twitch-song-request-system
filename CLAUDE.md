@@ -63,6 +63,8 @@ vtuber-song-queue/
 │   ├── data/han-readings.json  Pinyin + Japanese readings per 漢字 (generated from Unicode's Unihan)
 │   ├── history.js         Request history sheet (debounced 1.5s), startup snapshot
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
+│   ├── chat-log.js        Chat + redemption log for the dashboard Chat tab, chat-logs/YYYY-MM-DD.jsonl
+│   ├── song-notes.js      Song overlay note "last sung N days ago" when chat names a sheet song
 │   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
 │   ├── media-history.js   Last played media, for !replay
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk
@@ -93,7 +95,7 @@ vtuber-song-queue/
 ```
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
-`setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `link-search.json`, `package-lock.json`,
+`setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `chat-logs/`, `link-search.json`, `package-lock.json`,
 `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
@@ -218,10 +220,12 @@ vtuber-song-queue/
   limit) is failed with `failure.paused` and the pause reason. Clicking a failed badge
   (`/api/leihu/prepare`, retry) calls `POST /api/songs/<id>/redownload` for an unfinished
   download, so Leihu retries the same song instead of adding a new one
-- Dashboard tabs: `TABS` in dashboard/index.html, each a `.tabs` button + `.tab-page`; `#leihu` in the URL selects
-  the tab. Planned tabs: chat room, rewards, OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
-  with Leihu's settings (auto-prepare, auto-start, the two steps below) in a panel over it (`#leihu-side`,
-  ⚙ in the header; bulk progress also shows in the header), the UI in an iframe from `url` in `/api/leihu/status`
+- Dashboard tabs: `TABS` in dashboard/index.html, each a `.tabs` button + `.tab-page` with its own settings
+  (`.tab-config-btn` ⚙ at the right end of the tab's top row → `#config-<tab>` panel, `toggleTabConfig`; no
+  global settings popover: Song Queue holds the random cooldown + overlay look, Chat the song-notes switch); `#leihu` in the URL selects
+  the tab. Planned tabs: rewards, OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
+  with Leihu's settings (auto-prepare, auto-start, the two steps below) in its ⚙ panel (bulk progress
+  also shows in the header), the UI in an iframe from `url` in `/api/leihu/status`
   (Leihu sends no frame-blocking headers; only its `/api/remote/open` rejects browser requests). It loads
   on first view and again when Leihu comes back; a dashboard opened from another device shows a note
   instead, since Leihu listens on 127.0.0.1 only
@@ -231,6 +235,29 @@ vtuber-song-queue/
   the window, so Leihu closes with the song queue. Folder: `LEIHU_ROOT`, else `leihu-home.json` (`remember()`,
   called from `refresh()` with Leihu's `root`), else `%LOCALAPPDATA%\LeihuLiantai`. ■ closes only a Leihu the
   song queue started (`launched` in `/api/leihu/status`); Leihu's own shortcut reuses a running server
+- Dashboard Chat tab (chat-log.js): every `channel.chat.message` and redemption becomes a record (user,
+  badges, text split into text / emote / mention / cheer parts, message_type, bits, reply, `songs` = sheet
+  titles named in it — 2+ chars, 4+ for Latin-only titles, longest wins, not for !commands). Records are
+  kept in memory (latest 1000, today's log read back on start), appended to chat-logs/<local date>.jsonl
+  (`CHAT_LOG_DAYS`, pruned on start) and pushed over the WebSocket as `{type: 'chat'}` only to clients
+  that sent `{type: 'chat-subscribe'}` (the dashboard). twitch.js also subscribes to
+  `channel.chat.message_delete` / `clear_user_messages` / `clear` (same `user:read:chat` scope, each
+  optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
+  and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
+  channel, first-time `user_intro`, highlighted / bits, redemptions, one viewer, search, bots) run in
+  the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester. Sending
+  chat needs `user:write:chat` (not requested): the tab links to Twitch's popout chat instead
+- Song notes (song-notes.js): each song in a chat record gets `lastAt` (ms, from history.js
+  `getLastRequestedAt` — set when a song is moved to Played; null = never; left out until the history
+  sheet is loaded, `isReady()`). Within the random cooldown (`RANDOM_COOLDOWN_DAYS`, random.js
+  `getCooldownMs`; 0 = none) the song is marked `recent`. Any song with a known `lastAt` (null too),
+  at most once per song per 10 min: `onStream` + `{type: 'song-note', title, artist, days, recent}`
+  (days null = never sung) to all WebSocket clients. The song overlay floats them at its bottom, over the
+  Played list: "title - 99 days ago" (`overlay.days` / `overlay.never`), amber when recent, green
+  otherwise; a new one comes up from the bottom and pushes the others up, at most 4 (when full the
+  oldest, at the top, makes room), 15 s each. `SONG_NOTES=0` (Chat tab switch, `songNotes` in
+  `/api/settings`) stops the notes; songs are still marked `recent`
+  The Chat tab's ♪ buttons show the days as of the message, amber when recent, 📺 when shown
 - Dashboard Leihu tab → "Get your song list ready in Leihu": step ① links to the link finder
   (links.html), step ② "Prepare songs in Leihu" (`startBulk` in leihu.js); each shows counts from
   `sheet: { songs, linked, todo }` in `/api/leihu/status` (`sheetCounts`). Step ② sends every
@@ -400,6 +427,9 @@ register it in index.js.
 | GET | `/api/leihu/library` | Leihu's songs, for the dashboard link picker |
 | POST | `/api/leihu/link` | Manual link `{title, artist, id}` — `id: null` unlinks |
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
+| GET | `/api/chat/recent` | Chat tab: the latest 1000 chat records `{records, channel}` |
+| GET | `/api/chat/days` | Days with a chat log, newest first |
+| GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions applied |
 | POST | `/api/leihu/launch` | Start Leihu without its window, or close one the song queue started `{action: 'start' \| 'stop'}` |
 | POST | `/api/leihu/bulk` | Prepare all sheet songs in Leihu `{action: 'start' \| 'stop'}` → bulk status |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
@@ -438,6 +468,8 @@ See `.env.example` for full descriptions.
 - `LEIHU_PYTHON` — optional: the Python the link finder runs; unset = found in Leihu's folder
 - `LEIHU_AUTO_PREPARE` — `1` = prepare queued songs in Leihu ahead of time (dashboard toggle)
 - `LEIHU_AUTOSTART` — `1` = start Leihu without its window when the song queue starts (dashboard toggle)
+- `CHAT_LOG_DAYS` — days of chat log kept in chat-logs/ (default 30)
+- `SONG_NOTES` — `0` = no song notes on the song overlay (Chat tab switch; on when unset)
 - `LEIHU_ROOT` — optional: Leihu's folder for starting it; unset = remembered from Leihu's `/api/status` `root`
 
 ---

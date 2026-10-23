@@ -97,4 +97,4 @@ function pickRandom(excludeTitles = [], allowedTabs = []) {
   return picked;
 }
 
-module.exports = { pickRandom };
+module.exports = { pickRandom, getCooldownMs };

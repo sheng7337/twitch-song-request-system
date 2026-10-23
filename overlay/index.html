@@ -184,6 +184,26 @@
   }
 
   .list-empty { font-size: 10px; color: var(--text-muted); text-align: center; padding: 8px 0; }
+
+  /* ── Song notes (chat named a song: "title - 99 days ago" since it was last sung): floating
+        at the bottom of the overlay, over the Played list. A new one comes up from the bottom and
+        pushes the others up. Amber = sung within the cooldown, green = can be requested ── */
+  .played-section { position: relative; flex-shrink: 0; }
+  .notes-over {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 5;
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; pointer-events: none;
+  }
+  .note-item {
+    display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 4px;
+    background: rgba(6, 32, 18, 0.96); border: 1px solid rgba(74, 255, 154, 0.5); border-left: 3px solid var(--green);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); animation: note-up 0.35s ease;
+  }
+  @keyframes note-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .note-item.recent { background: rgba(40, 24, 6, 0.96); border-color: rgba(255, 184, 74, 0.6); border-left-color: #ffb84a; }
+  .n-title { font-size: 21px; color: #e8f5ec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .n-days  { font-size: 19px; color: var(--green); white-space: nowrap; }
+  .note-item.recent .n-title { color: #ffe9c7; }
+  .note-item.recent .n-days { color: #ffb84a; }
 </style>
 </head>
 <body>
@@ -213,15 +233,18 @@
 
   <div class="divider-line"></div>
 
-  <!-- Played -->
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-shrink:0;">
-    <p class="section-header green" style="margin:0;flex:1;" data-i18n="overlay.played">// PLAYED</p>
-    <span class="played-badge" id="played-badge">0 songs</span>
-  </div>
-  <div class="scroll-list played-scroll" id="played-list">
-    <div class="scroll-inner" id="played-inner">
-      <p class="list-empty" data-i18n="overlay.nothingPlayed">nothing played yet…</p>
+  <!-- Played; song notes float over it while chat names songs (paintNotes) -->
+  <div class="played-section">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-shrink:0;">
+      <p class="section-header green" style="margin:0;flex:1;" data-i18n="overlay.played">// PLAYED</p>
+      <span class="played-badge" id="played-badge">0 songs</span>
     </div>
+    <div class="scroll-list played-scroll" id="played-list">
+      <div class="scroll-inner" id="played-inner">
+        <p class="list-empty" data-i18n="overlay.nothingPlayed">nothing played yet…</p>
+      </div>
+    </div>
+    <div class="notes-over" id="notes-list" aria-live="polite"></div>
   </div>
 </div>
 
@@ -247,6 +270,7 @@ function connect() {
       const m = JSON.parse(e.data);
       if (m.type === 'state') renderState(m);
       if (m.type === 'settings') applySettings(m);
+      if (m.type === 'song-note') showSongNote(m);
     } catch(_) {}
   };
 }
@@ -377,13 +401,52 @@ function startTicker(key) {
   t.raf = requestAnimationFrame(step);
 }
 
+// Song notes: chat named a song; "title - 99 days" since it was last sung (server/song-notes.js).
+// days null = never sung; recent = within the cooldown. They float at the bottom of the overlay:
+// a new one comes up from the bottom, pushing the others up. At most NOTES_MAX show; when full,
+// the oldest (top) one makes room. Each shows for NOTE_MS.
+const NOTE_MS = 15000;
+const NOTES_MAX = 4;
+let songNotes = [];
+
+function showSongNote({ title, days, recent }) {
+  if (songNotes.some(n => n.title === title)) return;
+  const box = document.getElementById('notes-list');
+  while (songNotes.length >= NOTES_MAX) {
+    songNotes.shift();
+    box.firstElementChild?.remove();
+  }
+  const note = { title, days, recent, until: Date.now() + NOTE_MS };
+  songNotes.push(note);
+  box.insertAdjacentHTML('beforeend', noteHtml(note));
+}
+
+function noteHtml(n) {
+  return `<div class="note-item${n.recent ? ' recent' : ''}">
+      <span class="n-title">${esc(n.title)}</span>
+      <span class="n-days">- ${esc(n.days == null ? t('overlay.never') : t('overlay.days', { n: n.days }))}</span>
+    </div>`;
+}
+
+// Redraws all (language change, expiry) without the come-up animation
+function paintNotes() {
+  const box = document.getElementById('notes-list');
+  box.innerHTML = songNotes.map(noteHtml).join('');
+  for (const el of box.children) el.style.animation = 'none';
+}
+
+setInterval(() => {
+  const left = songNotes.filter(n => n.until > Date.now());
+  if (left.length !== songNotes.length) { songNotes = left; paintNotes(); }
+}, 1000);
+
 function esc(s) {
   return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // The language is the server's overlay setting; English until it arrives
 I18N.setLang('en', { save: false, tagPage: false });
-I18N.onChange(() => { if (lastState) renderState(lastState); });
+I18N.onChange(() => { if (lastState) renderState(lastState); paintNotes(); });
 
 connect();
 loadSettings();

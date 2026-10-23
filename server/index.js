@@ -10,8 +10,10 @@ const { isAllowedRequest } = require('./request-guard');
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
 const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
-const { connect: connectTwitch, setEventHandler, setChatHandler } = require('./twitch');
+const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
+const chatLog = require('./chat-log');
+const songNotes = require('./song-notes');
 const registerShoutout = require('./commands/shoutout');
 const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
@@ -115,7 +117,12 @@ registerWatch(registerCommand);
 registerReplay(registerCommand);
 registerStop(registerCommand);
 registerThanks(registerCommand);
-setChatHandler(handleChatEvent);
+songNotes.init(broadcastRaw);   // "last sung" notes for songs named in chat go to the song overlay
+setChatHandler((event) => {
+  try { chatLog.addChat(event, songNotes.check); } catch (err) { console.error('[chat-log] Could not log a message:', err.message); }
+  handleChatEvent(event);
+});
+setModerationHandler(chatLog.onModeration);
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
@@ -139,6 +146,7 @@ setEventHandler(async (event) => {
   const requester = event?.user_name;
 
   console.log(`[event] Redemption from @${requester}: "${requestText}" (reward: ${rewardId})`);
+  try { chatLog.addRedemption(event); } catch (err) { console.error('[chat-log] Could not log a redemption:', err.message); }
 
   // Random song reward(s) — each entry in TWITCH_RANDOM_REWARDS can restrict to specific sheet tabs.
   const matchedRandom = parseRandomReward(rewardId);
@@ -615,6 +623,7 @@ app.get('/api/settings', (req, res) => {
     textBrightness: Number.isFinite(brightness) && brightness >= TEXT_BRIGHTNESS_MIN && brightness <= TEXT_BRIGHTNESS_MAX ? brightness : TEXT_BRIGHTNESS_DEFAULT,
     leihuAutoPrepare: process.env.LEIHU_AUTO_PREPARE === '1',
     leihuAutoStart: process.env.LEIHU_AUTOSTART === '1',
+    songNotes: songNotes.enabled(),
     overlayLanguage: overlayLanguage(),
   });
 });
@@ -665,6 +674,11 @@ app.post('/api/settings', (req, res) => {
     setupRouter.writeEnvValues({ LEIHU_AUTO_PREPARE: updates.leihuAutoPrepare ? '1' : '0' });
   }
 
+  if (req.body.songNotes !== undefined) {
+    updates.songNotes = !!req.body.songNotes;
+    setupRouter.writeEnvValues({ SONG_NOTES: updates.songNotes ? '1' : '0' });
+  }
+
   if (req.body.leihuAutoStart !== undefined) {
     updates.leihuAutoStart = !!req.body.leihuAutoStart;
     setupRouter.writeEnvValues({ LEIHU_AUTOSTART: updates.leihuAutoStart ? '1' : '0' });
@@ -673,7 +687,20 @@ app.post('/api/settings', (req, res) => {
   res.json({ ok: true, ...updates });
 });
 
-// ── WebSocket (overlay + clip-player) ────────────────────────────────────────
+// ── Chat log (dashboard Chat tab, chat-log.js) ───────────────────────────────
+app.get('/api/chat/recent', (req, res) => res.json(chatLog.getRecent()));
+app.get('/api/chat/days', async (req, res) => res.json(await chatLog.days()));
+app.get('/api/chat/log', async (req, res) => res.json(await chatLog.load(String(req.query.day || ''))));
+
+// New chat goes only to dashboards that asked for it (overlay and clip player don't need it)
+function sendChat(msg) {
+  const str = JSON.stringify(msg);
+  for (const client of wss.clients) {
+    if (client.wantsChat && client.readyState === 1) client.send(str);
+  }
+}
+
+// ── WebSocket (overlay + clip-player + dashboard) ────────────────────────────
 wss.on('connection', (ws, req) => {
   console.log(`[ws] Client connected from ${req.socket.remoteAddress}`);
   registerClient(ws);
@@ -681,6 +708,7 @@ wss.on('connection', (ws, req) => {
     try {
       const msg = JSON.parse(data.toString());
       if (msg.type === 'media-ended') mediaQueue.onEnded(msg.mediaId);
+      if (msg.type === 'chat-subscribe') ws.wantsChat = true;
     } catch {}
   });
 });
@@ -701,6 +729,7 @@ async function start() {
   }
 
   generateSponsorVoice();
+  await chatLog.init(sendChat).catch(err => console.error('[chat-log] Could not read the chat log:', err.message));
   leihu.start();
 
   server.listen(PORT, () => {

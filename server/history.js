@@ -254,4 +254,9 @@ function getLastRequestedAt(title) {
   return rec ? rec.last_requested_at : null;
 }
 
-module.exports = { init, recordRequest, getHistory: () => startupSnapshot, getLastRequestedAt };
+// The history sheet is loaded: getLastRequestedAt() null then means "never requested", not "unknown"
+function isReady() {
+  return initialized;
+}
+
+module.exports = { init, recordRequest, getHistory: () => startupSnapshot, getLastRequestedAt, isReady };

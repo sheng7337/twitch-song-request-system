@@ -99,19 +99,19 @@
   .chip:hover { background: rgba(176,106,255,0.1); }
   .chip.on { color: var(--green); border-color: var(--border-green); }
 
-  /* Settings popover under the ⚙ button */
-  .settings-wrap { position: relative; }
-  .settings {
-    position: absolute; right: 0; top: calc(100% + 8px); z-index: 300;
-    width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto;
-    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 16px; display: flex; flex-direction: column; gap: 18px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  /* Each tab's settings: ⚙ at the right end of the tab's top row opens a panel from the right,
+     over the tab (toggleTabConfig) */
+  .tab-config {
+    position: absolute; top: 0; right: 16px; bottom: 14px; z-index: 250; width: min(420px, calc(100% - 32px));
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
   }
-  .settings[hidden] { display: none; }
-  .settings section, .leihu-side section { display: flex; flex-direction: column; gap: 8px; border-radius: 6px; transition: background .4s; }
-  .settings section.flash { background: rgba(176,106,255,0.12); }
-  .settings h3, .leihu-side h3 {
+  .tab-config[hidden] { display: none; }
+  .tab-config-close { position: absolute; top: 10px; right: 10px; }
+  .tab-config > section:first-of-type h3 { padding-right: 40px; }
+  .tab-config-btn[aria-expanded="true"] { background: rgba(176,106,255,0.15); }
+  .tab-config section { display: flex; flex-direction: column; gap: 8px; border-radius: 6px; }
+  .tab-config h3 {
     font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 2px;
     text-transform: uppercase; color: var(--purple);
   }
@@ -150,25 +150,17 @@
   }
   .tab:hover { color: var(--text); }
   .tab[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
-  .tab-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .tab-page { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   .tab-page[hidden] { display: none; }
 
-  /* ── Leihu tab: Leihu's own screen; its settings open as a panel over it (⚙ in the header) ── */
+  /* ── Leihu tab: Leihu's own screen; its settings open from ⚙ (.tab-config) ── */
   .leihu-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
   .leihu-view { flex: 1; background: var(--bg-panel); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   .leihu-view .col-header { gap: 10px; }
   .leihu-view .btn { font-size: 13px; padding: 4px 10px; text-decoration: none; }
-  .leihu-view .btn[aria-expanded="true"] { background: rgba(176,106,255,0.15); }
   .leihu-bulk { font-size: 13px; color: var(--amber); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .leihu-bulk[hidden] { display: none; }
   .leihu-body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .leihu-side {
-    position: absolute; top: 0; left: 0; bottom: 0; z-index: 10; width: min(420px, 100%);
-    background: var(--bg-panel); border-right: 1px solid var(--border); box-shadow: 10px 0 40px rgba(0,0,0,0.6);
-    padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;
-  }
-  .leihu-side[hidden] { display: none; }
-  .leihu-side-close { position: absolute; top: 10px; right: 10px; }
   .leihu-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: var(--bg); }
   .leihu-frame[hidden] { display: none; }
   .leihu-placeholder {
@@ -176,6 +168,64 @@
     padding: 24px; color: var(--text-dim); font-size: 14px; line-height: 1.6;
   }
   .leihu-placeholder[hidden] { display: none; }
+
+  /* ── Chat tab: live chat and earlier days' logs, with filters ── */
+  .tab-count {
+    display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px;
+    background: var(--purple); color: var(--bg); font-size: 11px; line-height: 17px; text-align: center;
+  }
+  .tab-count[hidden] { display: none; }
+  .chat-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
+  .chat-view { flex: 1; background: var(--bg-panel); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  .chat-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .chat-tools input[type="search"] {
+    flex: 1; min-width: 180px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 6px 9px; font-family: 'Share Tech Mono', monospace; font-size: 14px;
+  }
+  .chat-tools .btn, .chat-tools .lang-select { font-size: 13px; padding: 4px 10px; text-decoration: none; }
+  .chat-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+  .chat-filters .chip { font-size: 12px; padding: 3px 10px; }
+  .chat-filters .chip.on { color: var(--bg); background: var(--purple); border-color: var(--purple); }
+  .chat-filters .chip.user { color: var(--amber); border-color: var(--border-amber); }
+  .chat-count { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px; font-size: 14px; line-height: 1.55; }
+  .chat-empty { color: var(--text-dim); text-align: center; padding: 30px 10px; font-size: 13px; }
+  .chat-msg { padding: 2px 6px; border-radius: 3px; word-wrap: break-word; }
+  .chat-msg:hover { background: var(--bg-hover); }
+  .chat-msg.me-mention { background: rgba(176,106,255,0.12); }
+  .chat-msg.highlight { background: rgba(176,106,255,0.2); }
+  .chat-msg.intro { border-left: 2px solid var(--green); }
+  .chat-msg.redeem { background: rgba(255,184,74,0.08); color: var(--amber); }
+  .chat-msg.deleted .chat-text { text-decoration: line-through; opacity: 0.45; }
+  .chat-time { color: var(--text-dim); font-size: 12px; margin-right: 6px; }
+  .chat-badge {
+    display: inline-block; font-size: 10px; line-height: 14px; padding: 0 4px; margin-right: 3px; border-radius: 3px;
+    border: 1px solid currentColor; vertical-align: 1px;
+  }
+  .chat-badge.broadcaster { color: var(--red); }
+  .chat-badge.moderator { color: var(--green); }
+  .chat-badge.vip { color: #ff6ad5; }
+  .chat-badge.subscriber, .chat-badge.founder { color: var(--purple); }
+  .chat-name { font-weight: 600; cursor: pointer; }
+  .chat-name:hover { text-decoration: underline; }
+  .chat-text img { height: 24px; vertical-align: middle; }
+  .chat-text .mention { font-weight: 600; }
+  .chat-text mark { background: rgba(255,184,74,0.35); color: inherit; border-radius: 2px; }
+  .chat-reply { display: block; font-size: 12px; color: var(--text-dim); }
+  .chat-tag { font-size: 11px; color: var(--text-dim); margin-left: 6px; }
+  .chat-song {
+    margin-left: 6px; font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 0 7px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border-green); border-radius: 10px; color: var(--green);
+  }
+  .chat-song:hover { background: rgba(74,255,154,0.1); }
+  .chat-song.recent { color: var(--amber); border-color: var(--border-amber); }
+  .chat-song.recent:hover { background: rgba(255,184,74,0.1); }
+  .chat-more {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    background: var(--purple); color: var(--bg); border: none; border-radius: 14px; padding: 5px 14px;
+    font-family: 'Share Tech Mono', monospace; font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .chat-more[hidden] { display: none; }
 
   /* ── Layout: 2×2 — left: Now Playing over Up Next, right: Pending Review over Played ── */
   .board {
@@ -195,6 +245,7 @@
     .col-panel.grow { min-height: 320px; }
     .pending-panel { max-height: none; }
     .leihu-frame { flex: none; height: 85vh; }
+    .chat-list { flex: none; height: 75vh; }
   }
 
   /* ── Column panels ── */
@@ -630,54 +681,13 @@
   <button class="chip" id="leihu-chip" onclick="showTab('leihu')" data-i18n-title="dash.leihuChipTitle">
     🎤 <span id="leihu-state" data-i18n="dash.leihuOffline">Leihu offline</span>
   </button>
-  <div class="settings-wrap">
-    <button class="btn" id="settings-btn" onclick="toggleSettings()" aria-expanded="false" aria-controls="settings" data-i18n="dash.settings">⚙ Settings</button>
-    <!-- Settings save on their own: the number box on Enter or when leaving it, sliders when let go -->
-    <div class="settings" id="settings" hidden>
-      <section>
-        <h3 data-i18n="dash.set.randomTitle">Random song reward</h3>
-        <label class="setting">
-          <span class="setting-name" data-i18n="dash.set.cooldown">Cooldown</span>
-          <input type="number" class="cooldown-input" id="cooldown-input" min="0" max="60" step="1" onchange="saveCooldown()" />
-          <span data-i18n="dash.set.days">days</span>
-        </label>
-        <p class="setting-hint" data-i18n="dash.set.cooldownHint">Days after a song is requested before the random reward can pick it again. 0 = no cooldown, at most 60.</p>
-      </section>
-      <section>
-        <h3 data-i18n="dash.set.overlayTitle">Overlay look</h3>
-        <label class="setting">
-          <span class="setting-name" data-i18n="dash.set.opacity">Panel opacity</span>
-          <input type="range" class="opacity-slider" id="opacity-input" min="0" max="1" step="0.01"
-                 oninput="document.getElementById('opacity-value').textContent = this.value" onchange="saveOpacity()" />
-          <span class="opacity-value" id="opacity-value">0.92</span>
-        </label>
-        <label class="setting">
-          <span class="setting-name" data-i18n="dash.set.brightness">Brightness</span>
-          <input type="range" class="opacity-slider" id="brightness-input" min="0.5" max="2" step="0.05"
-                 oninput="document.getElementById('brightness-value').textContent = this.value" onchange="saveBrightness()" />
-          <span class="opacity-value" id="brightness-value">1</span>
-        </label>
-        <p class="setting-hint" data-i18n="dash.set.overlayHint">Opacity: 0 = see-through, 1 = solid. Brightness: 1 = normal.</p>
-        <button class="link-btn" onclick="resetOverlay()" data-i18n="dash.set.reset">Reset to default (0.92 / 1)</button>
-        <label class="setting">
-          <span class="setting-name" data-i18n="dash.set.overlayLang">Overlay language</span>
-          <select class="lang-select" id="overlay-lang" onchange="saveOverlayLanguage()">
-            <option value="en">English</option>
-            <option value="zh-TW">繁體中文</option>
-          </select>
-        </label>
-        <p class="setting-hint" data-i18n="dash.set.overlayLangHint">Language viewers see on the song overlay and clip player in OBS.</p>
-      </section>
-    </div>
-  </div>
-  <button class="btn skip" onclick="api('skip')" data-i18n="dash.skip">⏭ Skip</button>
-  <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
 </div>
 
 <!-- Tabs: a button here and a .tab-page below (TABS in the script). Planned: chat room, rewards, OBS / Streamlabs control -->
 <nav class="tabs" role="tablist" data-i18n-aria-label="dash.tabs" onkeydown="onTabKey(event)">
   <button class="tab" role="tab" id="tabbtn-queue" data-tab="queue" aria-controls="tab-queue" onclick="showTab('queue')" data-i18n="dash.tab.queue">🎵 Song Queue</button>
   <button class="tab" role="tab" id="tabbtn-leihu" data-tab="leihu" aria-controls="tab-leihu" onclick="showTab('leihu')" data-i18n="dash.tab.leihu">🎤 Leihu Singsing</button>
+  <button class="tab" role="tab" id="tabbtn-chat" data-tab="chat" aria-controls="tab-chat" onclick="showTab('chat')"><span data-i18n="dash.tab.chat">💬 Chat</span><span class="tab-count" id="chat-unread" hidden></span></button>
 </nav>
 
 <!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
@@ -694,17 +704,26 @@
    <div class="leihu-view">
     <div class="col-header">
       <span class="col-title purple" data-i18n="dash.leihu.title">Leihu Singsing</span>
-      <button class="btn" id="leihu-side-btn" onclick="toggleLeihuSide()" aria-expanded="false" aria-controls="leihu-side" data-i18n="dash.leihu.settings">⚙ Leihu settings</button>
-      <button class="link-btn leihu-bulk" id="leihu-bulk-mini" onclick="toggleLeihuSide(true)" hidden></button>
+      <button class="link-btn leihu-bulk" id="leihu-bulk-mini" onclick="toggleTabConfig('leihu', true)" hidden></button>
       <span class="topbar-spacer"></span>
       <button class="btn" id="leihu-reload" onclick="reloadLeihu()" hidden data-i18n="dash.leihu.reload">↻ Reload</button>
       <a class="btn" id="leihu-window" target="_blank" rel="noopener" hidden data-i18n="dash.leihu.newWindow">↗ Open in its own window</a>
       <button class="btn danger" id="leihu-close" onclick="launchLeihu('stop')" hidden data-i18n="dash.leihu.close">■ Close Leihu</button>
+      <button class="btn tab-config-btn" onclick="toggleTabConfig('leihu')" aria-expanded="false" aria-controls="config-leihu" data-i18n="dash.settings">⚙ Settings</button>
     </div>
     <div class="leihu-body">
-     <!-- Leihu settings and the "get your song list ready" steps: a panel over Leihu's screen, opened from ⚙ -->
-     <div class="leihu-side" id="leihu-side" hidden>
-      <button class="btn leihu-side-close" onclick="toggleLeihuSide(false)" data-i18n-aria-label="dash.leihu.closeSettings">✕</button>
+     <div class="leihu-placeholder" id="leihu-placeholder">
+       <p id="leihu-placeholder-text"></p>
+       <button class="btn add" id="leihu-start" onclick="launchLeihu('start')" hidden data-i18n="dash.leihu.start">▶ Start Leihu</button>
+     </div>
+     <iframe class="leihu-frame" id="leihu-frame" hidden data-i18n-title="dash.leihu.title"
+             allow="microphone; autoplay; fullscreen; clipboard-write"></iframe>
+    </div>
+   </div>
+  </div>
+  <!-- Leihu settings and the "get your song list ready" steps, over Leihu's screen -->
+  <div class="tab-config" id="config-leihu" hidden>
+      <button class="btn tab-config-close" onclick="toggleTabConfig('leihu', false)" data-i18n-aria-label="dash.closeSettings">✕</button>
       <section id="settings-leihu">
         <h3 data-i18n="dash.set.leihuTitle">Leihu Singsing</h3>
         <p class="setting-hint" id="leihu-detail"></p>
@@ -742,15 +761,40 @@
           <p class="setting-hint" data-i18n="dash.set.bulkSafe">Safe to leave running: one song at a time and only while Leihu is idle, so requested songs go first. If YouTube starts limiting downloads it stops by itself; press the button again a few hours later to continue.</p>
         </div>
       </section>
-     </div>
-     <div class="leihu-placeholder" id="leihu-placeholder">
-       <p id="leihu-placeholder-text"></p>
-       <button class="btn add" id="leihu-start" onclick="launchLeihu('start')" hidden data-i18n="dash.leihu.start">▶ Start Leihu</button>
-     </div>
-     <iframe class="leihu-frame" id="leihu-frame" hidden data-i18n-title="dash.leihu.title"
-             allow="microphone; autoplay; fullscreen; clipboard-write"></iframe>
+  </div>
+</div>
+
+<!-- Chat: live chat and earlier days' logs (server/chat-log.js), filtered here -->
+<div class="tab-page" id="tab-chat" role="tabpanel" aria-labelledby="tabbtn-chat" hidden>
+  <div class="chat-page">
+    <div class="chat-view">
+      <div class="chat-tools">
+        <input type="search" id="chat-search" oninput="onChatSearch()" data-i18n-placeholder="dash.chat.search" placeholder="Search messages or names…" />
+        <select class="lang-select" id="chat-day" onchange="onChatDay()" data-i18n-aria-label="dash.chat.day"></select>
+        <label class="setting">
+          <input type="checkbox" id="chat-hide-bots" onchange="onChatHideBots()" />
+          <span data-i18n="dash.chat.hideBots">Hide bots</span>
+        </label>
+        <span class="chat-count" id="chat-count"></span>
+        <a class="btn" id="chat-popout" target="_blank" rel="noopener" hidden data-i18n="dash.chat.popout">↗ Twitch chat</a>
+        <button class="btn tab-config-btn" onclick="toggleTabConfig('chat')" aria-expanded="false" aria-controls="config-chat" data-i18n="dash.settings">⚙ Settings</button>
+      </div>
+      <div class="chat-filters" id="chat-filters" role="group" data-i18n-aria-label="dash.chat.filters"></div>
+      <div class="chat-list" id="chat-list" onscroll="onChatScroll()"></div>
+      <button class="chat-more" id="chat-more" onclick="chatToBottom()" hidden></button>
     </div>
-   </div>
+  </div>
+  <!-- Chat settings -->
+  <div class="tab-config" id="config-chat" hidden>
+    <button class="btn tab-config-close" onclick="toggleTabConfig('chat', false)" data-i18n-aria-label="dash.closeSettings">✕</button>
+    <section>
+      <h3 data-i18n="dash.chat.notesTitle">Song notes on the stream overlay</h3>
+      <label class="setting">
+        <input type="checkbox" id="chat-song-notes" checked onchange="saveSongNotes()" />
+        <span data-i18n="dash.chat.songNotes">📺 Song notes on overlay</span>
+      </label>
+      <p class="setting-hint" data-i18n="dash.chat.songNotesHint">When chat names a song from the sheet, the song overlay briefly shows when it was last sung.</p>
+    </section>
   </div>
 </div>
 
@@ -765,6 +809,53 @@
   <input class="requester-input" type="text" id="requester-input" placeholder="requester ID" data-i18n-placeholder="dash.manual.requesterPlaceholder"
          onkeydown="if(event.key==='Enter') submitRequest()" />
   <button class="btn add" id="add-btn" onclick="submitRequest()" data-i18n="dash.manual.add">+ Add to Queue</button>
+  <button class="btn tab-config-btn" onclick="toggleTabConfig('queue')" aria-expanded="false" aria-controls="config-queue" data-i18n="dash.settings">⚙ Settings</button>
+</div>
+
+<!-- Song Queue settings. They save on their own: the number box on Enter or when leaving it, sliders when let go -->
+<div class="tab-config" id="config-queue" hidden>
+  <button class="btn tab-config-close" onclick="toggleTabConfig('queue', false)" data-i18n-aria-label="dash.closeSettings">✕</button>
+  <section>
+    <h3 data-i18n="dash.set.randomTitle">Random song reward</h3>
+    <label class="setting">
+      <span class="setting-name" data-i18n="dash.set.cooldown">Cooldown</span>
+      <input type="number" class="cooldown-input" id="cooldown-input" min="0" max="60" step="1" onchange="saveCooldown()" />
+      <span data-i18n="dash.set.days">days</span>
+    </label>
+    <p class="setting-hint" data-i18n="dash.set.cooldownHint">Days after a song is requested before the random reward can pick it again. 0 = no cooldown, at most 60.</p>
+  </section>
+  <section>
+    <h3 data-i18n="dash.set.overlayTitle">Overlay look</h3>
+    <label class="setting">
+      <span class="setting-name" data-i18n="dash.set.opacity">Panel opacity</span>
+      <input type="range" class="opacity-slider" id="opacity-input" min="0" max="1" step="0.01"
+             oninput="document.getElementById('opacity-value').textContent = this.value" onchange="saveOpacity()" />
+      <span class="opacity-value" id="opacity-value">0.92</span>
+    </label>
+    <label class="setting">
+      <span class="setting-name" data-i18n="dash.set.brightness">Brightness</span>
+      <input type="range" class="opacity-slider" id="brightness-input" min="0.5" max="2" step="0.05"
+             oninput="document.getElementById('brightness-value').textContent = this.value" onchange="saveBrightness()" />
+      <span class="opacity-value" id="brightness-value">1</span>
+    </label>
+    <p class="setting-hint" data-i18n="dash.set.overlayHint">Opacity: 0 = see-through, 1 = solid. Brightness: 1 = normal.</p>
+    <button class="link-btn" onclick="resetOverlay()" data-i18n="dash.set.reset">Reset to default (0.92 / 1)</button>
+    <label class="setting">
+      <span class="setting-name" data-i18n="dash.set.overlayLang">Overlay language</span>
+      <select class="lang-select" id="overlay-lang" onchange="saveOverlayLanguage()">
+        <option value="en">English</option>
+        <option value="zh-TW">繁體中文</option>
+      </select>
+    </label>
+    <p class="setting-hint" data-i18n="dash.set.overlayLangHint">Language viewers see on the song overlay and clip player in OBS.</p>
+  </section>
+  <section>
+    <h3 data-i18n="dash.set.clearTitle">Clear the queue</h3>
+    <p class="setting-hint" data-i18n="dash.set.clearHint">Removes Now Playing and every song in Up Next, e.g. to start a new stream fresh. Played and Pending Review stay. Nothing is recorded as sung.</p>
+    <div class="step-buttons">
+      <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
+    </div>
+  </section>
 </div>
 
 <div class="board">
@@ -837,9 +928,20 @@ let dragging = { zone: null, index: null, el: null };
 // ── WebSocket ──────────────────────────────────────────────────────────────────
 function connect() {
   ws = new WebSocket(WS_URL);
-  ws.onopen  = () => { document.getElementById('dot').classList.remove('off'); clearTimeout(reconnectTimer); };
+  ws.onopen  = () => {
+    document.getElementById('dot').classList.remove('off'); clearTimeout(reconnectTimer);
+    ws.send(JSON.stringify({ type: 'chat-subscribe' }));
+    loadChat();   // fills in chat missed while disconnected
+  };
   ws.onclose = () => { document.getElementById('dot').classList.add('off'); reconnectTimer = setTimeout(connect, 3000); };
-  ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.type === 'state') { state = m; render(); pollLeihu(); } } catch(_){} };
+  ws.onmessage = (e) => {
+    try {
+      const m = JSON.parse(e.data);
+      if (m.type === 'state') { state = m; render(); pollLeihu(); }
+      else if (m.type === 'chat') onChatRecord(m.record);
+      else if (m.type === 'chat-delete') onChatDelete(m);
+    } catch(_){}
+  };
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────────
@@ -1244,12 +1346,15 @@ function paintNodeWarning() {
 }
 
 const COOLDOWN_MAX_DAYS = 60; // ~2 months
+let cooldownDays = 7;          // random cooldown, also "sung recently" for songs named in chat
 
 async function loadSettings() {
   try {
     const res = await fetch('/api/settings');
     const settings = await res.json();
     document.getElementById('cooldown-input').value = settings.randomCooldownDays;
+    cooldownDays = settings.randomCooldownDays;
+    document.getElementById('chat-song-notes').checked = settings.songNotes !== false;
     document.getElementById('opacity-input').value = settings.panelBgAlpha;
     document.getElementById('opacity-value').textContent = settings.panelBgAlpha;
     document.getElementById('brightness-input').value = settings.textBrightness;
@@ -1260,28 +1365,23 @@ async function loadSettings() {
   } catch(_) {}
 }
 
-// ⚙ Settings popover. With a section ID (the Leihu chip) it opens at that section.
-function toggleSettings(sectionId) {
-  const panel = document.getElementById('settings');
-  panel.hidden = sectionId ? false : !panel.hidden;
-  document.getElementById('settings-btn').setAttribute('aria-expanded', String(!panel.hidden));
-  if (sectionId) {
-    const sec = document.getElementById(sectionId);
-    sec.scrollIntoView({ block: 'nearest' });
-    sec.classList.add('flash');
-    setTimeout(() => sec.classList.remove('flash'), 800);
-  }
+// Each tab's settings panel (#config-<tab>), from ⚙ at the right end of the tab's top row.
+// `open` undefined toggles. ✕, Esc and switching tabs close it.
+function toggleTabConfig(tab, open) {
+  const panel = document.getElementById('config-' + tab);
+  panel.hidden = open === undefined ? !panel.hidden : !open;
+  const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(!panel.hidden));
+  // Opens just under the tab's top row, so its ⚙ stays in view
+  if (!panel.hidden) panel.style.top = `${Math.max(0, btn.getBoundingClientRect().bottom - panel.parentElement.getBoundingClientRect().top + 8)}px`;
 }
 
-function closeSettings() {
-  document.getElementById('settings').hidden = true;
-  document.getElementById('settings-btn').setAttribute('aria-expanded', 'false');
+function closeTabConfigs() {
+  for (const tab of TABS) toggleTabConfig(tab, false);
 }
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.settings-wrap, #leihu-chip')) closeSettings();
-});
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSettings(); toggleLeihuSide(false); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTabConfigs(); });
 
 function resetOverlay() {
   document.getElementById('opacity-input').value = 0.92;
@@ -1320,6 +1420,8 @@ async function saveCooldown() {
       body: JSON.stringify({ randomCooldownDays: days }),
     });
     if (!res.ok) throw new Error('save failed');
+    cooldownDays = days;
+    renderChat();
     showToast(days > 0 ? t('dash.toast.cooldownSet', { days }) : t('dash.toast.cooldownOff'));
   } catch(_) {
     showToast(t('dash.toast.cooldownFailed'), true);
@@ -1599,7 +1701,7 @@ async function pollLeihu() {
 
 // ── Tabs ── Each tab is a button in .tabs and a .tab-page; #leihu in the address keeps the tab
 // on reload. Planned: chat room, rewards, OBS / Streamlabs control — add them here and in the markup.
-const TABS = ['queue', 'leihu'];
+const TABS = ['queue', 'leihu', 'chat'];
 let currentTab = 'queue';
 
 function showTab(name) {
@@ -1613,8 +1715,9 @@ function showTab(name) {
   }
   const hash = name === 'queue' ? '' : '#' + name;
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
-  closeSettings();
+  closeTabConfigs();
   paintLeihuView();
+  if (name === 'chat') onChatShown();
 }
 
 // Arrow keys move between tabs (the usual tab-list keys)
@@ -1734,12 +1837,6 @@ function paintBulk() {
   mini.title = mini.textContent;
 }
 
-// The Leihu settings panel over Leihu's screen: ⚙ toggles it, ✕ / Esc close it
-function toggleLeihuSide(open) {
-  const side = document.getElementById('leihu-side');
-  side.hidden = open === undefined ? !side.hidden : !open;
-  document.getElementById('leihu-side-btn').setAttribute('aria-expanded', String(!side.hidden));
-}
 
 async function bulkAction(action) {
   try {
@@ -1832,6 +1929,298 @@ async function openPicker(entry, st) {
   input.focus();
 }
 
+// ── Chat tab ── Live chat comes over the WebSocket (server/chat-log.js); earlier days load from
+// their log. Every filter runs here, on the records in memory.
+const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems'];
+// Common chat bots (logins), hidden while "Hide bots" is on
+const CHAT_BOTS = ['nightbot', 'streamelements', 'moobot', 'fossabot', 'wizebot', 'streamlabs', 'soundalerts',
+  'sery_bot', 'botrixoficial', 'kofistreambot', 'commanderroot', 'streamstickers', 'pokemoncommunitygame'];
+const CHAT_SHOWN_MAX = 1500;   // rows drawn at once; the count says when more matched
+const chat = {
+  live: [], day: '', dayRecords: null, days: [], channel: null, filter: 'all', user: null, query: '',
+  hideBots: true, unread: 0, newCount: 0, atBottom: true,
+};
+try { chat.hideBots = localStorage.getItem('chatHideBots') !== '0'; } catch(_) {}
+
+async function loadChat() {
+  try {
+    const data = await (await fetch('/api/chat/recent')).json();
+    chat.live = data.records || [];
+    chat.channel = data.channel || chat.channel;
+  } catch(_) {}
+  if (!chat.day) renderChat();
+}
+
+async function loadChatDays() {
+  try { chat.days = await (await fetch('/api/chat/days')).json(); } catch(_) {}
+  paintChatDays();
+}
+
+function paintChatDays() {
+  const sel = document.getElementById('chat-day');
+  sel.innerHTML = `<option value="">${esc(t('dash.chat.live'))}</option>`
+    + chat.days.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  sel.value = chat.day;
+}
+
+function onChatShown() {
+  chat.unread = 0;
+  paintChatUnread();
+  loadChatDays();
+  renderChat();
+}
+
+function isBot(rec) {
+  return CHAT_BOTS.includes((rec.user.login || '').toLowerCase());
+}
+
+function mentionsMe(rec) {
+  const me = (chat.channel || '').toLowerCase();
+  return !!me && rec.kind === 'chat' && (rec.parts || []).some(p => p.t === 'mention' && (p.login || '').toLowerCase() === me);
+}
+
+function chatWords() {
+  return chat.query.toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function chatMatches(rec) {
+  if (chat.hideBots && isBot(rec)) return false;
+  if (chat.user && rec.user.login !== chat.user) return false;
+  const words = chatWords();
+  if (words.length) {
+    const hay = `${rec.user.name} ${rec.user.login} ${rec.text} ${rec.reward || ''}`.toLowerCase();
+    if (!words.every(w => hay.includes(w))) return false;
+  }
+  const badges = rec.user.badges || [];
+  switch (chat.filter) {
+    case 'songs': return !!(rec.songs && rec.songs.length);
+    case 'commands': return rec.kind === 'chat' && rec.text.startsWith('!');
+    case 'mods': return badges.some(b => b === 'broadcaster' || b === 'moderator' || b === 'vip');
+    case 'subs': return badges.some(b => b === 'subscriber' || b === 'founder');
+    case 'mentions': return mentionsMe(rec);
+    case 'first': return rec.type === 'user_intro';
+    case 'highlight': return rec.type === 'channel_points_highlighted' || !!rec.bits;
+    case 'redeems': return rec.kind === 'redeem';
+    default: return true;
+  }
+}
+
+// Text with the search words marked
+function markWords(text, words) {
+  if (!words.length) return esc(text);
+  const re = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  return String(text).split(re).map((s, i) => i % 2 ? `<mark>${esc(s)}</mark>` : esc(s)).join('');
+}
+
+function chatTime(at) {
+  const d = new Date(at);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+const CHAT_BADGE_LABELS = { broadcaster: 'B', moderator: 'M', vip: 'V', subscriber: 'S', founder: 'F' };
+
+function chatRowHtml(rec) {
+  const words = chatWords();
+  const color = /^#[0-9a-f]{6}$/i.test(rec.user.color || '') ? rec.user.color : 'var(--purple)';
+  const name = `<span class="chat-name" data-login="${esc(rec.user.login)}" style="color:${color}">${esc(rec.user.name)}</span>`;
+  const time = `<span class="chat-time">${chatTime(rec.at)}</span>`;
+  if (rec.kind === 'redeem') {
+    return `<div class="chat-msg redeem" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
+      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}</div>`;
+  }
+  const badges = (rec.user.badges || []).filter(b => CHAT_BADGE_LABELS[b])
+    .map(b => `<span class="chat-badge ${b}" title="${esc(t('dash.chat.badge.' + b))}">${CHAT_BADGE_LABELS[b]}</span>`).join('');
+  const parts = (rec.parts && rec.parts.length ? rec.parts : [{ t: 'text', text: rec.text }]).map(p => {
+    if (p.t === 'emote') return `<img src="https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(p.id)}/default/dark/1.0" alt="${esc(p.text)}" title="${esc(p.text)}">`;
+    if (p.t === 'mention') return `<span class="mention">${markWords(p.text, words)}</span>`;
+    return markWords(p.text, words);
+  }).join('');
+  const cls = ['chat-msg', mentionsMe(rec) && 'me-mention', rec.type === 'channel_points_highlighted' && 'highlight',
+    rec.type === 'user_intro' && 'intro', rec.deleted && 'deleted'].filter(Boolean).join(' ');
+  const reply = rec.reply ? `<span class="chat-reply">↪ ${esc(rec.reply.name)}: ${esc(rec.reply.text)}</span>` : '';
+  const tags = (rec.type === 'user_intro' ? `<span class="chat-tag">${esc(t('dash.chat.tag.first'))}</span>` : '')
+    + (rec.bits ? `<span class="chat-tag">${esc(t('dash.chat.tag.bits', { bits: rec.bits }))}</span>` : '')
+    + (rec.deleted ? `<span class="chat-tag">${esc(t('dash.chat.tag.deleted'))}</span>` : '');
+  const songs = (rec.songs || []).map((s, i) => {
+    const sung = chatSungInfo(rec, s);
+    const tip = [t('dash.chat.addSong', { title: s.title }), sung.recent && t('dash.chat.sungRecently', { days: cooldownDays }),
+      s.onStream && t('dash.chat.shownOnStream')].filter(Boolean).join('\n');
+    return `<button class="chat-song${sung.recent ? ' recent' : ''}" data-id="${esc(rec.id)}" data-song="${i}" title="${esc(tip)}">`
+      + `♪ ${esc(s.title)}${sung.label ? ` · ${esc(sung.label)}` : ''}${s.onStream ? ' 📺' : ''}</button>`;
+  }).join('');
+  return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}</div>`;
+}
+
+// When a song named in chat was last sung, as of the message: { label, recent }. lastAt is left
+// out while the request history isn't loaded (no label then). recent = within the random cooldown.
+function chatSungInfo(rec, s) {
+  if (s.lastAt === undefined) return { label: '', recent: false };
+  if (s.lastAt === null) return { label: t('dash.chat.neverSung'), recent: false };
+  const days = Math.max(0, Math.floor((rec.at - s.lastAt) / 86400000));
+  return { label: t('dash.history.ago', { n: days }), recent: !!s.recent || (cooldownDays > 0 && rec.at - s.lastAt < cooldownDays * 86400000) };
+}
+
+function chatSource() {
+  return chat.day ? (chat.dayRecords || []) : chat.live;
+}
+
+function renderChat() {
+  if (currentTab !== 'chat') return;
+  const list = document.getElementById('chat-list');
+  const all = chatSource();
+  const shown = all.filter(chatMatches);
+  const rows = shown.slice(-CHAT_SHOWN_MAX);
+  list.innerHTML = rows.length ? rows.map(chatRowHtml).join('')
+    : `<div class="chat-empty">${esc(t(all.length ? 'dash.chat.noMatch' : chat.day ? 'dash.chat.emptyDay' : 'dash.chat.emptyLive'))}</div>`;
+  document.getElementById('chat-count').textContent = t(shown.length > rows.length ? 'dash.chat.countMore' : 'dash.chat.count',
+    { shown: shown.length, total: all.length, max: rows.length });
+  paintChatFilters();
+  const pop = document.getElementById('chat-popout');
+  pop.hidden = !chat.channel;
+  if (chat.channel) pop.href = `https://www.twitch.tv/popout/${encodeURIComponent(chat.channel)}/chat?popout=`;
+  document.getElementById('chat-hide-bots').checked = chat.hideBots;
+  chatToBottom();
+}
+
+function paintChatFilters() {
+  const box = document.getElementById('chat-filters');
+  box.innerHTML = CHAT_FILTERS.map(f =>
+    `<button class="chip${chat.filter === f ? ' on' : ''}" data-filter="${f}" aria-pressed="${chat.filter === f}">${esc(t('dash.chat.f.' + f))}</button>`).join('')
+    + (chat.user ? `<button class="chip user" data-clear-user="1" title="${esc(t('dash.chat.clearUser'))}">👤 ${esc(chat.userName || chat.user)} ✕</button>` : '');
+}
+
+document.getElementById('chat-filters').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.filter) chat.filter = b.dataset.filter;
+  if (b.dataset.clearUser) chat.user = null;
+  renderChat();
+});
+
+// Click a name: only that viewer (click again to show everyone). ♪: add the song to the queue.
+document.getElementById('chat-list').addEventListener('click', (e) => {
+  const name = e.target.closest('.chat-name');
+  if (name) {
+    chat.user = chat.user === name.dataset.login ? null : name.dataset.login;
+    chat.userName = name.textContent;
+    renderChat();
+    return;
+  }
+  const song = e.target.closest('.chat-song');
+  if (song) {
+    const rec = chatSource().find(r => r.id === song.dataset.id);
+    if (rec) addChatSong(rec, rec.songs[Number(song.dataset.song)]);
+  }
+});
+
+async function addChatSong(rec, s) {
+  if (!s) return;
+  const sheet = songList.find(x => x.title === s.title && (x.artist || '') === (s.artist || ''));
+  await api('add', { title: s.title, artist: s.artist, key: sheet?.key || '', requester: rec.user.name });
+  showToast(t('dash.toast.added', { title: s.title }));
+}
+
+let chatSearchTimer;
+function onChatSearch() {
+  clearTimeout(chatSearchTimer);
+  chatSearchTimer = setTimeout(() => { chat.query = document.getElementById('chat-search').value.trim(); renderChat(); }, 150);
+}
+
+async function onChatDay() {
+  chat.day = document.getElementById('chat-day').value;
+  chat.dayRecords = null;
+  if (chat.day) {
+    try { chat.dayRecords = await (await fetch(`/api/chat/log?day=${encodeURIComponent(chat.day)}`)).json(); }
+    catch(_) { chat.dayRecords = []; }
+  }
+  renderChat();
+}
+
+// Song notes on the stream overlay (server/song-notes.js, SONG_NOTES); saved for everyone
+async function saveSongNotes() {
+  const box = document.getElementById('chat-song-notes');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ songNotes: box.checked }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(t(box.checked ? 'dash.toast.songNotesOn' : 'dash.toast.songNotesOff'));
+  } catch(_) {
+    box.checked = !box.checked;
+    showToast(t('dash.toast.songNotesFailed'), true);
+  }
+}
+
+function onChatHideBots() {
+  chat.hideBots = document.getElementById('chat-hide-bots').checked;
+  try { localStorage.setItem('chatHideBots', chat.hideBots ? '1' : '0'); } catch(_) {}
+  renderChat();
+}
+
+function onChatScroll() {
+  const list = document.getElementById('chat-list');
+  chat.atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+  if (chat.atBottom && chat.newCount) { chat.newCount = 0; paintChatMore(); }
+}
+
+function chatToBottom() {
+  const list = document.getElementById('chat-list');
+  list.scrollTop = list.scrollHeight;
+  chat.atBottom = true;
+  chat.newCount = 0;
+  paintChatMore();
+}
+
+function paintChatMore() {
+  const more = document.getElementById('chat-more');
+  more.hidden = !chat.newCount;
+  more.textContent = chat.newCount ? t('dash.chat.newMessages', { n: chat.newCount }) : '';
+}
+
+function paintChatUnread() {
+  const el = document.getElementById('chat-unread');
+  el.hidden = !chat.unread;
+  el.textContent = chat.unread > 99 ? '99+' : String(chat.unread);
+}
+
+// A new message or redemption from the server
+function onChatRecord(rec) {
+  chat.live.push(rec);
+  if (chat.live.length > 1000) chat.live = chat.live.slice(-1000);
+  if (chat.day === '' && currentTab === 'chat' && chatMatches(rec)) {
+    const list = document.getElementById('chat-list');
+    const empty = list.querySelector('.chat-empty');
+    if (empty) empty.remove();
+    const stick = chat.atBottom;
+    list.insertAdjacentHTML('beforeend', chatRowHtml(rec));
+    while (list.children.length > CHAT_SHOWN_MAX) list.firstElementChild.remove();
+    if (stick) list.scrollTop = list.scrollHeight;
+    else { chat.newCount++; paintChatMore(); }
+    const shown = chat.live.filter(chatMatches).length;
+    document.getElementById('chat-count').textContent = t('dash.chat.count', { shown, total: chat.live.length });
+  }
+  if (currentTab !== 'chat' && rec.kind === 'chat' && !isBot(rec)) { chat.unread++; paintChatUnread(); }
+}
+
+// Mods deleted a message, or a timeout / ban / clear removed messages
+function onChatDelete(del) {
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  for (const list of [chat.live, chat.day === todayKey ? chat.dayRecords || [] : []]) {
+    for (const r of list) {
+      if (r.kind === 'chat' && (del.all || (del.ids && del.ids.includes(r.id)) || (del.user && r.user.id === del.user))) r.deleted = true;
+    }
+  }
+  if (currentTab === 'chat') {
+    const keep = chat.atBottom;
+    const list = document.getElementById('chat-list');
+    const top = list.scrollTop;
+    renderChat();
+    if (!keep) list.scrollTop = top;
+  }
+}
+
 function esc(s) {
   return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1844,6 +2233,9 @@ I18N.onChange(() => {
   paintBadges();
   paintBulk();
   paintLeihuView();
+  paintChatDays();
+  renderChat();
+  paintChatMore();
   if (filteredSongs.length) renderSuggest();
   if (!document.getElementById('node-warn').hidden) paintNodeWarning();
 });
