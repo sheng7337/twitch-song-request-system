@@ -26,7 +26,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-OK "Node.js：$nodeVer"
 
-# Ensure packages are installed
+Set-Location $PSScriptRoot
+
+# Security fixes: the minimum per Node.js line is secureNode in package.json.
+# Only tells the user -- installing Node.js is left to them.
+$nodeCheck = node server/node-check.js 2>$null
+if ($nodeCheck -like "outdated *") {
+    $parts = $nodeCheck -split " "
+    Write-Warn ('Node.js ' + $parts[1] + ' 缺少安全性修正，請安裝 ' + $parts[2] + ' 以上的版本：')
+    Write-Warn '    https://nodejs.org （或執行：winget upgrade OpenJS.NodeJS.LTS）'
+    Write-Warn '    然後重新啟動點歌系統。這次先照常啟動。'
+}
+
+# Ensure packages are installed. Raised minimum versions in package.json
+# (security fixes) are installed here too.
 Write-Step "檢查 npm 套件..."
 npm install --silent
 Write-OK "npm 套件已就緒"
@@ -43,8 +56,6 @@ Write-Host ""
 Write-Host "  直播結束後按 Ctrl+C 停止伺服器。" -ForegroundColor DarkGray
 Write-Host "  提醒：請確認 OBS 瀏覽器來源已設定並顯示於場景中。" -ForegroundColor DarkGray
 Write-Host ""
-
-Set-Location $PSScriptRoot
 
 # Poll until the server is ready, then open the browser.
 # The server itself decides the correct page (setup wizard or dashboard)

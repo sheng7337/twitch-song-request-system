@@ -407,6 +407,16 @@
   .empty-state { font-size: 14px; color: var(--text-dim); text-align: center; padding: 20px 12px; line-height: 1.6; }
 
   /* ── Manual request bar ── */
+  .node-warn {
+    display: flex; align-items: center; gap: 16px;
+    padding: 10px 20px;
+    background: rgba(80,45,10,0.5); border-bottom: 1px solid rgba(160,90,20,0.5);
+    color: var(--orange); font-size: 15px;
+  }
+  .node-warn[hidden] { display: none; }
+  .node-warn span { flex: 1; }
+  .node-warn a { color: inherit; }
+  .node-warn code { background: rgba(0,0,0,0.35); padding: 1px 6px; border-radius: 3px; user-select: all; }
   .request-bar {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 20px;
@@ -634,6 +644,12 @@
   </div>
   <button class="btn skip" onclick="api('skip')" data-i18n="dash.skip">⏭ Skip</button>
   <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
+</div>
+
+<!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
+<div class="node-warn" id="node-warn" role="alert" hidden>
+  <span id="node-warn-text"></span>
+  <button class="btn" onclick="document.getElementById('node-warn').hidden = true" data-i18n="dash.nodeWarnClose">Close</button>
 </div>
 
 <div class="request-bar">
@@ -1111,6 +1127,19 @@ async function loadHistory() {
   } catch(_) {}
 }
 
+let nodeStatus = null;
+async function loadNodeStatus() {
+  try {
+    nodeStatus = await (await fetch('/api/node-status')).json();
+    paintNodeWarning();
+  } catch(_) {}
+}
+function paintNodeWarning() {
+  if (!nodeStatus || !nodeStatus.outdated) return;
+  document.getElementById('node-warn-text').innerHTML = tHtml('dash.nodeWarn', nodeStatus);
+  document.getElementById('node-warn').hidden = false;
+}
+
 const COOLDOWN_MAX_DAYS = 60; // ~2 months
 
 async function loadSettings() {
@@ -1546,12 +1575,14 @@ I18N.onChange(() => {
   render();
   paintBadges();
   if (filteredSongs.length) renderSuggest();
+  if (!document.getElementById('node-warn').hidden) paintNodeWarning();
 });
 
 connect();
 loadSongList();
 loadHistory();
 loadSettings();
+loadNodeStatus();
 pollLeihu();
 setInterval(pollLeihu, 5000);
 </script>

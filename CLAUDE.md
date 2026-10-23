@@ -67,6 +67,7 @@ vtuber-song-queue/
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
 │   ├── messages.js        Message codes for errors/notes the web pages show translated
+│   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
@@ -351,6 +352,7 @@ register it in index.js.
 | POST | `/api/refresh-songs` | Force re-fetch song list from Google Sheets |
 | GET | `/api/songs` | Full song list (for dashboard autocomplete) |
 | GET | `/api/history` | Request history snapshot (startup state) |
+| GET | `/api/node-status` | `{version, minimum, outdated}` — is Node.js missing security fixes |
 | GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness, overlay language, Leihu auto-prepare |
 | GET | `/api/hls`, `/api/clip-stream` | Proxies for Twitch clip playback (Twitch hosts only) |
 | GET | `/api/leihu/status` | Leihu state of nowPlaying + queue, keyed by title + artist |
@@ -414,6 +416,23 @@ See `.env.example` for full descriptions.
 - `--list-height` — height of Up Next and Played scroll areas
 - `--panel-bg-alpha` — background opacity (set via dashboard WebSocket message)
 - Font sizes: `.np-title` (32px), `.q-title` / `.p-title` (21px), artists (15px), requesters (13px)
+
+---
+
+## Security updates
+
+- **npm packages — updated for the user.** `start.ps1` runs `npm install` on every start, but npm
+  keeps an installed version that still fits the range. So after a security fix, raise the minimum
+  in `package.json` (`dependencies`, or `overrides` for packages inside Express / axios / googleapis)
+  — the next start installs it. Same-major versions only, and run `npm test` first. Check with
+  `npm audit`. Left as is: `uuid` inside googleapis (fix needs googleapis 140 → 187+, untested;
+  the advisory needs a caller-supplied buffer, which googleapis doesn't pass)
+- **Node.js — the user is told, never installed for them** (needs an installer / admin prompt,
+  and a failed install would block the stream). `secureNode` in `package.json` lists the minimum
+  per release line; `server/node-check.js` compares. Shown by the start scripts (yellow warning,
+  starts anyway), the server log and a dashboard banner (`/api/node-status`; closing it lasts until
+  the page is opened again). Unlisted older or odd lines count as outdated. When Node.js ships a
+  security release, update `secureNode`
 
 ---
 

@@ -25,7 +25,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-OK "Node.js: $nodeVer"
 
-# Ensure packages are installed
+Set-Location $PSScriptRoot
+
+# Security fixes: the minimum per Node.js line is secureNode in package.json.
+# Only tells the user -- installing Node.js is left to them.
+$nodeCheck = node server/node-check.js 2>$null
+if ($nodeCheck -like "outdated *") {
+    $parts = $nodeCheck -split " "
+    Write-Warn ("Node.js " + $parts[1] + " is missing security fixes. Install " + $parts[2] + " or newer:")
+    Write-Warn "    https://nodejs.org  (or run: winget upgrade OpenJS.NodeJS.LTS)"
+    Write-Warn "    then start the song queue again. Starting anyway for now."
+}
+
+# Ensure packages are installed. Raised minimum versions in package.json
+# (security fixes) are installed here too.
 Write-Step "Checking npm packages..."
 npm install --silent
 Write-OK "npm packages ready"
@@ -42,8 +55,6 @@ Write-Host ""
 Write-Host "  Press Ctrl+C to stop the server when done streaming." -ForegroundColor DarkGray
 Write-Host "  Reminder: make sure your OBS Browser Source is visible in your scene." -ForegroundColor DarkGray
 Write-Host ""
-
-Set-Location $PSScriptRoot
 
 # Poll until the server is ready, then open the browser.
 # The server itself decides the correct page (setup wizard or dashboard)

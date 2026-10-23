@@ -25,6 +25,7 @@ const setupRouter = require('./setup-routes');
 const leihu = require('./leihu');
 const linkFinder = require('./link-finder');
 const { errorBody, message } = require('./messages');
+const { nodeStatus } = require('./node-check');
 
 const app = express();
 const server = http.createServer(app);
@@ -559,6 +560,7 @@ app.post('/api/pending/add-to-sheet', async (req, res) => {
 });
 
 app.get('/api/history', (req, res) => res.json(getHistory()));
+app.get('/api/node-status', (req, res) => res.json(nodeStatus()));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');
   res.json(getSongs());
@@ -662,6 +664,8 @@ const PORT = process.env.PORT || 3000;
 
 async function start() {
   console.log('\n🎵 VTuber Song Queue starting...\n');
+  const node = nodeStatus();
+  if (node.outdated) console.warn(`[node] Node.js ${node.version} is missing security fixes — install ${node.minimum} or newer from https://nodejs.org\n`);
 
   if (isSetupComplete()) {
     await activateServiceIfReady();
