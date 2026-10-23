@@ -212,6 +212,11 @@ vtuber-song-queue/
   connection; Leihu cuts the message, so `youtubeBlocked()` matches any part. Fix for users is in
   SETUP ("YouTube blocks downloads": wait, or `--cookies-from-browser firefox` in yt-dlp's own
   config file — no Leihu change)
+- Leihu 1.6+ YouTube download states (`dl_state` on unfinished songs, `yt_pause` in `/api/status`):
+  `queued` with no job yet counts as preparing; `paused` (Leihu stopped downloads for a YouTube
+  limit) is failed with `failure.paused` and the pause reason. Clicking a failed badge
+  (`/api/leihu/prepare`, retry) calls `POST /api/songs/<id>/redownload` for an unfinished
+  download, so Leihu retries the same song instead of adding a new one
 - Leihu's import returns an error for duplicates only after the download step — never send
   the same video twice; the `requested` map in leihu.js prevents it
 

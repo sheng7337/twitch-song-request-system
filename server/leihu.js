@@ -27,6 +27,7 @@ let library = null;          // Leihu's songs, or null while it can't be reached
 let activeJobs = new Set();  // Leihu song IDs with a queued/running job
 let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
 let canOpen = false;         // Leihu supports remote open, 1.5.2+ (/api/status reports `remote`)
+let ytPause = null;          // Leihu 1.6+: { on, reason } while it has paused YouTube downloads
 const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
 const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
 let links = loadLinks();
@@ -93,7 +94,10 @@ async function refresh() {
       hasLyrics: !!(m.lyrics_text && m.lyrics_text.trim()),
       lyricsSource: m.lyrics_source || null,
       lyricsPending: !!m.lyrics_pending,   // Leihu's "online lyrics available" chip
+      // Leihu 1.6+: YouTube download not finished — queued | paused | failed | cancelled
+      dlState: (m.steps && m.steps.import) ? null : (m.dl_state || null),
     }));
+    ytPause = statusRes.data.yt_pause || null;
     canOpen = 'remote' in statusRes.data;
     activeJobs = new Set((statusRes.data.jobs || [])
       .filter(j => j.status === 'queued' || j.status === 'running')
@@ -107,6 +111,7 @@ async function refresh() {
     activeJobs = new Set();
     jobErrors = new Map();
     canOpen = false;
+    ytPause = null;
     if (wasOnline) console.log(`[leihu] Leihu Singsing not reachable (${err.message})`);
   }
 }
@@ -128,14 +133,20 @@ function youtubeBlocked(text) {
   return /not a bot|confirm you.re not|cookies-from-browser|pass-cookies|exporting-youtube-cookies/i.test(text || '');
 }
 
-// Why Leihu's last job for this song failed, if Leihu still remembers: { reason, blocked }
+// Why Leihu's last job for this song failed, if Leihu still remembers: { reason, blocked }.
+// A download Leihu paused because YouTube is limiting this PC adds `paused: true`.
 function failure(id) {
+  const song = (library || []).find(s => s.id === id);
+  if (song && song.dlState === 'paused') {
+    const reason = (ytPause && ytPause.reason) || jobErrors.get(id) || '';
+    return { reason, blocked: youtubeBlocked(reason), paused: true };
+  }
   const reason = jobErrors.get(id);
   return reason ? { reason, blocked: youtubeBlocked(reason) } : null;
 }
 
 function songState(song) {
-  if (activeJobs.has(song.id)) return 'processing';
+  if (activeJobs.has(song.id) || song.dlState === 'queued') return 'processing';
   if (!song.complete) return 'failed';
   return song.hasLyrics ? 'ready' : 'nolyrics';
 }
@@ -259,12 +270,21 @@ function statusFor(title, artist) {
 
 // Import a missing song, or render its sheet key once it's ready.
 // Each request is sent at most once per server run; `retry` (the dashboard's
-// Prepare button) lets a failed import be sent again.
+// Prepare button) lets a failed import be sent again, and asks Leihu 1.6+ to download
+// again a song whose YouTube download failed, was cancelled or was paused.
 async function prepare(entry, { retry = false } = {}) {
   const vid = videoId(sheetSong(entry.title, entry.artist)?.url);
   if (retry && requested.get(`import:${vid}`) === 'failed') requested.delete(`import:${vid}`);
   const status = statusFor(entry.title, entry.artist);
-  if (status.state === 'missing') {
+  const song = status.id && library.find(s => s.id === status.id);
+  if (retry && status.state === 'failed' && song && song.dlState) {
+    try {
+      await axios.post(`${baseUrl()}/api/songs/${song.id}/redownload`, {}, { timeout: 10000 });
+      console.log(`[leihu] Downloading "${entry.title}" again`);
+    } catch (err) {
+      console.error(`[leihu] Download retry of "${entry.title}" failed:`, err.response?.data?.error || err.message);
+    }
+  } else if (status.state === 'missing') {
     const tag = `import:${vid}`;
     if (requested.has(tag)) return;
     requested.set(tag, 'sent');

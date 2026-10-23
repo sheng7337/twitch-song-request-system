@@ -1446,11 +1446,14 @@ function paintBadges() {
     const linked = s === 'ready' || s === 'nolyrics' || s === 'processing';
     const clickable = s && (!linked || st.manual);
     el.className = 'bt-badge' + (s ? ' ' + s : '') + (clickable ? ' click' : '');
-    // YouTube refusing downloads gets its own label and explanation; other failures show Leihu's reason
-    const blocked = s === 'failed' && st.failure && st.failure.blocked;
-    el.textContent = s ? t(blocked ? 'dash.bt.label.blocked' : 'dash.bt.label.' + s) : '';
-    el.title = !s ? '' : (blocked ? t('dash.bt.blocked') : t('dash.bt.hint.' + s))
-      + (s === 'failed' && st.failure && !blocked ? '\n' + t('dash.bt.reason', { reason: st.failure.reason }) : '')
+    // A download Leihu paused for a YouTube limit, and YouTube refusing downloads, get their own
+    // label and explanation; other failures show Leihu's reason
+    const paused = s === 'failed' && st.failure && st.failure.paused;
+    const blocked = !paused && s === 'failed' && st.failure && st.failure.blocked;
+    const special = paused ? 'paused' : blocked ? 'blocked' : null;
+    el.textContent = s ? t(special ? 'dash.bt.label.' + special : 'dash.bt.label.' + s) : '';
+    el.title = !s ? '' : (special ? t('dash.bt.' + special) : t('dash.bt.hint.' + s))
+      + (s === 'failed' && st.failure && st.failure.reason && !blocked ? '\n' + t('dash.bt.reason', { reason: st.failure.reason }) : '')
       + (st.leihuTitle ? '\n' + t('dash.bt.leihuTitle', { title: st.leihuTitle }) : '') + (st.manual ? '\n' + t('dash.bt.manual') : '');
     el.onclick = clickable ? () => onBadgeClick(entry, st) : null;
   }

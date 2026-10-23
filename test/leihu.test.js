@@ -18,7 +18,7 @@ const axiosStub = {
   get: async (url, opts = {}) => {
     if (!leihu.up) throw new Error('connect ECONNREFUSED');
     if (url.endsWith('/api/songs')) return { data: leihu.songs };
-    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}) } };
+    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}), ...(leihu.ytPause ? { yt_pause: leihu.ytPause } : {}) } };
     if (url.endsWith('/lyrics/candidates')) return { data: { results: leihu.candidates } };
     if (url.endsWith('/lyrics/search')) { searches.push(opts.params.q); return { data: { results: leihu.search } }; }
     throw new Error('unexpected GET ' + url);
@@ -249,4 +249,37 @@ test("a failed import shows Leihu's reason, and YouTube's bot check is recognize
   await L.refresh();
   assert.deepStrictEqual(statusOf(sheet[0]).failure, { reason: '找不到 ffmpeg，無法轉換 YouTube 音訊', blocked: false });
   leihu.jobs = [];
+});
+
+test('Leihu 1.6 download states: queued is preparing, paused says why, retry downloads again in place', async () => {
+  queueState.queue = [entry(sheet[0])];
+  const song = (dl_state) => [{ id: 'hhhhhhhhhh', title: 't（排隊下載）', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: { import: false }, dl_state }];
+
+  // Queued in Leihu but no job yet (e.g. right after Leihu restarts): not a failure
+  leihu.songs = song('queued');
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'processing');
+
+  leihu.songs = song('paused');
+  leihu.ytPause = { on: true, reason: 'HTTP Error 429: Too Many Requests' };
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'failed');
+  assert.deepStrictEqual(statusOf(sheet[0]).failure, { reason: 'HTTP Error 429: Too Many Requests', blocked: false, paused: true });
+  leihu.ytPause = null;
+
+  // Auto-prepare leaves a failed download alone; the dashboard's retry asks Leihu to download it again
+  leihu.songs = song('failed');
+  await L.refresh();
+  posts.length = 0;
+  await L.prepare(entry(sheet[0]));
+  assert.strictEqual(posts.length, 0);
+  await L.prepare(entry(sheet[0]), { retry: true });
+  assert.deepStrictEqual(posts.map(p => p.url), ['http://127.0.0.1:8765/api/songs/hhhhhhhhhh/redownload']);
+
+  // A finished song with a leftover state is just a song
+  leihu.songs = [{ ...song('failed')[0], steps: done, lyrics_text: LYR }];
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'ready');
+  posts.length = 0;
+  leihu.songs = [];
 });
