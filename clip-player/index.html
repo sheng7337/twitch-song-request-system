@@ -211,6 +211,13 @@
     transition: opacity 0.6s ease;
   }
 
+  /* !endingtk group headings (感謝訂閱 …): smaller, closer to the rule */
+  #sponsor-title.heading {
+    top: 225px;
+    font-size: 84px;
+    letter-spacing: 0.12em;
+  }
+
   #sponsor-rule {
     position: absolute;
     top: 358px;
@@ -458,11 +465,22 @@
 
   let sponsorGen = 0; // generation counter; incrementing cancels all pending callbacks
 
+  // !tk sends one list under 提供; !endingtk sends groups, each under its own heading (clip.credits.<key>)
+  function setSponsorHeading(key) {
+    sponsorTitleEl.textContent = key ? I18N.t('clip.credits.' + key) : '提供';
+    sponsorTitleEl.classList.toggle('heading', !!key);
+  }
+
   function showSponsorRoll(msg) {
-    const broadcasters = msg.broadcasters || [];
-    if (!broadcasters.length) { notifyEnded(); return; }
+    const groups = msg.groups || [{ key: null, people: msg.broadcasters || [] }];
+    const pages = [];
+    for (const g of groups) {
+      for (let i = 0; i < g.people.length; i += CARDS_PER_PAGE) pages.push({ key: g.key, people: g.people.slice(i, i + CARDS_PER_PAGE) });
+    }
+    if (!pages.length) { notifyEnded(); return; }
 
     const gen = ++sponsorGen;
+    setSponsorHeading(pages[0].key);
 
     sponsorBgEl.style.backgroundImage = msg.bgUrl ? `url("${msg.bgUrl}")` : 'none';
     sponsorTitleEl.style.opacity = '0';
@@ -484,13 +502,23 @@
       sponsorRuleEl.style.opacity = '1';
     }, 300);
 
-    // Start paging after title has faded in
-    const pages = [];
-    for (let i = 0; i < broadcasters.length; i += CARDS_PER_PAGE) {
-      pages.push(broadcasters.slice(i, i + CARDS_PER_PAGE));
+    // Start paging after title has faded in. A new group fades its heading in first.
+    function showPage(idx) {
+      if (sponsorGen !== gen) return;
+      if (idx > 0 && idx < pages.length && pages[idx].key !== pages[idx - 1].key) {
+        sponsorTitleEl.style.opacity = '0';
+        setTimeout(() => {
+          if (sponsorGen !== gen) return;
+          setSponsorHeading(pages[idx].key);
+          sponsorTitleEl.style.opacity = '1';
+          setTimeout(() => fillPage(idx), 600);
+        }, 600);
+        return;
+      }
+      fillPage(idx);
     }
 
-    function showPage(idx) {
+    function fillPage(idx) {
       if (sponsorGen !== gen) return;
 
       if (idx >= pages.length) {
@@ -506,7 +534,7 @@
       }
 
       sponsorCardsEl.innerHTML = '';
-      pages[idx].forEach(b => sponsorCardsEl.appendChild(makeSponsorCard(b)));
+      pages[idx].people.forEach(b => sponsorCardsEl.appendChild(makeSponsorCard(b)));
 
       setTimeout(() => {
         if (sponsorGen !== gen) return;

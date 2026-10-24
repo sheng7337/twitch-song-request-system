@@ -7,7 +7,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
-const { ensureFreshToken } = require('./twitch');
+const { ensureFreshToken, reconnect: reconnectTwitch } = require('./twitch');
 const { message } = require('./messages');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
@@ -131,7 +131,8 @@ router.post('/start-device-auth', async (req, res) => {
     const response = await axios.post('https://id.twitch.tv/oauth2/device', null, {
       params: {
         client_id: clientId,
-        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat',
+        // moderator:read:followers: new followers for !endingtk (not in chat)
+        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat moderator:read:followers',
       }
     });
     deviceAuthState = {
@@ -192,6 +193,7 @@ router.get('/poll-device-auth', async (req, res) => {
     });
     saveProgress({ displayName: user.display_name, broadcasterId: user.id });
     deviceAuthState = null;
+    reconnectTwitch();   // a running connection picks up the new permissions
 
     res.json({ status: 'authorized', displayName: user.display_name, broadcasterId: user.id });
   } catch (err) {

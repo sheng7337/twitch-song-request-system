@@ -16,6 +16,9 @@ let sessionId = null;
 let redemptionHandler = null; // set by index.js via setEventHandler
 let chatHandler = null;       // set by index.js via setChatHandler
 let moderationHandler = null; // set by index.js via setModerationHandler (deleted / cleared chat)
+let noticeHandler = null;     // set by index.js via setNoticeHandler (subs, gifts, raids as chat shows them)
+let followHandler = null;     // set by index.js via setFollowHandler
+let follows = null;           // new followers: 'on' | 'no-permission' (authorized before it was asked) | 'failed'
 
 // Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
 // so the same message_id can arrive more than once after reconnects.
@@ -146,6 +149,32 @@ async function subscribeToEvents(sid) {
       console.warn(`[twitch] Could not subscribe to ${type}:`, err.response?.data?.message || err.message);
     }
   }
+
+  // Subs, resubs, gifted subs and raids, as chat shows them (for !endingtk). Same scope as chat.
+  try {
+    await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+      type: 'channel.chat.notification', version: '1',
+      condition: { broadcaster_user_id: broadcasterId, user_id: broadcasterId },
+      transport: { method: 'websocket', session_id: sid },
+    }, { headers });
+  } catch (err) {
+    console.warn('[twitch] Could not subscribe to channel.chat.notification:', err.response?.data?.message || err.message);
+  }
+
+  // New followers (not in chat): needs moderator:read:followers. An authorization from before setup
+  // asked for it goes on without; the dashboard's Chat settings offer to authorize again.
+  try {
+    await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+      type: 'channel.follow', version: '2',
+      condition: { broadcaster_user_id: broadcasterId, moderator_user_id: broadcasterId },
+      transport: { method: 'websocket', session_id: sid },
+    }, { headers });
+    follows = 'on';
+    console.log('[twitch] Subscribed to new followers');
+  } catch (err) {
+    follows = err.response?.status === 403 ? 'no-permission' : 'failed';
+    console.warn('[twitch] Could not subscribe to new followers:', err.response?.data?.message || err.message);
+  }
 }
 
 const MODERATION_TYPES = ['channel.chat.message_delete', 'channel.chat.clear_user_messages', 'channel.chat.clear'];
@@ -207,6 +236,10 @@ function connectEventSub(url) {
         if (chatHandler) chatHandler(msg.payload.event);
       } else if (MODERATION_TYPES.includes(subType)) {
         if (moderationHandler) moderationHandler(subType, msg.payload.event);
+      } else if (subType === 'channel.chat.notification') {
+        if (noticeHandler) noticeHandler(msg.payload.event);
+      } else if (subType === 'channel.follow') {
+        if (followHandler) followHandler(msg.payload.event);
       }
     }
 
@@ -245,6 +278,24 @@ function setModerationHandler(fn) {
   moderationHandler = fn;
 }
 
+function setNoticeHandler(fn) {
+  noticeHandler = fn;
+}
+
+function setFollowHandler(fn) {
+  followHandler = fn;
+}
+
+function followStatus() {
+  return follows;
+}
+
+// After setup authorizes again: the close handler reconnects, and the new session subscribes
+// with the new token (and its new permissions)
+function reconnect() {
+  if (ws) ws.close();
+}
+
 async function connect() {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const token = process.env.TWITCH_USER_ACCESS_TOKEN;
@@ -272,4 +323,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, setEventHandler, setChatHandler, setModerationHandler, ensureFreshToken, setEnvValue };
+module.exports = { connect, reconnect, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, followStatus, ensureFreshToken, setEnvValue };

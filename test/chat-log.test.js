@@ -77,8 +77,8 @@ test('song mentions: longest title wins, short English words and commands do not
 });
 
 test('a redemption is logged with its reward and text', () => {
-  const rec = log.fromRedemption({ id: 'r1', user_id: '42', user_login: 'viewer', user_name: '觀眾A', user_input: ' 晴天 ', reward: { title: '點歌' } }, 5);
-  assert.deepStrictEqual(rec, { kind: 'redeem', id: 'r1', at: 5, user: { id: '42', login: 'viewer', name: '觀眾A', color: '', badges: [] }, text: '晴天', reward: '點歌' });
+  const rec = log.fromRedemption({ id: 'r1', user_id: '42', user_login: 'viewer', user_name: '觀眾A', user_input: ' 晴天 ', reward: { id: 'rw1', title: '點歌' } }, 5);
+  assert.deepStrictEqual(rec, { kind: 'redeem', id: 'r1', at: 5, user: { id: '42', login: 'viewer', name: '觀眾A', color: '', badges: [] }, text: '晴天', reward: '點歌', rewardId: 'rw1' });
 });
 
 test('messages are kept, sent to dashboards and saved per day; deletions apply when a day is read back', async () => {

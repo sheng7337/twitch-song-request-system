@@ -63,7 +63,10 @@ If you're interrupted partway through, it picks up where you left off.
 **Double-click `start.bat`** (English) or **`start_zh.bat`** (Traditional Chinese / 繁體中文).
 
 That's it — no ngrok, no URLs to copy, no `.env` to update. The script starts the
-server and opens your browser straight to **http://localhost:3000/dashboard**.
+server and opens the dashboard in a window of its own: a separate copy of Chrome (or Edge), so OBS
+can take Leihu Singsing's sound from it alone (see Leihu Singsing below). Logins and bookmarks of your
+usual browser aren't in it; the dashboard needs none. Until setup is done, and on a PC without
+Chrome or Edge, it opens your usual browser instead.
 
 ---
 
@@ -138,6 +141,7 @@ Mods and the broadcaster only — viewers can't trigger them.
 |---|---|
 | `!so <user>` | Plays a random clip of that channel and adds it to the sponsor roll |
 | `!tk` | Japanese-TV-style sponsor roll of every channel `!so`'d this stream, then clears the list |
+| `!endingtk` | The same roll for everyone who supported this stream, one heading each: raiders, subscribers (gifters and gifted viewers), cheers, new followers, channel-point redeemers, song requesters and the 8 most active chatters — since the last `!endingtk`. Who it would thank now: Chat tab ⚙ |
 | `!watch <url>` | Plays a Twitch clip, a YouTube video or a video file link (mp4/webm) |
 | `!replay` | Replays the last `!so` / `!watch` |
 | `!stop` | Stops what's playing and clears the waiting clips |
@@ -208,6 +212,10 @@ dashboard connects to it by itself — nothing to set up. When it isn't running,
 - When Leihu leaves a sheet song's lyrics blank, or flags that online lyrics fit better than what it
   recognized, an online lyric is applied — only an exact fit: same title, same artist, same length.
   Lyrics you picked in Leihu are never replaced.
+- **Leihu's sound as its own OBS source**: in the dashboard's Leihu tab, Leihu plays through the browser,
+  so OBS hears it mixed with every other tab. `start.bat` opens the dashboard in a separate copy of Chrome
+  (or Edge) for this; opened some other way, Leihu tab ⚙ → **🔊 Open the stream window** does the same. In OBS add **Application Audio Capture**, pick the
+  window **點歌控制台 Song Queue (OBS)** and set Window Match Priority to **Window title must match**.
 
 ---
 
@@ -243,7 +251,7 @@ vtuber-song-queue/
 ├── song-links.json           ← songs linked to Leihu by hand
 ├── link-search.json          ← link finder progress and decisions
 ├── server/                   ← the server (see CLAUDE.md for every file)
-│   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk)
+│   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk, !endingtk)
 ├── shared/                   ← English / 繁體中文 strings shared by the pages
 ├── overlay/index.html        ← OBS song overlay
 ├── clip-player/

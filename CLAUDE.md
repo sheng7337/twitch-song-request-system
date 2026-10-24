@@ -71,7 +71,8 @@ vtuber-song-queue/
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
 │   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
-│   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk)
+│   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json)
+│   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
 ├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
@@ -235,6 +236,13 @@ vtuber-song-queue/
   the window, so Leihu closes with the song queue. Folder: `LEIHU_ROOT`, else `leihu-home.json` (`remember()`,
   called from `refresh()` with Leihu's `root`), else `%LOCALAPPDATA%\LeihuLiantai`. ■ closes only a Leihu the
   song queue started (`launched` in `/api/leihu/status`); Leihu's own shortcut reuses a running server
+- Stream window (stream-window.js, `POST /api/stream-window`; start.ps1 / start_zh.ps1 call it with
+  `{tab:'queue', lang?}`, falling back to the default browser — 409 until setup is done; 🔊 in the Leihu tab's ⚙): opens
+  `/dashboard?window=stream[&lang=][#leihu]` in Chrome (else Edge) with `--user-data-dir=%LOCALAPPDATA%\SongRequestDashboard\stream-window`
+  `--app`, a separate browser process, so OBS's Application Audio Capture gets the Leihu iframe's sound without
+  the everyday browser. That window's title is fixed (`STREAM_WINDOW_TITLE`, not translated) for OBS's
+  "Window title must match". In it, /setup and twitch.tv links go to the usual browser (`POST /api/open-in-browser`,
+  only those URLs; it has no Twitch login). The header's 🔊 hint shows until it's opened once (localStorage `streamWindowOpened`)
 - Dashboard Chat tab (chat-log.js): every `channel.chat.message` and redemption becomes a record (user,
   badges, text split into text / emote / mention / cheer parts, message_type, bits, reply, `songs` = sheet
   titles named in it — 2+ chars, 4+ for Latin-only titles, longest wins, not for !commands). Records are
@@ -378,6 +386,7 @@ vtuber-song-queue/
 | `!replay` | Replays the last media |
 | `!stop` | Stops playback and clears the media queue |
 | `!tk` | Japanese-TV-style sponsor roll of everyone `!so`'d since the last `!tk` |
+| `!endingtk` | The same roll in groups (raiders, subs incl. gift recipients, cheers, followers, redeemers, song requesters, top 8 chatters) since the last `!endingtk` |
 
 Add a command: create `server/commands/<name>.js` exporting `register(registerCommand)`, then
 register it in index.js.

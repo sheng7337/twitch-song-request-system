@@ -56,9 +56,8 @@ Write-Host "  Press Ctrl+C to stop the server when done streaming." -ForegroundC
 Write-Host "  Reminder: make sure your OBS Browser Source is visible in your scene." -ForegroundColor DarkGray
 Write-Host ""
 
-# Poll until the server is ready, then open the browser.
-# The server itself decides the correct page (setup wizard or dashboard)
-# and redirects accordingly -- so we always open the root URL.
+# Poll until the server is ready, then open the dashboard (its own window, see below).
+# Until setup is done the server sends the root URL to the setup wizard.
 $openUrl = "http://localhost:3000/"
 Write-Host "  Waiting for server, then opening browser..." -ForegroundColor DarkGray
 Start-Job -ScriptBlock {
@@ -72,7 +71,13 @@ Start-Job -ScriptBlock {
             break
         } catch {}
     }
-    if ($ready) { Start-Process $u }
+    if ($ready) {
+        # The dashboard opens in its own Chrome/Edge window, so OBS can capture Leihu's sound alone.
+        # The setup wizard, or a PC without Chrome/Edge, opens in the default browser.
+        try {
+            Invoke-RestMethod -Method Post -Uri "http://localhost:3000/api/stream-window" -ContentType "application/json" -Body '{"tab":"queue"}' -TimeoutSec 5 | Out-Null
+        } catch { Start-Process $u }
+    }
 } -ArgumentList $openUrl | Out-Null
 
 npm start

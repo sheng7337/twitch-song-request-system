@@ -65,7 +65,13 @@ async function init() {
       currentStep = STEPS.indexOf('google-creds');
     } else if (status.configured.twitch) {
       currentStep = STEPS.indexOf('rewards');
-    } else if (status.clientId) {
+    }
+    // ?reauth=1 (dashboard → Chat settings): authorize again for a permission added later
+    if (status.configured.twitch && status.clientId && new URLSearchParams(location.search).get('reauth') === '1') {
+      state.clientId = status.clientId;
+      state.reauth = true;
+      currentStep = STEPS.indexOf('twitch-auth');
+    } else if (!status.configured.twitch && status.clientId) {
       // Twitch app already registered (Client ID known) but the user
       // authorization expired/was revoked — this happens when the refresh
       // token gets rejected. No need to re-enter the Client ID or redo
@@ -245,6 +251,10 @@ async function startDeviceAuth() {
   try {
     const res = await api('POST', '/setup/api/start-device-auth');
     document.getElementById('device-code-display').textContent = res.user_code;
+    // Twitch's own link carries the code (…/activate?device-code=…), so it's filled in there
+    if (/^https:\/\/(www\.)?twitch\.tv\/activate/.test(res.verification_uri || '')) {
+      document.querySelector('#auth-waiting .device-url').href = res.verification_uri;
+    }
 
     // Countdown timer
     let remaining = res.expires_in;

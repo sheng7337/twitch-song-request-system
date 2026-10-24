@@ -48,3 +48,6 @@ module.exports = function register(registerCommand) {
     },
   });
 };
+
+// !endingtk uses the same backgrounds
+module.exports.pickBgUrl = pickBgUrl;

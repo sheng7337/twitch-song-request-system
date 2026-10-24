@@ -23,6 +23,8 @@
     clip: {
       shoutout: 'Shoutout',
       watching: 'Now Watching',
+      // !endingtk headings
+      credits: { raiders: 'Raiders', subs: 'Subscribers', cheers: 'Cheers', followers: 'New Followers', redeemers: 'Channel Points', requesters: 'Song Requests', chatters: 'Top Chatters' },
     },
   },
   'zh-TW': {
@@ -43,6 +45,7 @@
     clip: {
       shoutout: '推薦頻道',
       watching: '現在播放',
+      credits: { raiders: '感謝揪團', subs: '感謝訂閱', cheers: '感謝小奇點', followers: '感謝追隨', redeemers: '感謝兌換', requesters: '感謝點歌', chatters: '感謝聊天' },
     },
   },
 });

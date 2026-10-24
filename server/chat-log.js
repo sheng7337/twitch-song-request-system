@@ -6,7 +6,11 @@
 //
 // Each line is one record:
 //   { kind: 'chat', id, at, user, text, parts, type, bits?, reply?, songs? }
-//   { kind: 'redeem', id, at, user, text, reward }
+//   { kind: 'redeem', id, at, user, text, reward, rewardId }
+//   { kind: 'notice', id, at, user, notice, system, text, anonymous?, recipient?, viewers?, avatar? }
+//       — Twitch's sub / resub / gift / raid … lines (notice = notice_type, system = Twitch's own wording);
+//         recipient: who got a gifted sub; a raid's user is the raiding channel
+//   { kind: 'follow', id, at, user }
 //   { kind: 'delete', at, ids? | user? | all? }   — a mod deleted messages; applied on load
 // user = { id, login, name, color, badges: ['moderator', 'subscriber', ...] }
 // parts = the message split into text / emote / mention / cheer, for drawing emotes.
@@ -110,8 +114,33 @@ function fromRedemption(e, at = Date.now()) {
   return {
     kind: 'redeem', id: e.id || `r${at}`, at,
     user: { ...userOf(e, ''), color: '', badges: [] },
-    text: (e.user_input || '').trim(), reward: e.reward?.title || '',
+    text: (e.user_input || '').trim(), reward: e.reward?.title || '', rewardId: e.reward?.id || '',
   };
+}
+
+// channel.chat.notification
+function fromNotice(e, at = Date.now()) {
+  const rec = {
+    kind: 'notice', id: e.message_id || `n${at}`, at,
+    user: { ...userOf(e, 'chatter'), color: e.color || '', badges: (e.badges || []).map(b => b.set_id) },
+    notice: e.notice_type || '', system: e.system_message || '', text: e.message?.text || '',
+  };
+  if (e.chatter_is_anonymous) rec.anonymous = true;
+  const gift = e.sub_gift;
+  if (gift?.recipient_user_id) {
+    rec.recipient = { id: gift.recipient_user_id, login: gift.recipient_user_login || '', name: gift.recipient_user_name || gift.recipient_user_login || '' };
+  }
+  if (e.raid) {
+    rec.user = { ...rec.user, id: e.raid.user_id || rec.user.id, login: e.raid.user_login || rec.user.login, name: e.raid.user_name || rec.user.name };
+    rec.viewers = e.raid.viewer_count || 0;
+    if (e.raid.profile_image_url) rec.avatar = e.raid.profile_image_url;
+  }
+  return rec;
+}
+
+// channel.follow (v2)
+function fromFollow(e, at = Date.now()) {
+  return { kind: 'follow', id: `f${e.user_id}-${at}`, at, user: { ...userOf(e, ''), color: '', badges: [] } };
 }
 
 // ── Log ─────────────────────────────────────────────────────────────────────
@@ -145,6 +174,18 @@ function addChat(event, prepare) {
 function addRedemption(event) {
   if (event.broadcaster_user_login) channel = event.broadcaster_user_login;
   return add(fromRedemption(event));
+}
+
+// Shared-chat notices (shared_chat_sub …) are about the other channels in the shared chat
+function addNotice(event) {
+  if (event.broadcaster_user_login) channel = event.broadcaster_user_login;
+  if ((event.notice_type || '').startsWith('shared_chat_')) return null;
+  return add(fromNotice(event));
+}
+
+function addFollow(event) {
+  if (event.broadcaster_user_login) channel = event.broadcaster_user_login;
+  return add(fromFollow(event));
 }
 
 // Marks records deleted: { ids } (one message), { user } (a timeout / ban clears a viewer's
@@ -218,4 +259,4 @@ function flush() {
   return writing;
 }
 
-module.exports = { init, addChat, addRedemption, onModeration, getRecent, load, days, prune, flush, fromChat, fromRedemption, songsIn, dayOf };
+module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };

@@ -196,6 +196,7 @@
   .chat-msg.highlight { background: rgba(176,106,255,0.2); }
   .chat-msg.intro { border-left: 2px solid var(--green); }
   .chat-msg.redeem { background: rgba(255,184,74,0.08); color: var(--amber); }
+  .chat-msg.event { background: rgba(74,255,154,0.08); color: var(--green); }
   .chat-msg.deleted .chat-text { text-decoration: line-through; opacity: 0.45; }
   .chat-time { color: var(--text-dim); font-size: 12px; margin-right: 6px; }
   .chat-badge {
@@ -705,6 +706,7 @@
     <div class="col-header">
       <span class="col-title purple" data-i18n="dash.leihu.title">Leihu Singsing</span>
       <button class="link-btn leihu-bulk" id="leihu-bulk-mini" onclick="toggleTabConfig('leihu', true)" hidden></button>
+      <button class="link-btn" id="leihu-obs-sound" onclick="showObsSound()" hidden data-i18n="dash.leihu.obsSound">🔊 Sound for OBS</button>
       <span class="topbar-spacer"></span>
       <button class="btn" id="leihu-reload" onclick="reloadLeihu()" hidden data-i18n="dash.leihu.reload">↻ Reload</button>
       <a class="btn" id="leihu-window" target="_blank" rel="noopener" hidden data-i18n="dash.leihu.newWindow">↗ Open in its own window</a>
@@ -737,6 +739,14 @@
           <span data-i18n="dash.set.autoStart">Start Leihu with the song queue</span>
         </label>
         <p class="setting-hint" data-i18n="dash.set.autoStartHint">Leihu then runs without its own window and shows only in this tab. It closes when the song queue closes.</p>
+      </section>
+      <!-- Leihu's sound on its own in OBS: the dashboard in a separate copy of the browser (stream-window.js) -->
+      <section id="settings-obs-sound">
+        <h3 data-i18n="dash.set.obsSoundTitle">Leihu's sound as its own OBS source</h3>
+        <p class="setting-hint" id="obs-sound-hint"></p>
+        <div class="step-buttons">
+          <button class="btn" id="obs-sound-open" onclick="openStreamWindow()" data-i18n="dash.set.obsSoundOpen">🔊 Open the stream window</button>
+        </div>
       </section>
       <section id="settings-ready">
         <h3 data-i18n="dash.set.readyTitle">Get your song list ready in Leihu</h3>
@@ -794,6 +804,13 @@
         <span data-i18n="dash.chat.songNotes">📺 Song notes on overlay</span>
       </label>
       <p class="setting-hint" data-i18n="dash.chat.songNotesHint">When chat names a song from the sheet, the song overlay briefly shows when it was last sung.</p>
+    </section>
+    <!-- !endingtk (server/ending-credits.js) -->
+    <section>
+      <h3 data-i18n="dash.chat.creditsTitle">Ending roll (!endingtk)</h3>
+      <p class="setting-hint" data-i18n="dash.chat.creditsHint"></p>
+      <p class="setting-hint" id="credits-now"></p>
+      <p class="setting-hint" id="credits-follows"></p>
     </section>
   </div>
 </div>
@@ -1370,6 +1387,7 @@ async function loadSettings() {
 function toggleTabConfig(tab, open) {
   const panel = document.getElementById('config-' + tab);
   panel.hidden = open === undefined ? !panel.hidden : !open;
+  if (tab === 'chat' && !panel.hidden) loadCredits();
   const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
   if (!btn) return;
   btn.setAttribute('aria-expanded', String(!panel.hidden));
@@ -1735,6 +1753,30 @@ window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
 // and again when Leihu comes back after being closed. Leihu only listens on its own PC, so a
 // dashboard opened from another device (phone, second PC) can't show it.
 const isLoopback = (host) => ['localhost', '127.0.0.1', '[::1]', '::1'].includes(host);
+// The stream window (🔊 in the Leihu settings) is the dashboard in a separate copy of Chrome/Edge, so
+// OBS's Application Audio Capture gets Leihu's sound alone. OBS finds it by this title: not translated.
+const IS_STREAM_WINDOW = new URLSearchParams(location.search).get('window') === 'stream';
+const STREAM_WINDOW_TITLE = '點歌控制台 Song Queue (OBS)';
+const pageTitle = () => IS_STREAM_WINDOW ? STREAM_WINDOW_TITLE : t('dash.pageTitle');
+// The stream window has no Twitch login: setup (authorize again) and Twitch links open in the usual browser
+if (IS_STREAM_WINDOW) {
+  document.addEventListener('click', async (e) => {
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a) return;
+    const u = new URL(a.href);
+    const forUsual = (u.origin === location.origin && u.pathname.startsWith('/setup'))
+      || (u.protocol === 'https:' && ['twitch.tv', 'www.twitch.tv'].includes(u.hostname));
+    if (!forUsual) return;
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/open-in-browser', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: a.href }) });
+      if (!res.ok) throw new Error(I18N.server(await res.json(), 'dash.toast.requestFailed'));
+      showToast(t('dash.toast.openedInBrowser'));
+    } catch (err) {
+      showToast(t('dash.toast.streamWindowFailed', { message: err.message }), true);
+    }
+  });
+}
 let leihuViewOnline = false;
 
 function paintLeihuView() {
@@ -1761,6 +1803,37 @@ function paintLeihuView() {
   const win = document.getElementById('leihu-window');
   win.hidden = !online;
   if (url) win.href = url;
+  paintObsSound(online);
+}
+
+// Until the stream window has been opened once, the Leihu header points to it
+function paintObsSound(online) {
+  const onPc = isLoopback(location.hostname);
+  let opened = false;
+  try { opened = localStorage.getItem('streamWindowOpened') === '1'; } catch(_) {}
+  document.getElementById('leihu-obs-sound').hidden = !online || !onPc || IS_STREAM_WINDOW || opened;
+  document.getElementById('settings-obs-sound').hidden = !onPc;
+  document.getElementById('obs-sound-open').hidden = IS_STREAM_WINDOW;
+  document.getElementById('obs-sound-hint').textContent =
+    t(IS_STREAM_WINDOW ? 'dash.set.obsSoundHere' : 'dash.set.obsSoundHint', { title: STREAM_WINDOW_TITLE });
+}
+
+function showObsSound() {
+  toggleTabConfig('leihu', true);
+  document.getElementById('settings-obs-sound').scrollIntoView({ block: 'nearest' });
+}
+
+async function openStreamWindow() {
+  try {
+    const res = await fetch('/api/stream-window', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(I18N.server(data, 'dash.toast.requestFailed'));
+    try { localStorage.setItem('streamWindowOpened', '1'); } catch(_) {}
+    showToast(t('dash.toast.streamWindowOpened'));
+    paintLeihuView();
+  } catch (err) {
+    showToast(t('dash.toast.streamWindowFailed', { message: err.message }), true);
+  }
 }
 
 function reloadLeihu() {
@@ -1931,7 +2004,7 @@ async function openPicker(entry, st) {
 
 // ── Chat tab ── Live chat comes over the WebSocket (server/chat-log.js); earlier days load from
 // their log. Every filter runs here, on the records in memory.
-const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems'];
+const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems', 'events'];
 // Common chat bots (logins), hidden while "Hide bots" is on
 const CHAT_BOTS = ['nightbot', 'streamelements', 'moobot', 'fossabot', 'wizebot', 'streamlabs', 'soundalerts',
   'sery_bot', 'botrixoficial', 'kofistreambot', 'commanderroot', 'streamstickers', 'pokemoncommunitygame'];
@@ -1988,7 +2061,7 @@ function chatMatches(rec) {
   if (chat.user && rec.user.login !== chat.user) return false;
   const words = chatWords();
   if (words.length) {
-    const hay = `${rec.user.name} ${rec.user.login} ${rec.text} ${rec.reward || ''}`.toLowerCase();
+    const hay = `${rec.user.name} ${rec.user.login} ${rec.text} ${rec.reward || ''} ${rec.system || ''}`.toLowerCase();
     if (!words.every(w => hay.includes(w))) return false;
   }
   const badges = rec.user.badges || [];
@@ -2001,6 +2074,7 @@ function chatMatches(rec) {
     case 'first': return rec.type === 'user_intro';
     case 'highlight': return rec.type === 'channel_points_highlighted' || !!rec.bits;
     case 'redeems': return rec.kind === 'redeem';
+    case 'events': return rec.kind === 'notice' || rec.kind === 'follow';
     default: return true;
   }
 }
@@ -2024,6 +2098,11 @@ function chatRowHtml(rec) {
   const color = /^#[0-9a-f]{6}$/i.test(rec.user.color || '') ? rec.user.color : 'var(--purple)';
   const name = `<span class="chat-name" data-login="${esc(rec.user.login)}" style="color:${color}">${esc(rec.user.name)}</span>`;
   const time = `<span class="chat-time">${chatTime(rec.at)}</span>`;
+  if (rec.kind === 'notice' || rec.kind === 'follow') {
+    const what = rec.kind === 'follow' ? t('dash.chat.followed', { name: rec.user.name }) : (rec.system || rec.notice);
+    return `<div class="chat-msg event" data-id="${esc(rec.id)}">${time}${markWords(what, words)}`
+      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}</div>`;
+  }
   if (rec.kind === 'redeem') {
     return `<div class="chat-msg redeem" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
       + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}</div>`;
@@ -2136,6 +2215,25 @@ async function onChatDay() {
   renderChat();
 }
 
+// !endingtk: who it would thank now, and whether new followers come in (they need a Twitch
+// permission that setup asks for since !endingtk; older setups authorize again)
+async function loadCredits() {
+  const now = document.getElementById('credits-now');
+  const follows = document.getElementById('credits-follows');
+  try {
+    const c = await (await fetch('/api/credits')).json();
+    now.textContent = c.groups.length
+      ? t('dash.chat.creditsNow', { list: c.groups.map(g => t('dash.chat.creditsGroup.' + g.key, { n: g.count })).join(t('dash.chat.creditsSep')) })
+      : t('dash.chat.creditsNone');
+    follows.innerHTML = c.follows === 'on' ? esc(t('dash.chat.followsOn'))
+      : c.follows === 'no-permission' ? `${esc(t('dash.chat.followsNoPermission'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a>`
+      : c.follows === 'failed' ? esc(t('dash.chat.followsFailed')) : '';
+  } catch(_) {
+    now.textContent = '';
+    follows.textContent = '';
+  }
+}
+
 // Song notes on the stream overlay (server/song-notes.js, SONG_NOTES); saved for everyone
 async function saveSongNotes() {
   const box = document.getElementById('chat-song-notes');
@@ -2226,9 +2324,9 @@ function esc(s) {
 }
 
 I18N.init();
-document.title = t('dash.pageTitle');
+document.title = pageTitle();
 I18N.onChange(() => {
-  document.title = t('dash.pageTitle');
+  document.title = pageTitle();
   render();
   paintBadges();
   paintBulk();

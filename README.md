@@ -34,6 +34,7 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 |---|---|
 | `!so <帳號>` | 播放指定頻道的隨機 Clip，並記錄至感謝名單 |
 | `!tk` | 播放感謝名單，列出本場所有 `!so` 的頻道 |
+| `!endingtk` | 片尾感謝名單：揪團、訂閱、小奇點、新追隨、兌換、點歌和最活躍的聊天觀眾 |
 | `!watch <網址>` | 播放 Twitch Clip、YouTube 或影片連結 |
 | `!replay` | 重播上一個片段 |
 | `!stop` | 立即停止當前播放 |

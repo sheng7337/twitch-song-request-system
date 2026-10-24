@@ -57,9 +57,8 @@ Write-Host "  直播結束後按 Ctrl+C 停止伺服器。" -ForegroundColor Dar
 Write-Host "  提醒：請確認 OBS 瀏覽器來源已設定並顯示於場景中。" -ForegroundColor DarkGray
 Write-Host ""
 
-# Poll until the server is ready, then open the browser.
-# The server itself decides the correct page (setup wizard or dashboard)
-# and redirects accordingly -- so we always open the root URL.
+# Poll until the server is ready, then open the dashboard (its own window, see below).
+# Until setup is done the server sends the root URL to the setup wizard.
 $openUrl = "http://localhost:3000/?lang=zh-TW"
 Write-Host "  等待伺服器就緒後自動開啟瀏覽器..." -ForegroundColor DarkGray
 Start-Job -ScriptBlock {
@@ -73,7 +72,13 @@ Start-Job -ScriptBlock {
             break
         } catch {}
     }
-    if ($ready) { Start-Process $u }
+    if ($ready) {
+        # 控制台開在自己的 Chrome／Edge 視窗，OBS 才能單獨擷取雷虎練唱台的聲音。
+        # 安裝精靈（或電腦上沒有 Chrome／Edge 時）用預設瀏覽器開啟。
+        try {
+            Invoke-RestMethod -Method Post -Uri "http://localhost:3000/api/stream-window" -ContentType "application/json" -Body '{"tab":"queue","lang":"zh-TW"}' -TimeoutSec 5 | Out-Null
+        } catch { Start-Process $u }
+    }
 } -ArgumentList $openUrl | Out-Null
 
 npm start

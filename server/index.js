@@ -10,7 +10,7 @@ const { isAllowedRequest } = require('./request-guard');
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
 const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
-const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler } = require('./twitch');
+const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, followStatus } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const chatLog = require('./chat-log');
 const songNotes = require('./song-notes');
@@ -19,12 +19,15 @@ const registerWatch = require('./commands/watch');
 const registerReplay = require('./commands/replay');
 const registerStop = require('./commands/stop');
 const registerThanks = require('./commands/thanks');
+const registerEndingThanks = require('./commands/ending-thanks');
+const endingCredits = require('./ending-credits');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
 const { pickRandom } = require('./random');
 const setupRouter = require('./setup-routes');
 const leihu = require('./leihu');
+const streamWindow = require('./stream-window');
 const linkFinder = require('./link-finder');
 const { errorBody, message } = require('./messages');
 const { nodeStatus } = require('./node-check');
@@ -117,12 +120,20 @@ registerWatch(registerCommand);
 registerReplay(registerCommand);
 registerStop(registerCommand);
 registerThanks(registerCommand);
+registerEndingThanks(registerCommand);
 songNotes.init(broadcastRaw);   // "last sung" notes for songs named in chat go to the song overlay
 setChatHandler((event) => {
   try { chatLog.addChat(event, songNotes.check); } catch (err) { console.error('[chat-log] Could not log a message:', err.message); }
   handleChatEvent(event);
 });
 setModerationHandler(chatLog.onModeration);
+// Subs, gifts, raids and follows: shown in the Chat tab, thanked by !endingtk (ending-credits.js)
+setNoticeHandler((event) => {
+  try { chatLog.addNotice(event); } catch (err) { console.error('[chat-log] Could not log a chat notice:', err.message); }
+});
+setFollowHandler((event) => {
+  try { chatLog.addFollow(event); } catch (err) { console.error('[chat-log] Could not log a follow:', err.message); }
+});
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
@@ -459,6 +470,29 @@ app.post('/api/leihu/launch', async (req, res) => {
   }
 });
 
+// The dashboard in a browser window of its own, so OBS can capture the Leihu tab's sound from it
+// alone (stream-window.js). The startup scripts open it at the song queue ({ tab: 'queue', lang }); until
+// setup is done they open the wizard in the default browser instead.
+// From the stream window: setup and Twitch links open in the usual browser, where Twitch is logged in
+app.post('/api/open-in-browser', (req, res) => {
+  try {
+    res.json(streamWindow.openInUsualBrowser(String(req.body.url || ''), PORT));
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
+app.post('/api/stream-window', (req, res) => {
+  if (!isSetupComplete()) return res.status(409).json({ error: 'setup is not complete' });
+  const lang = ['en', 'zh-TW'].includes(req.body.lang) ? `&lang=${req.body.lang}` : '';
+  const tab = req.body.tab === 'queue' ? '' : '#leihu';
+  try {
+    res.json(streamWindow.open(`http://localhost:${PORT}/dashboard?window=stream${lang}${tab}`));
+  } catch (err) {
+    res.status(400).json(errorBody(err));
+  }
+});
+
 // Prepare every sheet song with a YouTube link in Leihu, a few at a time (leihu.js startBulk)
 app.post('/api/leihu/bulk', async (req, res) => {
   try {
@@ -691,6 +725,11 @@ app.post('/api/settings', (req, res) => {
 app.get('/api/chat/recent', (req, res) => res.json(chatLog.getRecent()));
 app.get('/api/chat/days', async (req, res) => res.json(await chatLog.days()));
 app.get('/api/chat/log', async (req, res) => res.json(await chatLog.load(String(req.query.day || ''))));
+// !endingtk: whether new followers come in (needs moderator:read:followers), and who it would thank now
+app.get('/api/credits', async (req, res) => {
+  const groups = await endingCredits.gather();
+  res.json({ follows: followStatus(), lastAt: endingCredits.lastRunAt() || null, groups: groups.map(g => ({ key: g.key, count: g.people.length })) });
+});
 
 // New chat goes only to dashboards that asked for it (overlay and clip player don't need it)
 function sendChat(msg) {

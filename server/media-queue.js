@@ -17,8 +17,10 @@ function init(broadcastRaw) {
 function expectedDurationMs(payload) {
   if (payload.kind === 'youtube') return YOUTUBE_MAX_MS;
   if (payload.kind === 'sponsor-card') {
-    const pages = Math.ceil((payload.broadcasters?.length || 0) / 4);
-    return 2000 + pages * 11000; // a page shows at most ~10.5s
+    // !tk: one list; !endingtk: groups, each starting on a new page under its heading
+    const groups = payload.groups || [{ people: payload.broadcasters || [] }];
+    const pages = groups.reduce((n, g) => n + Math.ceil(g.people.length / 4), 0);
+    return 2000 + pages * 11000 + groups.length * 1500; // a page shows at most ~10.5s, a heading change 1.2s
   }
   return ((payload.duration || 30) + 3) * 1000;
 }
