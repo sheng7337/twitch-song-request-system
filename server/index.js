@@ -23,6 +23,7 @@ const registerEndingThanks = require('./commands/ending-thanks');
 const endingCredits = require('./ending-credits');
 const redemptions = require('./redemptions');
 const firstChat = require('./first-chat');
+const chatSend = require('./chat-send');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
@@ -741,6 +742,15 @@ app.post('/api/settings', (req, res) => {
 app.get('/api/chat/recent', (req, res) => res.json(chatLog.getRecent()));
 app.get('/api/chat/days', async (req, res) => res.json(await chatLog.days()));
 app.get('/api/chat/log', async (req, res) => res.json(await chatLog.load(String(req.query.day || ''))));
+// Posting to chat (chat-send.js): GET → whether the app may (user:write:chat); POST { text, replyTo? }
+app.get('/api/chat/send', async (req, res) => res.json({ canSend: await chatSend.canSend(), max: chatSend.MAX_LENGTH }));
+app.post('/api/chat/send', async (req, res) => {
+  try {
+    res.json(await chatSend.send(req.body.text, req.body.replyTo));
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json(errorBody(err));
+  }
+});
 // !endingtk: whether new followers come in (needs moderator:read:followers), and who it would thank now
 app.get('/api/credits', async (req, res) => {
   const groups = await endingCredits.gather();

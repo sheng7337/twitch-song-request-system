@@ -131,8 +131,8 @@ router.post('/start-device-auth', async (req, res) => {
     const response = await axios.post('https://id.twitch.tv/oauth2/device', null, {
       params: {
         client_id: clientId,
-        // moderator:read:followers: new followers for !endingtk (not in chat)
-        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat moderator:read:followers',
+        // moderator:read:followers: new followers for !endingtk (not in chat); user:write:chat: the Chat tab's message box
+        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers',
       }
     });
     deviceAuthState = {

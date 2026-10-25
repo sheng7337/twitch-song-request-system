@@ -245,6 +245,26 @@
     font-family: 'Share Tech Mono', monospace; font-size: 13px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   }
   .chat-more[hidden] { display: none; }
+  .chat-reply-btn {
+    margin-left: 6px; font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 0 7px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border); border-radius: 10px; color: var(--text-dim); opacity: 0;
+  }
+  .chat-msg:hover .chat-reply-btn, .chat-reply-btn:focus { opacity: 1; }
+  .chat-reply-btn:hover { color: var(--text); }
+  .chat-compose { border-top: 1px solid var(--border); padding: 8px 10px; }
+  .chat-compose[hidden], .chat-compose [hidden] { display: none; }
+  .chat-replying { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .chat-replying span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-compose-row { display: flex; gap: 8px; align-items: center; }
+  .chat-compose input {
+    flex: 1; min-width: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 7px 9px; font-size: 14px;
+  }
+  .chat-compose input:disabled { opacity: 0.5; }
+  .chat-compose .btn { font-size: 13px; padding: 5px 14px; }
+  .chat-left { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .chat-left.over { color: var(--red); }
+  .chat-compose-note { font-size: 12px; color: var(--amber); margin-top: 6px; }
 
   /* ── Layout: 2×2 — left: Now Playing over Up Next, right: Pending Review over Played ── */
   .board {
@@ -810,6 +830,19 @@
       <div class="chat-filters" id="chat-filters" role="group" data-i18n-aria-label="dash.chat.filters"></div>
       <div class="chat-list" id="chat-list" onscroll="onChatScroll()"></div>
       <button class="chat-more" id="chat-more" onclick="chatToBottom()" hidden></button>
+      <form class="chat-compose" id="chat-compose" onsubmit="sendChatMessage(event)" hidden>
+        <div class="chat-replying" id="chat-replying" hidden>
+          <span id="chat-replying-text"></span>
+          <button type="button" class="chat-act" onclick="setChatReply(null)" data-i18n-aria-label="dash.chat.cancelReply" aria-label="Cancel reply">✕</button>
+        </div>
+        <div class="chat-compose-row">
+          <input type="text" id="chat-input" autocomplete="off" oninput="paintChatLeft()" onkeydown="if (event.key === 'Escape') setChatReply(null)"
+            data-i18n-placeholder="dash.chat.sendPlaceholder" placeholder="Message the chat…" />
+          <span class="chat-left" id="chat-left" hidden></span>
+          <button class="btn" type="submit" id="chat-send" data-i18n="dash.chat.send">Send</button>
+        </div>
+        <div class="chat-compose-note" id="chat-compose-note" hidden></div>
+      </form>
     </div>
   </div>
   <!-- Chat settings -->
@@ -2039,11 +2072,12 @@ const chat = {
   live: [], day: '', dayRecords: null, days: [], channel: null, filter: 'all', user: null, query: '',
   hideBots: true, unread: 0, newCount: 0, atBottom: true,
   manageable: new Set(),   // rewards whose redemptions ✓ / ↩ can change (the app made them)
+  canSend: false, sendMax: 500, replyTo: null,   // the message box (needs user:write:chat); the message it answers
 };
 try { chat.hideBots = localStorage.getItem('chatHideBots') !== '0'; } catch(_) {}
 
 async function loadChat() {
-  await loadManageable();
+  await Promise.all([loadManageable(), loadChatSend()]);
   try {
     const data = await (await fetch('/api/chat/recent')).json();
     chat.live = data.records || [];
@@ -2165,7 +2199,9 @@ function chatRowHtml(rec) {
     return `<button class="chat-song${sung.recent ? ' recent' : ''}" data-id="${esc(rec.id)}" data-song="${i}" title="${esc(tip)}">`
       + `♪ ${esc(s.title)}${sung.label ? ` · ${esc(sung.label)}` : ''}${s.onStream ? ' 📺' : ''}</button>`;
   }).join('');
-  return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}</div>`;
+  const answer = chat.canSend && !chat.day && !rec.deleted
+    ? `<button class="chat-reply-btn" data-reply="${esc(rec.id)}">${esc(t('dash.chat.reply'))}</button>` : '';
+  return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}${answer}</div>`;
 }
 
 // A redemption's state: waiting ones get ✓ done / ↩ refund (rewards the app made) or a link to Twitch's
@@ -2240,6 +2276,8 @@ document.getElementById('chat-list').addEventListener('click', (e) => {
   }
   const act = e.target.closest('[data-redeem]');
   if (act) { setRedeemStatus(act); return; }
+  const answer = e.target.closest('[data-reply]');
+  if (answer) { setChatReply(chatSource().find(r => r.id === answer.dataset.reply)); return; }
   const song = e.target.closest('.chat-song');
   if (song) {
     const rec = chatSource().find(r => r.id === song.dataset.id);
@@ -2295,6 +2333,83 @@ async function onChatDay() {
     catch(_) { chat.dayRecords = []; }
   }
   renderChat();
+  paintChatCompose();
+}
+
+// The message box under the live chat: posts as the authorized account (server/chat-send.js). Setups
+// from before it have no permission yet: the box is off, with the link to authorize again.
+async function loadChatSend() {
+  try {
+    const s = await (await fetch('/api/chat/send')).json();
+    chat.canSend = !!s.canSend;
+    chat.sendMax = s.max || chat.sendMax;
+  } catch(_) {}
+  paintChatCompose();
+}
+
+function paintChatCompose() {
+  const form = document.getElementById('chat-compose');
+  form.hidden = !!chat.day;
+  document.getElementById('chat-input').disabled = !chat.canSend;
+  document.getElementById('chat-send').disabled = !chat.canSend;
+  const note = document.getElementById('chat-compose-note');
+  note.hidden = chat.canSend;
+  note.innerHTML = chat.canSend ? '' : `${esc(t('dash.chat.sendNoPermission'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a>`;
+  if (chat.day) chat.replyTo = null;
+  paintChatReply();
+  paintChatLeft();
+  paintChatMore();
+}
+
+// ↪ Reply on a message: the next message answers it (a Twitch reply). ✕ or Esc stops.
+function setChatReply(rec) {
+  chat.replyTo = rec && rec.kind === 'chat' ? { id: rec.id, name: rec.user.name, text: rec.text } : null;
+  paintChatReply();
+  if (chat.replyTo) document.getElementById('chat-input').focus();
+}
+
+function paintChatReply() {
+  const r = chat.replyTo;
+  document.getElementById('chat-replying').hidden = !r;
+  document.getElementById('chat-replying-text').textContent = r ? t('dash.chat.replyingTo', { name: r.name, text: r.text }) : '';
+}
+
+// Characters left, shown near Twitch's limit
+function paintChatLeft() {
+  const left = chat.sendMax - [...document.getElementById('chat-input').value.trim()].length;
+  const el = document.getElementById('chat-left');
+  el.hidden = left > 50;
+  el.textContent = t('dash.chat.charsLeft', { n: left });
+  el.classList.toggle('over', left < 0);
+}
+
+async function sendChatMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('chat-send');
+  const text = input.value.trim();
+  if (!text || btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/chat/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, replyTo: chat.replyTo?.id }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      if (body.code === 'chatNoPermission') { chat.canSend = false; paintChatCompose(); renderChat(); }
+      throw new Error(I18N.server(body, 'dash.toast.requestFailed'));
+    }
+    input.value = '';
+    setChatReply(null);
+    paintChatLeft();
+    chatToBottom();
+  } catch (err) {
+    showToast(t('dash.toast.chatFailed', { message: err.message }), true);
+  } finally {
+    btn.disabled = !chat.canSend;
+    if (chat.canSend) input.focus();
+  }
 }
 
 // !endingtk: who it would thank now, and whether new followers come in (they need a Twitch
@@ -2422,6 +2537,8 @@ function chatToBottom() {
 function paintChatMore() {
   const more = document.getElementById('chat-more');
   more.hidden = !chat.newCount;
+  const compose = document.getElementById('chat-compose');
+  more.style.bottom = `${14 + (compose.hidden ? 0 : compose.offsetHeight)}px`;
   more.textContent = chat.newCount ? t('dash.chat.newMessages', { n: chat.newCount }) : '';
 }
 

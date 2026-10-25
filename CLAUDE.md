@@ -74,6 +74,7 @@ vtuber-song-queue/
 │   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json)
 │   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
 │   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst
+│   ├── chat-send.js       The Chat tab's message box: Helix POST /chat/messages (replies too)
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
@@ -112,7 +113,8 @@ vtuber-song-queue/
 - `session_reconnect` → reconnect to the given URL; socket close → reconnect after 5s
 - Notifications are deduplicated by `message_id` (Twitch delivers at-least-once)
 - Auth: user access token from **Device Authorization Flow** (public client, no client secret).
-  Scopes: `channel:read:redemptions channel:manage:redemptions user:read:chat`
+  Scopes: `channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers`
+  (older setups lack the last ones: the dashboard links to `/setup?reauth=1`)
 - `ensureFreshToken()` refreshes 1 min before expiry. Call it before **every** Helix call.
   Concurrent calls share one refresh (`refreshPromise`) — Twitch rotates the refresh token,
   so two parallel refreshes would invalidate each other
@@ -279,8 +281,12 @@ vtuber-song-queue/
   optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
   and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
   channel, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
-  the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester. Sending
-  chat needs `user:write:chat` (not requested): the tab links to Twitch's popout chat instead
+  the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester
+- Message box (chat-send.js): posts as the authorized account (sender = broadcaster), `↪ Reply` on a
+  row sets `reply_parent_message_id`. The message comes back through EventSub chat, so nothing is added
+  locally. `canSend()` checks the token's scopes via `/oauth2/validate` (true cached 5 min; missing
+  re-checked each time, so authorizing again turns the box on). Dropped messages (AutoMod, slow mode…)
+  → `chatDropped` with Twitch's reason; the text stays in the box
 - Song notes (song-notes.js): each song in a chat record gets `lastAt` (ms, from history.js
   `getLastRequestedAt` — set when a song is moved to Played; null = never; left out until the history
   sheet is loaded, `isReady()`). Within the random cooldown (`RANDOM_COOLDOWN_DAYS`, random.js
@@ -465,6 +471,8 @@ register it in index.js.
 | GET | `/api/chat/recent` | Chat tab: the latest 1000 chat records `{records, channel}` |
 | GET | `/api/chat/days` | Days with a chat log, newest first |
 | GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions and redemption statuses applied |
+| GET | `/api/chat/send` | `{canSend, max}` — whether the token may post (`user:write:chat`) |
+| POST | `/api/chat/send` | `{text, replyTo?}` → `{id}`; posts to chat as the streamer |
 | GET | `/api/redemptions/manageable` | `{ids, channel}` — rewards whose redemptions the Chat tab can change |
 | POST | `/api/redemptions/status` | `{id, rewardId, action: 'done' \| 'refund'}` |
 | GET | `/api/rewards` | Chat ⚙: every reward with `role`, `manageable`, `skipsQueue`, `takeover` |
