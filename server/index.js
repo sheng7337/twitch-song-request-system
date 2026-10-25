@@ -9,8 +9,8 @@ const { isAllowedRequest } = require('./request-guard');
 
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
-const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw } = require('./queue');
-const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, followStatus } = require('./twitch');
+const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw, setRedemptionHook, forgetRedemption } = require('./queue');
+const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, followStatus } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const chatLog = require('./chat-log');
 const songNotes = require('./song-notes');
@@ -21,6 +21,7 @@ const registerStop = require('./commands/stop');
 const registerThanks = require('./commands/thanks');
 const registerEndingThanks = require('./commands/ending-thanks');
 const endingCredits = require('./ending-credits');
+const redemptions = require('./redemptions');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
@@ -134,6 +135,13 @@ setNoticeHandler((event) => {
 setFollowHandler((event) => {
   try { chatLog.addFollow(event); } catch (err) { console.error('[chat-log] Could not log a follow:', err.message); }
 });
+// Redemptions done or refunded (Chat tab, Twitch's queue, or songs leaving the queue: redemptions.js)
+setRewardHandler((type, event) => {
+  if (type === 'channel.channel_points_custom_reward.remove') return redemptions.onRewardRemoved(event);
+  if (event.status !== 'unfulfilled') forgetRedemption(event.id);
+  try { chatLog.setRedeemStatus(event.id, event.status, event.redeemed_at); } catch (err) { console.error('[chat-log] Could not log a redemption update:', err.message); }
+});
+setRedemptionHook(redemptions.settle);
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
@@ -155,6 +163,8 @@ setEventHandler(async (event) => {
   const requestText = event?.user_input?.trim();
   const rewardId = event?.reward?.id;
   const requester = event?.user_name;
+  // Sung → done, removed from the queue → refunded (queue.js); only for rewards the app made
+  const redemption = event?.id && rewardId ? { id: event.id, rewardId } : null;
 
   console.log(`[event] Redemption from @${requester}: "${requestText}" (reward: ${rewardId})`);
   try { chatLog.addRedemption(event); } catch (err) { console.error('[chat-log] Could not log a redemption:', err.message); }
@@ -171,9 +181,11 @@ setEventHandler(async (event) => {
     const allowedTabs = matchedRandom.tabs || [];
     const picked = pickRandom(excludeTitles, allowedTabs);
     if (picked) {
-      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true, tabs: allowedTabs });
+      addSong({ title: picked.title, artist: picked.artist, key: picked.key || '', requester, isRandom: true, tabs: allowedTabs, redemption });
       const tabInfo = allowedTabs.length > 0 ? ` [${allowedTabs.join('/')}]` : '';
       console.log(`[random] Added "${picked.title}" for @${requester}${tabInfo}`);
+    } else if (redemption) {
+      redemptions.settle(redemption, 'refund');   // nothing left to draw
     }
     return;
   }
@@ -192,16 +204,16 @@ setEventHandler(async (event) => {
   const result = matchSong(requestText);
 
   if (result.matched && result.confident) {
-    addSong({ title: result.song.title, artist: result.song.artist, key: result.song.key || '', requester });
+    addSong({ title: result.song.title, artist: result.song.artist, key: result.song.key || '', requester, redemption });
     console.log(`[queue] Added "${result.song.title}" for @${requester} (${result.confidence}%)`);
   } else if (result.candidates?.length > 1) {
-    addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: result.confidence, candidates: result.candidates });
+    addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: result.confidence, candidates: result.candidates, redemption });
     console.log(`[queue] ${result.candidates.length} candidates for "${requestText}" → pending`);
   } else if (result.matched && !result.confident) {
-    addPending({ title: result.song.title, artist: result.song.artist, requester, originalRequest: requestText, confidence: result.confidence });
+    addPending({ title: result.song.title, artist: result.song.artist, requester, originalRequest: requestText, confidence: result.confidence, redemption });
     console.log(`[queue] Weak match "${result.song.title}" (${result.confidence}%) → pending`);
   } else {
-    addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: null });
+    addPending({ title: '', artist: '', requester, originalRequest: requestText, confidence: null, redemption });
     console.log(`[queue] No match for "${requestText}" → pending`);
   }
 });
@@ -276,7 +288,7 @@ app.post('/api/redraw', (req, res) => {
   const picked = pickRandom(excludeTitles, tabs);
   if (!picked) return res.status(400).json(message('noRedraw', {}, 'no songs available to redraw'));
 
-  const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester, tabs });
+  const ok = redrawSong(zone, index, { ...picked, requester: currentSong.requester, tabs, redemption: currentSong.redemption });
   if (!ok) return res.status(400).json(message('redrawFailed', {}, 'redraw failed'));
 
   console.log(`[random] Redrawn to "${picked.title}" for @${currentSong.requester}`);
@@ -729,6 +741,41 @@ app.get('/api/chat/log', async (req, res) => res.json(await chatLog.load(String(
 app.get('/api/credits', async (req, res) => {
   const groups = await endingCredits.gather();
   res.json({ follows: followStatus(), lastAt: endingCredits.lastRunAt() || null, groups: groups.map(g => ({ key: g.key, count: g.people.length })) });
+});
+
+// ── Channel-point redemptions (redemptions.js) ─────────────────────────────────
+// Which rewards' redemptions the Chat tab can mark done / refund, and the channel for Twitch's own queue
+app.get('/api/redemptions/manageable', async (req, res) => {
+  res.json({ ids: [...await redemptions.manageableIds()], channel: await redemptions.channelLogin() });
+});
+// { id, rewardId, action: 'done' | 'refund' }
+app.post('/api/redemptions/status', async (req, res) => {
+  const { id, rewardId, action } = req.body;
+  if (!id || !rewardId || !['done', 'refund'].includes(action)) return res.status(400).json({ error: 'id, rewardId and action (done | refund) are needed' });
+  try {
+    const result = await redemptions.setStatus(String(rewardId), String(id), action);
+    forgetRedemption(String(id));
+    res.json(result);
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json(errorBody(err));
+  }
+});
+// Chat ⚙: every reward, and taking over one made on Twitch ({ id, action: 'start' | 'finish' | 'cancel' })
+app.get('/api/rewards', async (req, res) => {
+  try {
+    res.json(await redemptions.listRewards());
+  } catch (err) {
+    res.status(500).json(errorBody(err));
+  }
+});
+app.post('/api/rewards/takeover', async (req, res) => {
+  const fn = { start: redemptions.startTakeover, finish: redemptions.finishTakeover, cancel: redemptions.cancelTakeover }[req.body.action];
+  if (!fn || !req.body.id) return res.status(400).json({ error: 'id and action (start | finish | cancel) are needed' });
+  try {
+    res.json(await fn(String(req.body.id)));
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json({ ...errorBody(err), error: err.response?.data?.message || err.message });
+  }
 });
 
 // New chat goes only to dashboards that asked for it (overlay and clip player don't need it)

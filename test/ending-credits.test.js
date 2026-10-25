@@ -9,6 +9,7 @@ const { stubModule } = require('./helpers');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ending-credits-'));
 process.env.CHAT_LOG_DIR = tmp;
 process.env.ENDING_CREDITS_FILE = path.join(tmp, 'ending-credits.json');
+process.env.REWARD_TAKEOVERS_FILE = path.join(tmp, 'reward-takeovers.json');
 process.env.TWITCH_BROADCASTER_ID = '1';
 process.env.TWITCH_REWARD_ID = 'song-reward';
 process.env.TWITCH_RANDOM_REWARDS = JSON.stringify([{ id: 'random-reward', tabs: [] }]);

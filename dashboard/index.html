@@ -221,6 +221,24 @@
   .chat-song:hover { background: rgba(74,255,154,0.1); }
   .chat-song.recent { color: var(--amber); border-color: var(--border-amber); }
   .chat-song.recent:hover { background: rgba(255,184,74,0.1); }
+  .chat-msg.redeem.waiting { border-left: 2px solid var(--amber); }
+  .chat-act {
+    margin-left: 6px; font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 0 7px; cursor: pointer; text-decoration: none;
+    background: transparent; border: 1px solid var(--border-amber); border-radius: 10px; color: var(--amber);
+  }
+  .chat-act:hover { background: rgba(255,184,74,0.1); }
+  .chat-act.done { color: var(--green); border-color: var(--border-green); }
+  .chat-act.done:hover { background: rgba(74,255,154,0.1); }
+  .chat-act.sure, .chat-act.sure:hover { color: var(--bg); background: var(--amber); }
+  .chat-act:disabled { opacity: 0.5; cursor: default; }
+  .reward-rows { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .reward-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; }
+  .reward-row .reward-name { font-weight: 600; }
+  .reward-row .chat-tag { margin-left: 0; }
+  .reward-row .reward-state { color: var(--text-dim); flex: 1 1 160px; }
+  .reward-row .reward-state.ok { color: var(--green); }
+  .reward-row .reward-steps { flex-basis: 100%; color: var(--amber); line-height: 1.5; }
+  .reward-row .btn { font-size: 12px; padding: 3px 9px; text-decoration: none; }
   .chat-more {
     position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
     background: var(--purple); color: var(--bg); border: none; border-radius: 14px; padding: 5px 14px;
@@ -812,6 +830,12 @@
       <p class="setting-hint" id="credits-now"></p>
       <p class="setting-hint" id="credits-follows"></p>
     </section>
+    <!-- Channel-point rewards: which the app manages (✓ / ↩ in the chat), taking over ones made on Twitch (server/redemptions.js) -->
+    <section>
+      <h3 data-i18n="dash.chat.rewardsTitle">Channel-point rewards</h3>
+      <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
+      <div class="reward-rows" id="reward-rows"></div>
+    </section>
   </div>
 </div>
 
@@ -957,6 +981,7 @@ function connect() {
       if (m.type === 'state') { state = m; render(); pollLeihu(); }
       else if (m.type === 'chat') onChatRecord(m.record);
       else if (m.type === 'chat-delete') onChatDelete(m);
+      else if (m.type === 'chat-redeem') onChatRedeem(m);
     } catch(_){}
   };
 }
@@ -1387,7 +1412,7 @@ async function loadSettings() {
 function toggleTabConfig(tab, open) {
   const panel = document.getElementById('config-' + tab);
   panel.hidden = open === undefined ? !panel.hidden : !open;
-  if (tab === 'chat' && !panel.hidden) loadCredits();
+  if (tab === 'chat' && !panel.hidden) { loadCredits(); loadRewards(); }
   const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
   if (!btn) return;
   btn.setAttribute('aria-expanded', String(!panel.hidden));
@@ -1765,7 +1790,7 @@ if (IS_STREAM_WINDOW) {
     if (!a) return;
     const u = new URL(a.href);
     const forUsual = (u.origin === location.origin && u.pathname.startsWith('/setup'))
-      || (u.protocol === 'https:' && ['twitch.tv', 'www.twitch.tv'].includes(u.hostname));
+      || (u.protocol === 'https:' && ['twitch.tv', 'www.twitch.tv', 'dashboard.twitch.tv'].includes(u.hostname));
     if (!forUsual) return;
     e.preventDefault();
     try {
@@ -2004,7 +2029,7 @@ async function openPicker(entry, st) {
 
 // ── Chat tab ── Live chat comes over the WebSocket (server/chat-log.js); earlier days load from
 // their log. Every filter runs here, on the records in memory.
-const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems', 'events'];
+const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems', 'waiting', 'events'];
 // Common chat bots (logins), hidden while "Hide bots" is on
 const CHAT_BOTS = ['nightbot', 'streamelements', 'moobot', 'fossabot', 'wizebot', 'streamlabs', 'soundalerts',
   'sery_bot', 'botrixoficial', 'kofistreambot', 'commanderroot', 'streamstickers', 'pokemoncommunitygame'];
@@ -2012,16 +2037,27 @@ const CHAT_SHOWN_MAX = 1500;   // rows drawn at once; the count says when more m
 const chat = {
   live: [], day: '', dayRecords: null, days: [], channel: null, filter: 'all', user: null, query: '',
   hideBots: true, unread: 0, newCount: 0, atBottom: true,
+  manageable: new Set(),   // rewards whose redemptions ✓ / ↩ can change (the app made them)
 };
 try { chat.hideBots = localStorage.getItem('chatHideBots') !== '0'; } catch(_) {}
 
 async function loadChat() {
+  await loadManageable();
   try {
     const data = await (await fetch('/api/chat/recent')).json();
     chat.live = data.records || [];
     chat.channel = data.channel || chat.channel;
   } catch(_) {}
   if (!chat.day) renderChat();
+}
+
+// Rewards the app made: their waiting redemptions get ✓ / ↩; the rest link to Twitch's own reward queue
+async function loadManageable() {
+  try {
+    const m = await (await fetch('/api/redemptions/manageable')).json();
+    chat.manageable = new Set(m.ids || []);
+    chat.channel = chat.channel || m.channel || null;
+  } catch(_) {}
 }
 
 async function loadChatDays() {
@@ -2074,6 +2110,7 @@ function chatMatches(rec) {
     case 'first': return rec.type === 'user_intro';
     case 'highlight': return rec.type === 'channel_points_highlighted' || !!rec.bits;
     case 'redeems': return rec.kind === 'redeem';
+    case 'waiting': return rec.kind === 'redeem' && rec.status === 'unfulfilled';
     case 'events': return rec.kind === 'notice' || rec.kind === 'follow';
     default: return true;
   }
@@ -2104,8 +2141,8 @@ function chatRowHtml(rec) {
       + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}</div>`;
   }
   if (rec.kind === 'redeem') {
-    return `<div class="chat-msg redeem" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
-      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}</div>`;
+    return `<div class="chat-msg redeem${rec.status === 'unfulfilled' ? ' waiting' : ''}" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
+      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}${redeemActions(rec)}</div>`;
   }
   const badges = (rec.user.badges || []).filter(b => CHAT_BADGE_LABELS[b])
     .map(b => `<span class="chat-badge ${b}" title="${esc(t('dash.chat.badge.' + b))}">${CHAT_BADGE_LABELS[b]}</span>`).join('');
@@ -2128,6 +2165,21 @@ function chatRowHtml(rec) {
       + `♪ ${esc(s.title)}${sung.label ? ` · ${esc(sung.label)}` : ''}${s.onStream ? ' 📺' : ''}</button>`;
   }).join('');
   return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}</div>`;
+}
+
+// A redemption's state: waiting ones get ✓ done / ↩ refund (rewards the app made) or a link to Twitch's
+// reward queue (rewards made on Twitch). Older logs have no status: nothing shown.
+function redeemActions(rec) {
+  if (rec.status === 'fulfilled') return `<span class="chat-tag">${esc(t('dash.chat.redeemDone'))}</span>`;
+  if (rec.status === 'canceled') return `<span class="chat-tag">${esc(t('dash.chat.redeemRefunded'))}</span>`;
+  if (rec.status !== 'unfulfilled') return '';
+  if (chat.manageable.has(rec.rewardId)) {
+    return `<button class="chat-act done" data-redeem="done" data-id="${esc(rec.id)}">${esc(t('dash.chat.redeemMarkDone'))}</button>`
+      + `<button class="chat-act" data-redeem="refund" data-id="${esc(rec.id)}">${esc(t('dash.chat.redeemRefund'))}</button>`;
+  }
+  if (!chat.channel) return '';
+  return `<a class="chat-act" href="https://www.twitch.tv/popout/${encodeURIComponent(chat.channel)}/reward-queue" target="_blank" rel="noopener"`
+    + ` title="${esc(t('dash.chat.redeemQueueTip'))}">${esc(t('dash.chat.redeemQueue'))}</a>`;
 }
 
 // When a song named in chat was last sung, as of the message: { label, recent }. lastAt is left
@@ -2185,6 +2237,8 @@ document.getElementById('chat-list').addEventListener('click', (e) => {
     renderChat();
     return;
   }
+  const act = e.target.closest('[data-redeem]');
+  if (act) { setRedeemStatus(act); return; }
   const song = e.target.closest('.chat-song');
   if (song) {
     const rec = chatSource().find(r => r.id === song.dataset.id);
@@ -2197,6 +2251,33 @@ async function addChatSong(rec, s) {
   const sheet = songList.find(x => x.title === s.title && (x.artist || '') === (s.artist || ''));
   await api('add', { title: s.title, artist: s.artist, key: sheet?.key || '', requester: rec.user.name });
   showToast(t('dash.toast.added', { title: s.title }));
+}
+
+// ✓ / ↩ on a waiting redemption. ↩ asks once more: the points go back and Twitch can't undo it.
+async function setRedeemStatus(btn) {
+  const rec = chatSource().find(r => r.kind === 'redeem' && r.id === btn.dataset.id);
+  if (!rec) return;
+  const action = btn.dataset.redeem;
+  if (action === 'refund' && !btn.classList.contains('sure')) {
+    btn.classList.add('sure');
+    btn.textContent = t('dash.chat.redeemRefundSure');
+    setTimeout(() => { btn.classList.remove('sure'); btn.textContent = t('dash.chat.redeemRefund'); }, 4000);
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/redemptions/status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: rec.id, rewardId: rec.rewardId, action }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(I18N.server(body, 'dash.toast.requestFailed'));
+    onChatRedeem({ id: rec.id, status: body.status });
+    showToast(t(action === 'done' ? 'dash.toast.redeemDone' : 'dash.toast.redeemRefunded', { name: rec.user.name }));
+  } catch (err) {
+    btn.disabled = false;
+    showToast(t('dash.toast.redeemFailed', { message: err.message }), true);
+  }
 }
 
 let chatSearchTimer;
@@ -2233,6 +2314,73 @@ async function loadCredits() {
     follows.textContent = '';
   }
 }
+
+// Chat ⚙ → Channel-point rewards. Taking over one made on Twitch (server/redemptions.js): the app makes
+// a hidden copy, the streamer deletes the original on Twitch, the copy takes its place (by itself when
+// Twitch reports the delete; "I've deleted it" checks at once).
+let rewardsView = null;
+async function loadRewards() {
+  const box = document.getElementById('reward-rows');
+  if (!rewardsView) box.textContent = t('dash.chat.rewardsLoading');
+  try {
+    const res = await fetch('/api/rewards');
+    const body = await res.json();
+    if (!res.ok) throw new Error(I18N.server(body, 'dash.toast.requestFailed'));
+    rewardsView = body;
+  } catch (err) {
+    rewardsView = null;
+    box.textContent = t('dash.chat.rewardsFailed', { message: err.message });
+    return;
+  }
+  paintRewards();
+  const ids = rewardsView.rewards.filter(r => r.manageable).map(r => r.id);
+  chat.channel = chat.channel || rewardsView.channel || null;
+  if (ids.length !== chat.manageable.size || ids.some(id => !chat.manageable.has(id))) {
+    chat.manageable = new Set(ids);
+    rerenderChat();
+  }
+}
+
+function paintRewards() {
+  if (!rewardsView) return;
+  const ch = rewardsView.channel;
+  const page = `https://dashboard.twitch.tv/${ch ? `u/${encodeURIComponent(ch)}/` : ''}viewer-rewards/channel-points/rewards`;
+  document.getElementById('reward-rows').innerHTML = rewardsView.rewards.map(r => {
+    const tags = (r.role ? `<span class="chat-tag">${esc(t('dash.chat.rewardRole.' + r.role))}</span>` : '')
+      + (r.enabled ? '' : `<span class="chat-tag">${esc(t('dash.chat.rewardOff'))}</span>`);
+    const btn = (act, label) => `<button class="btn" data-takeover="${act}" data-id="${esc(r.id)}">${esc(t(label))}</button>`;
+    let rest;
+    if (r.manageable) rest = `<span class="reward-state ok">${esc(t('dash.chat.rewardManaged'))}</span>`;
+    else if (r.skipsQueue) rest = `<span class="reward-state">${esc(t('dash.chat.rewardSkipsQueue'))}</span>`;
+    else if (r.takeover) {
+      rest = `<span class="reward-state">${esc(t('dash.chat.rewardCopyReady'))}</span>`
+        + `<div class="reward-steps">${esc(t('dash.chat.rewardDeleteStep', { title: r.title }))}</div>`
+        + `<a class="btn" href="${esc(page)}" target="_blank" rel="noopener">${esc(t('dash.chat.rewardOpenTwitch'))}</a>`
+        + btn('finish', 'dash.chat.rewardFinish') + btn('cancel', 'dash.chat.rewardCancel');
+    } else {
+      rest = `<span class="reward-state">${esc(t('dash.chat.rewardOnTwitch'))}</span>` + btn('start', 'dash.chat.rewardTakeOver');
+    }
+    return `<div class="reward-row"><span class="reward-name">${esc(r.title)}</span>${tags}${rest}</div>`;
+  }).join('') || esc(t('dash.chat.rewardsNone'));
+}
+
+document.getElementById('reward-rows').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-takeover]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    const res = await fetch('/api/rewards/takeover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: b.dataset.id, action: b.dataset.takeover }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(I18N.server(body, 'dash.toast.requestFailed'));
+    if (b.dataset.takeover === 'finish') showToast(t('dash.toast.rewardTakenOver'));
+  } catch (err) {
+    showToast(err.message, true);
+  }
+  await loadRewards();
+});
 
 // Song notes on the stream overlay (server/song-notes.js, SONG_NOTES); saved for everyone
 async function saveSongNotes() {
@@ -2301,6 +2449,24 @@ function onChatRecord(rec) {
   if (currentTab !== 'chat' && rec.kind === 'chat' && !isBot(rec)) { chat.unread++; paintChatUnread(); }
 }
 
+// Draws the chat again where it was (at the bottom only if it was there)
+function rerenderChat() {
+  if (currentTab !== 'chat') return;
+  const keep = chat.atBottom;
+  const list = document.getElementById('chat-list');
+  const top = list.scrollTop;
+  renderChat();
+  if (!keep) list.scrollTop = top;
+}
+
+// A redemption done or refunded, here or on Twitch
+function onChatRedeem(m) {
+  for (const list of [chat.live, chat.dayRecords || []]) {
+    for (const r of list) if (r.kind === 'redeem' && r.id === m.id) r.status = m.status;
+  }
+  rerenderChat();
+}
+
 // Mods deleted a message, or a timeout / ban / clear removed messages
 function onChatDelete(del) {
   const today = new Date();
@@ -2310,13 +2476,7 @@ function onChatDelete(del) {
       if (r.kind === 'chat' && (del.all || (del.ids && del.ids.includes(r.id)) || (del.user && r.user.id === del.user))) r.deleted = true;
     }
   }
-  if (currentTab === 'chat') {
-    const keep = chat.atBottom;
-    const list = document.getElementById('chat-list');
-    const top = list.scrollTop;
-    renderChat();
-    if (!keep) list.scrollTop = top;
-  }
+  rerenderChat();
 }
 
 function esc(s) {
@@ -2334,6 +2494,7 @@ I18N.onChange(() => {
   paintChatDays();
   renderChat();
   paintChatMore();
+  paintRewards();
   if (filteredSongs.length) renderSuggest();
   if (!document.getElementById('node-warn').hidden) paintNodeWarning();
 });

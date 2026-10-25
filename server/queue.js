@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const STATE_PATH = path.join(__dirname, '..', 'queue-state.json');
+const STATE_PATH = process.env.QUEUE_STATE_FILE || path.join(__dirname, '..', 'queue-state.json');   // tests use a temp file
 // Only recent state is restored: a mid-stream restart picks up where it left
 // off, but yesterday's leftover queue doesn't reappear at the next stream.
 const RESTORE_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -15,6 +15,9 @@ let nowPlaying = null;
 let playedSongs = [];
 let pending = [];
 let clients = new Set();
+// A song from a channel-point redemption carries it ({ id, rewardId }): sung → done, removed →
+// refunded. index.js hands in redemptions.settle; only rewards the app made can be changed.
+let settleRedemption = () => {};
 
 function restoreState() {
   let saved;
@@ -62,6 +65,25 @@ function broadcastRaw(msg) {
   }
 }
 
+function setRedemptionHook(fn) {
+  settleRedemption = fn;
+}
+
+// Done or refunded once: the entry no longer carries it (a played song dragged back changes nothing)
+function settle(entry, action) {
+  if (!entry || !entry.redemption) return;
+  const r = entry.redemption;
+  delete entry.redemption;
+  try { settleRedemption(r, action); } catch (err) { console.error('[queue] Could not settle a redemption:', err.message); }
+}
+
+// Done or refunded elsewhere (Chat tab ✓ / ↩, or Twitch's own queue): the song no longer settles it
+function forgetRedemption(id) {
+  for (const entry of [nowPlaying, ...queue, ...pending]) {
+    if (entry?.redemption?.id === id) { delete entry.redemption; saveState(); }
+  }
+}
+
 function registerClient(ws) {
   clients.add(ws);
   ws.send(JSON.stringify({ type: 'state', nowPlaying, queue, playedSongs, pending }));
@@ -69,9 +91,10 @@ function registerClient(ws) {
 }
 
 // `tabs` is the random reward's tab filter, kept so a redraw stays within it.
-function addSong({ title, artist, key, requester, isRandom, tabs }) {
+function addSong({ title, artist, key, requester, isRandom, tabs, redemption }) {
   const entry = { title, artist, key: key != null ? String(key) : '', requester, addedAt: Date.now() };
   if (isRandom) entry.isRandom = true;
+  if (redemption) entry.redemption = redemption;
   if (isRandom && tabs?.length) entry.tabs = tabs;
   if (!nowPlaying) { nowPlaying = entry; }
   else { queue.push(entry); }
@@ -80,7 +103,7 @@ function addSong({ title, artist, key, requester, isRandom, tabs }) {
 }
 
 // Add to pending (weak match, no match, or multiple candidates)
-function addPending({ title, artist, requester, originalRequest, confidence, candidates }) {
+function addPending({ title, artist, requester, originalRequest, confidence, candidates, redemption }) {
   const entry = {
     title: title || '',
     artist: artist || '',
@@ -90,6 +113,7 @@ function addPending({ title, artist, requester, originalRequest, confidence, can
     candidates: candidates || null,   // array of songs when multiple confident matches exist
     addedAt: Date.now(),
   };
+  if (redemption) entry.redemption = redemption;
   pending.push(entry);
   broadcastState();
   return entry;
@@ -122,17 +146,21 @@ function acceptPending(index, editedTitle, editedArtist, candidateIndex) {
     key = entry.key != null ? String(entry.key) : '';
   }
 
-  addSong({ title, artist, key, requester: entry.requester });
+  addSong({ title, artist, key, requester: entry.requester, redemption: entry.redemption });
   return true;
 }
 
 function skipSong() {
-  if (nowPlaying) playedSongs.push({ ...nowPlaying, playedAt: Date.now() });
+  if (nowPlaying) {
+    settle(nowPlaying, 'done');
+    playedSongs.push({ ...nowPlaying, playedAt: Date.now() });
+  }
   nowPlaying = queue.length > 0 ? queue.shift() : null;
   broadcastState();
   return nowPlaying;
 }
 
+// Clear All: the songs' redemptions stay waiting (Chat tab → Waiting, or Twitch's queue)
 function clearQueue() {
   queue = [];
   nowPlaying = null;
@@ -146,16 +174,17 @@ function getState() {
 function deleteSong(zone, index) {
   if (zone === 'nowPlaying') {
     if (!nowPlaying) return false;
+    settle(nowPlaying, 'refund');
     nowPlaying = queue.length > 0 ? queue.shift() : null;
   } else if (zone === 'queue') {
     if (index < 0 || index >= queue.length) return false;
-    queue.splice(index, 1);
+    settle(queue.splice(index, 1)[0], 'refund');
   } else if (zone === 'played') {
     if (index < 0 || index >= playedSongs.length) return false;
     playedSongs.splice(index, 1);
   } else if (zone === 'pending') {
     if (index < 0 || index >= pending.length) return false;
-    pending.splice(index, 1);
+    settle(pending.splice(index, 1)[0], 'refund');
     broadcastState();
     return true;
   } else {
@@ -190,9 +219,12 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
       requester: p.requester,
       addedAt: p.addedAt,
     };
+    if (p.redemption) song.redemption = p.redemption;
   } else {
     return false;
   }
+
+  if (toZone === 'played' && fromZone !== 'played') settle(song, 'done');
 
   // Insert into destination
   if (toZone === 'nowPlaying') {
@@ -215,6 +247,7 @@ function moveSong(fromZone, fromIndex, toZone, toIndex) {
       candidates: null,
       addedAt: song.addedAt || Date.now(),
     };
+    if (song.redemption) entry.redemption = song.redemption;
     const i = Math.max(0, Math.min(toIndex, pending.length));
     pending.splice(i, 0, entry);
   } else {
@@ -236,6 +269,7 @@ function redrawSong(zone, index, newSong) {
     isRandom: true,
   };
   if (newSong.tabs?.length) entry.tabs = newSong.tabs;
+  if (newSong.redemption) entry.redemption = newSong.redemption;
   if (zone === 'nowPlaying') {
     if (!nowPlaying) return false;
     nowPlaying = entry;
@@ -252,5 +286,5 @@ function redrawSong(zone, index, newSong) {
 module.exports = {
   registerClient, addSong, addPending, updatePending, acceptPending,
   skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong,
-  broadcastSettings, broadcastRaw,
+  broadcastSettings, broadcastRaw, setRedemptionHook, forgetRedemption,
 };

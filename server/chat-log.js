@@ -6,12 +6,15 @@
 //
 // Each line is one record:
 //   { kind: 'chat', id, at, user, text, parts, type, bits?, reply?, songs? }
-//   { kind: 'redeem', id, at, user, text, reward, rewardId }
+//   { kind: 'redeem', id, at, user, text, reward, rewardId, status? }
+//       — status: 'unfulfilled' (waiting in Twitch's queue) | 'fulfilled' (done) | 'canceled' (refunded)
 //   { kind: 'notice', id, at, user, notice, system, text, anonymous?, recipient?, viewers?, avatar? }
 //       — Twitch's sub / resub / gift / raid … lines (notice = notice_type, system = Twitch's own wording);
 //         recipient: who got a gifted sub; a raid's user is the raiding channel
 //   { kind: 'follow', id, at, user }
 //   { kind: 'delete', at, ids? | user? | all? }   — a mod deleted messages; applied on load
+//   { kind: 'redeem-status', at, id, status }      — a redemption done or refunded later; in the
+//       redemption's day file (at = the redemption's), applied on load
 // user = { id, login, name, color, badges: ['moderator', 'subscriber', ...] }
 // parts = the message split into text / emote / mention / cheer, for drawing emotes.
 // songs = sheet songs the message names, for the "songs mentioned" filter:
@@ -111,11 +114,13 @@ function fromChat(e, at = Date.now()) {
 
 // channel.channel_points_custom_reward_redemption.add
 function fromRedemption(e, at = Date.now()) {
-  return {
+  const rec = {
     kind: 'redeem', id: e.id || `r${at}`, at,
     user: { ...userOf(e, ''), color: '', badges: [] },
     text: (e.user_input || '').trim(), reward: e.reward?.title || '', rewardId: e.reward?.id || '',
   };
+  if (e.status && e.status !== 'unknown') rec.status = e.status;
+  return rec;
 }
 
 // channel.chat.notification
@@ -211,7 +216,23 @@ function onModeration(type, e) {
   else if (type === 'channel.chat.clear') remove({ all: true });
 }
 
-// A day's records with deletions applied, oldest first
+// A redemption done or refunded (channel.channel_points_custom_reward_redemption.update, or the
+// app's own ✓ / ↩, redemptions.js). redeemedAt (Twitch's time) finds the day file when the
+// redemption is no longer in memory.
+function setRedeemStatus(id, status, redeemedAt) {
+  const rec = recent.find(r => r.kind === 'redeem' && r.id === id);
+  if (rec && rec.status === status) return;
+  if (rec) rec.status = status;
+  append({ kind: 'redeem-status', at: rec ? rec.at : (Date.parse(redeemedAt) || Date.now()), id, status });
+  send({ type: 'chat-redeem', id, status });
+}
+
+function applyStatus(records, st) {
+  const rec = records.find(r => r.kind === 'redeem' && r.id === st.id);
+  if (rec) rec.status = st.status;
+}
+
+// A day's records with deletions and redemption statuses applied, oldest first
 async function load(day) {
   if (!DAY_RE.test(day || '')) return [];
   let text;
@@ -222,6 +243,7 @@ async function load(day) {
     let rec;
     try { rec = JSON.parse(line); } catch { continue; }   // a line cut off by a crash
     if (rec.kind === 'delete') applyDelete(out, rec);
+    else if (rec.kind === 'redeem-status') applyStatus(out, rec);
     else out.push(rec);
   }
   return out;
@@ -242,7 +264,7 @@ async function prune(now = Date.now()) {
   }
 }
 
-// `sendFn` pushes { type: 'chat' | 'chat-delete', ... } to the dashboards that want chat.
+// `sendFn` pushes { type: 'chat' | 'chat-delete' | 'chat-redeem', ... } to the dashboards that want chat.
 // Today's log is read back, so a restart keeps the chat on screen.
 async function init(sendFn) {
   send = sendFn || send;
@@ -259,4 +281,4 @@ function flush() {
   return writing;
 }
 
-module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };
+module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };

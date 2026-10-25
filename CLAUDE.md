@@ -72,6 +72,7 @@ vtuber-song-queue/
 │   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
 │   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json)
+│   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
@@ -97,7 +98,7 @@ vtuber-song-queue/
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
 `setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `chat-logs/`, `link-search.json`, `package-lock.json`,
-`.env` backups.
+`ending-credits.json`, `reward-takeovers.json`, `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -121,6 +122,29 @@ vtuber-song-queue/
 - Listens to ALL Channel Points redemptions, then routes by reward ID:
   `TWITCH_RANDOM_REWARDS` entry → random picker (with that entry's tab filter);
   `TWITCH_REWARD_ID` → matcher; anything else → ignored (other rewards may also take text input)
+- Songs from a redemption carry `redemption: {id, rewardId}` through pending / accept / moves / redraw.
+  queue.js `settle()` hands it to `redemptions.settle` once and drops it: **done** (FULFILLED) when the
+  song goes to Played (✓ Finished, or dragged there), **refunded** (CANCELED) when it's deleted from
+  now playing / queue / pending, or when a random reward has nothing left to draw. Clear All leaves
+  them waiting. Only rewards this app's Client ID created can be changed (Twitch's rule); others are
+  skipped silently and stay in Twitch's own queue
+
+### Channel-point redemptions (redemptions.js)
+- `manageableIds()`: `only_manageable_rewards=true`, cached 10 min. `setStatus` PATCHes
+  `/channel_points/custom_rewards/redemptions` (404 = already handled → `redemptionHandled`)
+- Status in the chat log: `redeem.status` from the add event (`unfulfilled` / `fulfilled` for
+  skip-queue rewards), later `{kind: 'redeem-status', at, id, status}` lines in the redemption's day
+  file (at = the redemption's time), applied on load, pushed as `{type: 'chat-redeem'}`. Sources:
+  `channel.channel_points_custom_reward_redemption.update` (any reward, done here or on Twitch)
+  and the app's own PATCH response
+- Takeover of a reward made on Twitch (Chat ⚙ → Channel-point rewards): `startTakeover` creates a
+  disabled copy (`copyOf`: cost, prompt, color, text input, skip-queue, limits, cooldown — the icon
+  can't be set by apps) named `<title> (new)` (titles must be unique). The streamer deletes the
+  original on Twitch; `channel.channel_points_custom_reward.remove` (or "I've deleted it", or
+  `listRewards` noticing it's gone) runs `finishTakeover`: the copy gets the original's title and
+  enabled / paused state, and `TWITCH_REWARD_ID` / the `TWITCH_RANDOM_REWARDS` entry switch to it.
+  reward-takeovers.json keeps finished ones so ending-credits.js still counts the old ID as song
+  requests. `cancelTakeover` deletes the copy
 
 ### Queue state (queue.js)
 - `nowPlaying`, `queue[]`, `playedSongs[]`, `pending[]` (weak/unmatched requests for review)
@@ -128,6 +152,7 @@ vtuber-song-queue/
 - Every change is written to `queue-state.json`; restored at startup only if saved within
   6 hours (a crash mid-stream recovers; yesterday's leftovers don't reappear)
 - History is recorded when a song is **finished** (skip / moved to played), not when queued
+- `QUEUE_STATE_FILE` overrides the state file (tests)
 
 ### Random picker (random.js)
 - `RANDOM_PICK_MODE`: `weighted` (favours songs not requested recently) or `pure`
@@ -252,7 +277,7 @@ vtuber-song-queue/
   `channel.chat.message_delete` / `clear_user_messages` / `clear` (same `user:read:chat` scope, each
   optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
   and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
-  channel, first-time `user_intro`, highlighted / bits, redemptions, one viewer, search, bots) run in
+  channel, first-time `user_intro`, highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
   the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester. Sending
   chat needs `user:write:chat` (not requested): the tab links to Twitch's popout chat instead
 - Song notes (song-notes.js): each song in a chat record gets `lastAt` (ms, from history.js
@@ -438,7 +463,11 @@ register it in index.js.
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
 | GET | `/api/chat/recent` | Chat tab: the latest 1000 chat records `{records, channel}` |
 | GET | `/api/chat/days` | Days with a chat log, newest first |
-| GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions applied |
+| GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions and redemption statuses applied |
+| GET | `/api/redemptions/manageable` | `{ids, channel}` — rewards whose redemptions the Chat tab can change |
+| POST | `/api/redemptions/status` | `{id, rewardId, action: 'done' \| 'refund'}` |
+| GET | `/api/rewards` | Chat ⚙: every reward with `role`, `manageable`, `skipsQueue`, `takeover` |
+| POST | `/api/rewards/takeover` | `{id, action: 'start' \| 'finish' \| 'cancel'}` |
 | POST | `/api/leihu/launch` | Start Leihu without its window, or close one the song queue started `{action: 'start' \| 'stop'}` |
 | POST | `/api/leihu/bulk` | Prepare all sheet songs in Leihu `{action: 'start' \| 'stop'}` → bulk status |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
@@ -530,7 +559,8 @@ See `.env.example` for full descriptions.
   Twitch or the real `.env`
 - Don't add tests that load `queue.js` or `sheets.js` unstubbed from the repo root: they write
   `queue-state.json` / `song-cache.json` there. Tests point `LEIHU_LINKS_FILE` at a temp file so
-  `song-links.json` is never touched
+  `song-links.json` is never touched; likewise `QUEUE_STATE_FILE`, `CHAT_LOG_DIR`, `ENDING_CREDITS_FILE`,
+  `REWARD_TAKEOVERS_FILE`
 
 ---
 

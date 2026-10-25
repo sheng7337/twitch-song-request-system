@@ -114,3 +114,22 @@ test('a restart shows today again; logs older than CHAT_LOG_DAYS are deleted', a
   assert.deepStrictEqual(await log.load(kept), []);
   assert.ok(log.getRecent().records.some(r => r.id === 'r9'), "today's chat is back after a restart");
 });
+
+test('a redemption done or refunded later: sent to dashboards, and applied when its day is read back', async () => {
+  const sent = [];
+  await log.init(m => sent.push(m));
+  const rec = log.addRedemption({ id: 'w1', user_login: 'viewer', user_name: '觀眾A', user_input: '晴天', status: 'unfulfilled', reward: { id: 'rw1', title: '點歌' } });
+  assert.strictEqual(rec.status, 'unfulfilled');
+  log.setRedeemStatus('w1', 'fulfilled');
+  log.setRedeemStatus('w1', 'fulfilled');   // Twitch's update event after the dashboard's own ✓
+  // Yesterday's redemption, no longer in memory: its status goes to yesterday's file
+  const yesterday = Date.now() - 86400000;
+  fs.appendFileSync(path.join(tmp, `${log.dayOf(yesterday)}.jsonl`), JSON.stringify({ kind: 'redeem', id: 'w0', at: yesterday, user: {}, text: '', reward: '點歌', rewardId: 'rw1', status: 'unfulfilled' }) + '\n');
+  log.setRedeemStatus('w0', 'canceled', new Date(yesterday).toISOString());
+  await log.flush();
+
+  assert.deepStrictEqual(sent.filter(m => m.type === 'chat-redeem'), [{ type: 'chat-redeem', id: 'w1', status: 'fulfilled' }, { type: 'chat-redeem', id: 'w0', status: 'canceled' }]);
+  assert.strictEqual((await log.load(log.dayOf(Date.now()))).find(r => r.id === 'w1').status, 'fulfilled');
+  const before = await log.load(log.dayOf(yesterday));
+  assert.deepStrictEqual(before.map(r => [r.id, r.status]), [['w0', 'canceled']], 'status lines are applied, not listed');
+});

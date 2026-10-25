@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const chatLog = require('./chat-log');
+const redemptions = require('./redemptions');
 const { ensureFreshToken } = require('./twitch');
 
 const STATE_PATH = process.env.ENDING_CREDITS_FILE || path.join(__dirname, '..', 'ending-credits.json');   // tests use a temp file
@@ -33,10 +34,12 @@ function saveRunAt(at) {
   }
 }
 
-// Song request and random song rewards: their redeemers are thanked as requesters
+// Song request and random song rewards: their redeemers are thanked as requesters. A reward the
+// app took over (redemptions.js) still counts under its old ID, earlier that stream.
 function songRewardIds() {
   const ids = new Set([process.env.TWITCH_REWARD_ID].filter(Boolean));
   try { for (const r of JSON.parse(process.env.TWITCH_RANDOM_REWARDS || '[]')) if (r.id) ids.add(r.id); } catch {}
+  for (const id of redemptions.originalsOf(ids)) ids.add(id);
   return ids;
 }
 

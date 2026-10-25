@@ -370,7 +370,7 @@ function renderRewardPicker(containerId, type, label, hint, requiresText) {
         ${matching.map(r => `
           <div class="reward-option" onclick="pickReward('${type}', ${r._idx})" id="reward-opt-${type}-${r._idx}">
             <div class="reward-opt-tag">${r.is_user_input_required ? t.textInputTag : t.noTextTag}</div>
-            <div class="reward-opt-name">${esc(r.title)}</div>
+            <div class="reward-opt-name">${esc(r.title)}${r.manageable ? '' : ` <span style="color:var(--text-dim)">${t.madeOnTwitch}</span>`}</div>
             <div class="reward-opt-cost">${r.cost} pts</div>
           </div>`).join('')}
         ${newOptionHtml}
@@ -387,9 +387,11 @@ function renderRewardPicker(containerId, type, label, hint, requiresText) {
       </div>`;
   }
 
+  // Rewards this app makes can be completed / refunded from the dashboard; ones made on Twitch can be taken over there later
   container.innerHTML = `
     <div style="font-size:11px; letter-spacing:2px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase">${label}</div>
-    <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px">${hint}</div>
+    <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">${hint}</div>
+    <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px">${t.manageHint}</div>
     ${listHtml}
     <div id="create-form-${type}" style="display:none; margin-top:12px">
       <div class="field" style="margin-bottom:10px">

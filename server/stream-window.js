@@ -46,7 +46,7 @@ function open(url) {
 function isForUsualBrowser(url, port) {
   let u;
   try { u = new URL(url); } catch { return false; }
-  if (u.protocol === 'https:' && ['twitch.tv', 'www.twitch.tv'].includes(u.hostname)) return true;
+  if (u.protocol === 'https:' && ['twitch.tv', 'www.twitch.tv', 'dashboard.twitch.tv'].includes(u.hostname)) return true;
   return u.protocol === 'http:' && u.host === `localhost:${port}` && (u.pathname === '/setup' || u.pathname.startsWith('/setup/'));
 }
 

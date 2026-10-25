@@ -226,11 +226,13 @@ router.get('/rewards', async (req, res) => {
   try {
     const auth = await helixAuth();
     if (!auth) return res.status(400).json(message('twitchNotConfigured', {}, 'Twitch not configured yet — please complete Step 2 first'));
-    const r = await axios.get(
-      `https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`,
-      { headers: auth.headers }
-    );
-    res.json({ rewards: r.data.data || [] });
+    const [r, mine] = await Promise.all([
+      axios.get(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}`, { headers: auth.headers }),
+      axios.get(`https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=${auth.broadcasterId}&only_manageable_rewards=true`, { headers: auth.headers }),
+    ]);
+    // manageable: made by this app, so the dashboard can mark its redemptions done / refunded
+    const ids = new Set((mine.data.data || []).map(x => x.id));
+    res.json({ rewards: (r.data.data || []).map(x => ({ ...x, manageable: ids.has(x.id) })) });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.message || err.message });
   }
