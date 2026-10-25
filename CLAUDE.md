@@ -73,6 +73,7 @@ vtuber-song-queue/
 │   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
 │   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json)
 │   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
+│   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
@@ -277,7 +278,7 @@ vtuber-song-queue/
   `channel.chat.message_delete` / `clear_user_messages` / `clear` (same `user:read:chat` scope, each
   optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
   and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
-  channel, first-time `user_intro`, highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
+  channel, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
   the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester. Sending
   chat needs `user:write:chat` (not requested): the tab links to Twitch's popout chat instead
 - Song notes (song-notes.js): each song in a chat record gets `lastAt` (ms, from history.js

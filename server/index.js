@@ -22,6 +22,7 @@ const registerThanks = require('./commands/thanks');
 const registerEndingThanks = require('./commands/ending-thanks');
 const endingCredits = require('./ending-credits');
 const redemptions = require('./redemptions');
+const firstChat = require('./first-chat');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
@@ -108,6 +109,9 @@ async function activateServiceIfReady() {
   // re-auth after token expiry. connect() is idempotent: it no-ops when a
   // socket already exists, so this is safe to call on any config change.
   await connectTwitch();
+  // Twitch's "first message in the channel" flag, for the Chat tab
+  firstChat.start(redemptions.channelLogin, chatLog.markFirst)
+    .catch(err => console.error('[first-chat] Could not start:', err.message));
   await initHistory();
 }
 setupRouter.setConfigChangeCallback(() => activateServiceIfReady().catch(err => {

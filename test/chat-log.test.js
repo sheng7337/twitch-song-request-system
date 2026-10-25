@@ -133,3 +133,20 @@ test('a redemption done or refunded later: sent to dashboards, and applied when 
   const before = await log.load(log.dayOf(yesterday));
   assert.deepStrictEqual(before.map(r => [r.id, r.status]), [['w0', 'canceled']], 'status lines are applied, not listed');
 });
+
+test('a first message in the channel: flagged before or after it arrives, and read back', async () => {
+  const sent = [];
+  await log.init(m => sent.push(m));
+  log.markFirst('early');   // Twitch's IRC was quicker than EventSub
+  const a = log.addChat({ message_id: 'early', chatter_user_login: 'a', chatter_user_name: 'A', message: { text: 'hi', fragments: [] }, message_type: 'text' });
+  const b = log.addChat({ message_id: 'late', chatter_user_login: 'b', chatter_user_name: 'B', message: { text: 'yo', fragments: [] }, message_type: 'text' });
+  log.markFirst('late');
+  log.markFirst('late');
+  await log.flush();
+  assert.strictEqual(a.first, true);
+  assert.strictEqual(b.first, true);
+  assert.deepStrictEqual(sent.filter(m => m.type === 'chat-first'), [{ type: 'chat-first', id: 'late' }]);
+  const day = await log.load(log.dayOf(Date.now()));
+  assert.deepStrictEqual(day.filter(r => r.first).map(r => r.id), ['early', 'late']);
+  assert.ok(!day.some(r => r.kind === 'chat-first'), 'flag lines are applied, not listed');
+});

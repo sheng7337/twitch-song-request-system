@@ -982,6 +982,7 @@ function connect() {
       else if (m.type === 'chat') onChatRecord(m.record);
       else if (m.type === 'chat-delete') onChatDelete(m);
       else if (m.type === 'chat-redeem') onChatRedeem(m);
+      else if (m.type === 'chat-first') onChatFirst(m);
     } catch(_){}
   };
 }
@@ -2107,7 +2108,7 @@ function chatMatches(rec) {
     case 'mods': return badges.some(b => b === 'broadcaster' || b === 'moderator' || b === 'vip');
     case 'subs': return badges.some(b => b === 'subscriber' || b === 'founder');
     case 'mentions': return mentionsMe(rec);
-    case 'first': return rec.type === 'user_intro';
+    case 'first': return isFirstChat(rec);
     case 'highlight': return rec.type === 'channel_points_highlighted' || !!rec.bits;
     case 'redeems': return rec.kind === 'redeem';
     case 'waiting': return rec.kind === 'redeem' && rec.status === 'unfulfilled';
@@ -2152,9 +2153,9 @@ function chatRowHtml(rec) {
     return markWords(p.text, words);
   }).join('');
   const cls = ['chat-msg', mentionsMe(rec) && 'me-mention', rec.type === 'channel_points_highlighted' && 'highlight',
-    rec.type === 'user_intro' && 'intro', rec.deleted && 'deleted'].filter(Boolean).join(' ');
+    isFirstChat(rec) && 'intro', rec.deleted && 'deleted'].filter(Boolean).join(' ');
   const reply = rec.reply ? `<span class="chat-reply">↪ ${esc(rec.reply.name)}: ${esc(rec.reply.text)}</span>` : '';
-  const tags = (rec.type === 'user_intro' ? `<span class="chat-tag">${esc(t('dash.chat.tag.first'))}</span>` : '')
+  const tags = (isFirstChat(rec) ? `<span class="chat-tag">${esc(t('dash.chat.tag.first'))}</span>` : '')
     + (rec.bits ? `<span class="chat-tag">${esc(t('dash.chat.tag.bits', { bits: rec.bits }))}</span>` : '')
     + (rec.deleted ? `<span class="chat-tag">${esc(t('dash.chat.tag.deleted'))}</span>` : '');
   const songs = (rec.songs || []).map((s, i) => {
@@ -2457,6 +2458,18 @@ function rerenderChat() {
   const top = list.scrollTop;
   renderChat();
   if (!keep) list.scrollTop = top;
+}
+
+// A viewer's first message in the channel: Twitch's flag (rec.first), or its "introduce yourself" prompt
+function isFirstChat(rec) {
+  return rec.kind === 'chat' && (rec.first || rec.type === 'user_intro');
+}
+
+function onChatFirst(m) {
+  for (const list of [chat.live, chat.dayRecords || []]) {
+    for (const r of list) if (r.kind === 'chat' && r.id === m.id) r.first = true;
+  }
+  rerenderChat();
 }
 
 // A redemption done or refunded, here or on Twitch

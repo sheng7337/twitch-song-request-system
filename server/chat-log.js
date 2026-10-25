@@ -5,7 +5,8 @@
 // can be searched. Filtering happens in the dashboard.
 //
 // Each line is one record:
-//   { kind: 'chat', id, at, user, text, parts, type, bits?, reply?, songs? }
+//   { kind: 'chat', id, at, user, text, parts, type, first?, bits?, reply?, songs? }
+//       — first: the viewer's first message in the channel (Twitch's own flag, first-chat.js)
 //   { kind: 'redeem', id, at, user, text, reward, rewardId, status? }
 //       — status: 'unfulfilled' (waiting in Twitch's queue) | 'fulfilled' (done) | 'canceled' (refunded)
 //   { kind: 'notice', id, at, user, notice, system, text, anonymous?, recipient?, viewers?, avatar? }
@@ -15,6 +16,7 @@
 //   { kind: 'delete', at, ids? | user? | all? }   — a mod deleted messages; applied on load
 //   { kind: 'redeem-status', at, id, status }      — a redemption done or refunded later; in the
 //       redemption's day file (at = the redemption's), applied on load
+//   { kind: 'chat-first', at, id }                  — the flag arrived after the message; applied on load
 // user = { id, login, name, color, badges: ['moderator', 'subscriber', ...] }
 // parts = the message split into text / emote / mention / cheer, for drawing emotes.
 // songs = sheet songs the message names, for the "songs mentioned" filter:
@@ -35,6 +37,7 @@ let recent = [];
 let channel = null;        // the broadcaster's login, for Twitch's own chat window
 let send = () => {};       // pushes a record to dashboards with the Chat tab open
 let writing = Promise.resolve();
+const earlyFirst = [];     // first-message flags that arrived before their message (a few at most)
 
 function keepDays() {
   const n = Number(process.env.CHAT_LOG_DAYS);
@@ -172,6 +175,8 @@ function add(rec) {
 function addChat(event, prepare) {
   if (event.broadcaster_user_login) channel = event.broadcaster_user_login;
   const rec = fromChat(event);
+  const early = earlyFirst.indexOf(rec.id);
+  if (early >= 0) { earlyFirst.splice(early, 1); rec.first = true; }
   if (prepare) prepare(rec);
   return add(rec);
 }
@@ -227,12 +232,32 @@ function setRedeemStatus(id, status, redeemedAt) {
   send({ type: 'chat-redeem', id, status });
 }
 
+// A viewer's first message in the channel (first-chat.js). Twitch's IRC and EventSub race, so
+// the flag can come just before the message too.
+function markFirst(id) {
+  const rec = recent.find(r => r.kind === 'chat' && r.id === id);
+  if (!rec) {
+    earlyFirst.push(id);
+    if (earlyFirst.length > 50) earlyFirst.shift();
+    return;
+  }
+  if (rec.first) return;
+  rec.first = true;
+  append({ kind: 'chat-first', at: rec.at, id });
+  send({ type: 'chat-first', id });
+}
+
+function applyFirst(records, f) {
+  const rec = records.find(r => r.kind === 'chat' && r.id === f.id);
+  if (rec) rec.first = true;
+}
+
 function applyStatus(records, st) {
   const rec = records.find(r => r.kind === 'redeem' && r.id === st.id);
   if (rec) rec.status = st.status;
 }
 
-// A day's records with deletions and redemption statuses applied, oldest first
+// A day's records with deletions, redemption statuses and first messages applied, oldest first
 async function load(day) {
   if (!DAY_RE.test(day || '')) return [];
   let text;
@@ -244,6 +269,7 @@ async function load(day) {
     try { rec = JSON.parse(line); } catch { continue; }   // a line cut off by a crash
     if (rec.kind === 'delete') applyDelete(out, rec);
     else if (rec.kind === 'redeem-status') applyStatus(out, rec);
+    else if (rec.kind === 'chat-first') applyFirst(out, rec);
     else out.push(rec);
   }
   return out;
@@ -264,7 +290,7 @@ async function prune(now = Date.now()) {
   }
 }
 
-// `sendFn` pushes { type: 'chat' | 'chat-delete' | 'chat-redeem', ... } to the dashboards that want chat.
+// `sendFn` pushes { type: 'chat' | 'chat-delete' | 'chat-redeem' | 'chat-first', ... } to the dashboards that want chat.
 // Today's log is read back, so a restart keeps the chat on screen.
 async function init(sendFn) {
   send = sendFn || send;
@@ -281,4 +307,4 @@ function flush() {
   return writing;
 }
 
-module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };
+module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, markFirst, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };
