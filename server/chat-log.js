@@ -11,12 +11,15 @@
 //       — status: 'unfulfilled' (waiting in Twitch's queue) | 'fulfilled' (done) | 'canceled' (refunded)
 //   { kind: 'notice', id, at, user, notice, system, text, anonymous?, recipient?, viewers?, avatar? }
 //       — Twitch's sub / resub / gift / raid … lines (notice = notice_type, system = Twitch's own wording);
-//         recipient: who got a gifted sub; a raid's user is the raiding channel
+//         recipient: who got a gifted sub; a raid's user is the raiding channel; communityGift: a
+//         sub_gift that is one of a gift of several (the community_sub_gift line says it once)
 //   { kind: 'follow', id, at, user }
 //   { kind: 'delete', at, ids? | user? | all? }   — a mod deleted messages; applied on load
 //   { kind: 'redeem-status', at, id, status }      — a redemption done or refunded later; in the
 //       redemption's day file (at = the redemption's), applied on load
 //   { kind: 'chat-first', at, id }                  — the flag arrived after the message; applied on load
+//   { kind: 'announced', at, ids, done }            — ✓ in the Chat tab's "to announce" (done: false = undone);
+//       in the records' day file, applied on load as `announced: true`
 // user = { id, login, name, color, badges: ['moderator', 'subscriber', ...] }
 // parts = the message split into text / emote / mention / cheer, for drawing emotes.
 // songs = sheet songs the message names, for the "songs mentioned" filter:
@@ -138,6 +141,7 @@ function fromNotice(e, at = Date.now()) {
   if (gift?.recipient_user_id) {
     rec.recipient = { id: gift.recipient_user_id, login: gift.recipient_user_login || '', name: gift.recipient_user_name || gift.recipient_user_login || '' };
   }
+  if (gift?.community_gift_id) rec.communityGift = gift.community_gift_id;
   if (e.raid) {
     rec.user = { ...rec.user, id: e.raid.user_id || rec.user.id, login: e.raid.user_login || rec.user.login, name: e.raid.user_name || rec.user.name };
     rec.viewers = e.raid.viewer_count || 0;
@@ -247,6 +251,31 @@ function markFirst(id) {
   send({ type: 'chat-first', id });
 }
 
+// Records marked announced (✓ in the Chat tab's "to announce"), or brought back. One line per day
+// file (at = the records'), applied on load.
+function setAnnounced(items, done) {
+  const byDay = new Map();
+  for (const { id, at } of items) {
+    const rec = recent.find(r => r.id === id);
+    if (rec) { if (done) rec.announced = true; else delete rec.announced; }
+    const when = rec ? rec.at : at;
+    const day = dayOf(when);
+    if (!byDay.has(day)) byDay.set(day, { kind: 'announced', at: when, ids: [], done });
+    byDay.get(day).ids.push(id);
+  }
+  for (const line of byDay.values()) append(line);
+  send({ type: 'chat-announced', ids: items.map(i => i.id), done });
+}
+
+function applyAnnounced(records, a) {
+  const ids = new Set(a.ids || []);
+  for (const r of records) {
+    if (!ids.has(r.id)) continue;
+    if (a.done) r.announced = true;
+    else delete r.announced;
+  }
+}
+
 function applyFirst(records, f) {
   const rec = records.find(r => r.kind === 'chat' && r.id === f.id);
   if (rec) rec.first = true;
@@ -257,7 +286,7 @@ function applyStatus(records, st) {
   if (rec) rec.status = st.status;
 }
 
-// A day's records with deletions, redemption statuses and first messages applied, oldest first
+// A day's records with deletions, redemption statuses, first messages and ✓ marks applied, oldest first
 async function load(day) {
   if (!DAY_RE.test(day || '')) return [];
   let text;
@@ -270,9 +299,23 @@ async function load(day) {
     if (rec.kind === 'delete') applyDelete(out, rec);
     else if (rec.kind === 'redeem-status') applyStatus(out, rec);
     else if (rec.kind === 'chat-first') applyFirst(out, rec);
+    else if (rec.kind === 'announced') applyAnnounced(out, rec);
     else out.push(rec);
   }
   return out;
+}
+
+// Every record from `since` on, from each day file the time touches
+async function loadSince(since, now = Date.now()) {
+  await writing;
+  const records = [];
+  for (let day = dayOf(since); day <= dayOf(now);) {
+    records.push(...await load(day));
+    const next = new Date(`${day}T12:00:00`);
+    next.setDate(next.getDate() + 1);
+    day = dayOf(next.getTime());
+  }
+  return records.filter(r => r.at >= since);
 }
 
 // Days with a log, newest first
@@ -290,7 +333,7 @@ async function prune(now = Date.now()) {
   }
 }
 
-// `sendFn` pushes { type: 'chat' | 'chat-delete' | 'chat-redeem' | 'chat-first', ... } to the dashboards that want chat.
+// `sendFn` pushes { type: 'chat' | 'chat-delete' | 'chat-redeem' | 'chat-first' | 'chat-announced', ... } to the dashboards that want chat.
 // Today's log is read back, so a restart keeps the chat on screen.
 async function init(sendFn) {
   send = sendFn || send;
@@ -307,4 +350,4 @@ function flush() {
   return writing;
 }
 
-module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, markFirst, getRecent, load, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };
+module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, markFirst, setAnnounced, getRecent, load, loadSince, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };

@@ -110,14 +110,7 @@ async function addAvatars(groups) {
 // Everyone since the last roll: the chat log of each day the window touches
 async function gather(now = Date.now()) {
   const since = Math.max(lastRunAt(), now - WINDOW_MS);
-  await chatLog.flush();
-  const records = [];
-  for (let day = chatLog.dayOf(since); day <= chatLog.dayOf(now);) {
-    records.push(...await chatLog.load(day));
-    const next = new Date(`${day}T12:00:00`);
-    next.setDate(next.getDate() + 1);
-    day = chatLog.dayOf(next.getTime());
-  }
+  const records = await chatLog.loadSince(since, now);
   return collect(records, { since, broadcasterId: process.env.TWITCH_BROADCASTER_ID || '', songRewards: songRewardIds() });
 }
 

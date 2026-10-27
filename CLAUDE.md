@@ -75,6 +75,7 @@ vtuber-song-queue/
 │   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
 │   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst
 │   ├── chat-send.js       The Chat tab's message box: Helix POST /chat/messages (replies too)
+│   ├── stream-session.js  When the stream went live (stream.online / Helix /streams), for "to announce"
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
@@ -100,7 +101,7 @@ vtuber-song-queue/
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
 `setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `chat-logs/`, `link-search.json`, `package-lock.json`,
-`ending-credits.json`, `reward-takeovers.json`, `.env` backups.
+`ending-credits.json`, `reward-takeovers.json`, `stream-session.json`, `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -280,8 +281,15 @@ vtuber-song-queue/
   `channel.chat.message_delete` / `clear_user_messages` / `clear` (same `user:read:chat` scope, each
   optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
   and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
-  channel, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
+  channel, to announce, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
   the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester
+- "To announce" (要宣讀): subs / resubs / gifts (a community gift once: its `sub_gift` lines carry
+  `communityGift` and are left out), raids, watch streaks, bits badges, charity, follows, cheers,
+  highlighted messages, first-time chatters, and each viewer's first message this session (`greet`,
+  worked out in the dashboard; bots and the streamer left out). The session = since the stream last
+  went live (stream-session.js; `/api/chat/session` loads it across day files, 12 h before any go-live
+  is known). ✓ / ✓ All → `/api/chat/announced` → `{kind: 'announced', ids, done}` lines → `announced`
+  on load, `{type: 'chat-announced'}` to every dashboard; ✓ again (with "show announced") undoes
 - Message box (chat-send.js): posts as the authorized account (sender = broadcaster), `↪ Reply` on a
   row sets `reply_parent_message_id`. The message comes back through EventSub chat, so nothing is added
   locally. `canSend()` checks the token's scopes via `/oauth2/validate` (true cached 5 min; missing
@@ -471,6 +479,8 @@ register it in index.js.
 | GET | `/api/chat/recent` | Chat tab: the latest 1000 chat records `{records, channel}` |
 | GET | `/api/chat/days` | Days with a chat log, newest first |
 | GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions and redemption statuses applied |
+| GET | `/api/chat/session` | `{startedAt, live, since, records}` — this stream session's records, for "to announce" |
+| POST | `/api/chat/announced` | `{items: [{id, at}], done}` — ✓ marks |
 | GET | `/api/chat/send` | `{canSend, max}` — whether the token may post (`user:write:chat`) |
 | POST | `/api/chat/send` | `{text, replyTo?}` → `{id}`; posts to chat as the streamer |
 | GET | `/api/redemptions/manageable` | `{ids, channel}` — rewards whose redemptions the Chat tab can change |
@@ -569,7 +579,7 @@ See `.env.example` for full descriptions.
 - Don't add tests that load `queue.js` or `sheets.js` unstubbed from the repo root: they write
   `queue-state.json` / `song-cache.json` there. Tests point `LEIHU_LINKS_FILE` at a temp file so
   `song-links.json` is never touched; likewise `QUEUE_STATE_FILE`, `CHAT_LOG_DIR`, `ENDING_CREDITS_FILE`,
-  `REWARD_TAKEOVERS_FILE`
+  `REWARD_TAKEOVERS_FILE`, `STREAM_SESSION_FILE`
 
 ---
 

@@ -19,6 +19,7 @@ let moderationHandler = null; // set by index.js via setModerationHandler (delet
 let noticeHandler = null;     // set by index.js via setNoticeHandler (subs, gifts, raids as chat shows them)
 let followHandler = null;     // set by index.js via setFollowHandler
 let rewardHandler = null;     // set by index.js via setRewardHandler
+let streamHandler = null;     // set by index.js via setStreamHandler (stream went live / ended)
 let follows = null;           // new followers: 'on' | 'no-permission' (authorized before it was asked) | 'failed'
 
 // Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
@@ -175,6 +176,19 @@ async function subscribeToEvents(sid) {
     }
   }
 
+  // The stream going live / ending (stream-session.js): no permission needed
+  for (const type of STREAM_TYPES) {
+    try {
+      await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+        type, version: '1',
+        condition: { broadcaster_user_id: broadcasterId },
+        transport: { method: 'websocket', session_id: sid },
+      }, { headers });
+    } catch (err) {
+      console.warn(`[twitch] Could not subscribe to ${type}:`, err.response?.data?.message || err.message);
+    }
+  }
+
   // New followers (not in chat): needs moderator:read:followers. An authorization from before setup
   // asked for it goes on without; the dashboard's Chat settings offer to authorize again.
   try {
@@ -194,6 +208,7 @@ async function subscribeToEvents(sid) {
 const MODERATION_TYPES = ['channel.chat.message_delete', 'channel.chat.clear_user_messages', 'channel.chat.clear'];
 // A redemption done or refunded (here or on Twitch), and a reward deleted (redemptions.js takeovers)
 const REWARD_TYPES = ['channel.channel_points_custom_reward_redemption.update', 'channel.channel_points_custom_reward.remove'];
+const STREAM_TYPES = ['stream.online', 'stream.offline'];
 
 function connectEventSub(url) {
   const wsUrl = url || EVENTSUB_WS_URL;
@@ -258,6 +273,8 @@ function connectEventSub(url) {
         if (followHandler) followHandler(msg.payload.event);
       } else if (REWARD_TYPES.includes(subType)) {
         if (rewardHandler) rewardHandler(subType, msg.payload.event);
+      } else if (STREAM_TYPES.includes(subType)) {
+        if (streamHandler) streamHandler(subType, msg.payload.event);
       }
     }
 
@@ -308,6 +325,10 @@ function setRewardHandler(fn) {
   rewardHandler = fn;
 }
 
+function setStreamHandler(fn) {
+  streamHandler = fn;
+}
+
 function followStatus() {
   return follows;
 }
@@ -345,4 +366,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, reconnect, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, followStatus, ensureFreshToken, setEnvValue };
+module.exports = { connect, reconnect, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, setStreamHandler, followStatus, ensureFreshToken, setEnvValue };

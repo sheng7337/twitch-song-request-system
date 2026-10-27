@@ -150,3 +150,25 @@ test('a first message in the channel: flagged before or after it arrives, and re
   assert.deepStrictEqual(day.filter(r => r.first).map(r => r.id), ['early', 'late']);
   assert.ok(!day.some(r => r.kind === 'chat-first'), 'flag lines are applied, not listed');
 });
+
+test('announced marks: kept per day, applied when read back, and undone; a gift of several subs is marked as such', async () => {
+  const sent = [];
+  await log.init(m => sent.push(m));
+  const gift = log.addNotice({ message_id: 'g1', chatter_user_login: 'santa', chatter_user_name: 'Santa', notice_type: 'sub_gift',
+    sub_gift: { recipient_user_id: '9', recipient_user_login: 'kid', community_gift_id: 'cg1' } });
+  assert.strictEqual(gift.communityGift, 'cg1');
+  const hi = log.addChat({ message_id: 'hi1', chatter_user_login: 'a', chatter_user_name: 'A', message: { text: 'hello', fragments: [] }, message_type: 'text' });
+  const yesterday = Date.now() - 86400000;
+  fs.appendFileSync(path.join(tmp, `${log.dayOf(yesterday)}.jsonl`), JSON.stringify({ kind: 'follow', id: 'f-old', at: yesterday, user: {} }) + '\n');
+  log.setAnnounced([{ id: 'hi1', at: hi.at }, { id: 'g1', at: gift.at }, { id: 'f-old', at: yesterday }], true);
+  log.setAnnounced([{ id: 'g1', at: gift.at }], false);
+  await log.flush();
+
+  assert.strictEqual(hi.announced, true);
+  assert.deepStrictEqual(sent.filter(m => m.type === 'chat-announced').map(m => [m.ids, m.done]), [[['hi1', 'g1', 'f-old'], true], [['g1'], false]]);
+  const since = await log.loadSince(yesterday - 1000);
+  const marked = Object.fromEntries(since.filter(r => ['hi1', 'g1', 'f-old'].includes(r.id)).map(r => [r.id, !!r.announced]));
+  assert.deepStrictEqual(marked, { 'f-old': true, g1: false, hi1: true });
+  assert.ok(!since.some(r => r.kind === 'announced'), 'mark lines are applied, not listed');
+  assert.ok((await log.loadSince(Date.now() - 60000)).every(r => r.at >= Date.now() - 60000), 'only records since then');
+});

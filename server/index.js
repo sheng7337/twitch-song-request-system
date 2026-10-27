@@ -10,7 +10,7 @@ const { isAllowedRequest } = require('./request-guard');
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
 const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw, setRedemptionHook, forgetRedemption } = require('./queue');
-const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, followStatus } = require('./twitch');
+const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, setStreamHandler, followStatus } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const chatLog = require('./chat-log');
 const songNotes = require('./song-notes');
@@ -24,6 +24,7 @@ const endingCredits = require('./ending-credits');
 const redemptions = require('./redemptions');
 const firstChat = require('./first-chat');
 const chatSend = require('./chat-send');
+const streamSession = require('./stream-session');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
 const { init: initHistory, recordRequest, getHistory } = require('./history');
@@ -105,11 +106,14 @@ async function activateServiceIfReady() {
     coreServicesStarted = true;
     console.log('\n[setup] Configuration complete — starting song queue services...\n');
     await startAutoRefresh();
+    // Live or not, checked now and then too: a go-live / end event can be missed while reconnecting
+    setInterval(() => streamSession.refresh(), 10 * 60 * 1000);
   }
   // Called every time setup is complete — handles both first start and
   // re-auth after token expiry. connect() is idempotent: it no-ops when a
   // socket already exists, so this is safe to call on any config change.
   await connectTwitch();
+  streamSession.refresh();
   // Twitch's "first message in the channel" flag, for the Chat tab
   firstChat.start(redemptions.channelLogin, chatLog.markFirst)
     .catch(err => console.error('[first-chat] Could not start:', err.message));
@@ -147,6 +151,9 @@ setRewardHandler((type, event) => {
   try { chatLog.setRedeemStatus(event.id, event.status, event.redeemed_at); } catch (err) { console.error('[chat-log] Could not log a redemption update:', err.message); }
 });
 setRedemptionHook(redemptions.settle);
+// The stream went live / ended: the Chat tab's "to announce" starts a new session
+setStreamHandler(streamSession.onEvent);
+streamSession.init(session => sendChat({ type: 'chat-session', ...session }));
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
@@ -742,6 +749,20 @@ app.post('/api/settings', (req, res) => {
 app.get('/api/chat/recent', (req, res) => res.json(chatLog.getRecent()));
 app.get('/api/chat/days', async (req, res) => res.json(await chatLog.days()));
 app.get('/api/chat/log', async (req, res) => res.json(await chatLog.load(String(req.query.day || ''))));
+// "To announce" (Chat tab): this stream session's records (stream-session.js; the last 12 hours until
+// a go-live has been seen), and ✓ marks { items: [{ id, at }], done }
+app.get('/api/chat/session', async (req, res) => {
+  const session = streamSession.get();
+  const since = session.startedAt || Date.now() - 12 * 3600000;
+  res.json({ ...session, since, records: await chatLog.loadSince(since) });
+});
+app.post('/api/chat/announced', (req, res) => {
+  const items = (Array.isArray(req.body.items) ? req.body.items : [])
+    .filter(i => i && i.id).map(i => ({ id: String(i.id), at: Number(i.at) || Date.now() }));
+  if (!items.length) return res.status(400).json({ error: 'items [{ id, at }] are needed' });
+  chatLog.setAnnounced(items, req.body.done !== false);
+  res.json({ ok: true });
+});
 // Posting to chat (chat-send.js): GET → whether the app may (user:write:chat); POST { text, replyTo? }
 app.get('/api/chat/send', async (req, res) => res.json({ canSend: await chatSend.canSend(), max: chatSend.MAX_LENGTH }));
 app.post('/api/chat/send', async (req, res) => {
