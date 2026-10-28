@@ -50,7 +50,7 @@ const STRINGS = {
 
     twitchAuth: {
       title: 'Step 2 — Connect Your Channel',
-      subtitle: 'We need your permission to create Channel Points rewards on your behalf.<br>' +
+      subtitle: 'We need your permission to create Channel Points rewards and complete or refund their redemptions, read your chat and post in it from the dashboard, and see new followers.<br>' +
                 'Click the button below, then enter the code shown at <strong>twitch.tv/activate</strong>.',
       importantTitle: 'Important',
       importantBody: 'Make sure your browser is signed in to your <strong>broadcaster Twitch account</strong> ' +
@@ -304,7 +304,7 @@ const STRINGS = {
 
     twitchAuth: {
       title: '步驟 2 — 連接你的頻道',
-      subtitle: '我們需要你的授權，才能代表你建立頻道點數兌換項目。<br>' +
+      subtitle: '我們需要你的授權，才能建立頻道點數兌換項目並完成或退還兌換、讀取聊天室並從控制台發言，以及得知新追隨。<br>' +
                 '請點擊下方按鈕，然後在 <strong>twitch.tv/activate</strong> 輸入顯示的代碼。',
       importantTitle: '重要提醒',
       importantBody: '點擊下方按鈕前，請確認你的瀏覽器已經登入<strong>實況主的 Twitch 帳號</strong>' +

@@ -10,6 +10,8 @@ Twitch 頻道點數點歌，附 OBS 顯示層與連麥 Shoutout 功能。
 
 **每次直播**：雙擊 `start_zh.bat`，就這樣。
 
+**控制台**：`http://localhost:3000/dashboard` — 點歌佇列、雷虎練唱台，以及聊天室（篩選、要宣讀、直接發言和回覆、完成或退還兌換）。
+
 > 完整說明請見 [SETUP_zh_TW.md](SETUP_zh_TW.md)
 
 ---
@@ -43,7 +45,7 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 
 ## !tk 背景圖設定
 
-每次呼叫 `!tk` 時，系統會從資料夾中隨機選取一張背景圖片。
+每次呼叫 `!tk` 或 `!endingtk` 時，系統會從資料夾中隨機選取一張背景圖片。
 
 1. 將背景圖片（jpg / png / gif / webp）放入 `clip-player/sponsor-bgs/` 資料夾，可放多張
 2. 重新啟動伺服器

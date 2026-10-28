@@ -96,7 +96,7 @@ Write-Step "請求授權代碼..."
 
 $deviceRes = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
     client_id = $clientId
-    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat"
+    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers"
 }
 $deviceCode   = $deviceRes.device_code
 $userCode     = $deviceRes.user_code

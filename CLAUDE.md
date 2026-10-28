@@ -76,13 +76,14 @@ vtuber-song-queue/
 │   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst
 │   ├── chat-send.js       The Chat tab's message box: Helix POST /chat/messages (replies too)
 │   ├── stream-session.js  When the stream went live (stream.online / Helix /streams), for "to announce"
+│   ├── stream-window.js   The dashboard in its own Chrome / Edge window, so OBS can capture Leihu's sound
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
 ├── shared/                Served at /shared: i18n.js (language helper), i18n-server.js (server
 │                          messages), i18n-viewer.js (overlay + clip player strings)
 ├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, cyberpunk dark/neon style
-├── dashboard/index.html   Streamer control panel — tabs (Song Queue: 2×2 panels, drag/drop, history, manual add; Leihu), ⚙ settings popover
+├── dashboard/index.html   Streamer control panel — tabs (Song Queue: 2×2 panels, drag/drop, history, manual add; Leihu; Chat), ⚙ per tab
 ├── dashboard/links.html   YouTube link finder review page
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)
@@ -110,12 +111,16 @@ vtuber-song-queue/
 
 ### Twitch EventSub (twitch.js)
 - Outbound WebSocket to `wss://eventsub.wss.twitch.tv/ws`; on `session_welcome`, subscribes to
-  `channel.channel_points_custom_reward_redemption.add` and `channel.chat.message`
+  `channel.channel_points_custom_reward_redemption.add` and `channel.chat.message`, then (each
+  optional, a failure leaves the rest working) `channel.chat.message_delete` / `clear_user_messages` /
+  `clear`, `channel.chat.notification`, `…_redemption.update`, `channel.channel_points_custom_reward.remove`,
+  `stream.online` / `stream.offline` and `channel.follow` v2 (`moderator:read:followers`)
 - `session_reconnect` → reconnect to the given URL; socket close → reconnect after 5s
 - Notifications are deduplicated by `message_id` (Twitch delivers at-least-once)
 - Auth: user access token from **Device Authorization Flow** (public client, no client secret).
   Scopes: `channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers`
-  (older setups lack the last ones: the dashboard links to `/setup?reauth=1`)
+  (older setups lack the last two: the dashboard links to `/setup?reauth=1`, which jumps to the
+  wizard's authorization step). setup.ps1 / setup_zh.ps1 ask for the same scopes
 - `ensureFreshToken()` refreshes 1 min before expiry. Call it before **every** Helix call.
   Concurrent calls share one refresh (`refreshPromise`) — Twitch rotates the refresh token,
   so two parallel refreshes would invalidate each other
@@ -252,8 +257,9 @@ vtuber-song-queue/
   download, so Leihu retries the same song instead of adding a new one
 - Dashboard tabs: `TABS` in dashboard/index.html, each a `.tabs` button + `.tab-page` with its own settings
   (`.tab-config-btn` ⚙ at the right end of the tab's top row → `#config-<tab>` panel, `toggleTabConfig`; no
-  global settings popover: Song Queue holds the random cooldown + overlay look, Chat the song-notes switch); `#leihu` in the URL selects
-  the tab. Planned tabs: rewards, OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
+  global settings popover: Song Queue holds the random cooldown + overlay look, Chat the song-notes switch, the
+  `!endingtk` preview (`/api/credits`) and channel-point rewards); `#leihu` / `#chat` in the URL selects
+  the tab. Planned tab: OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
   with Leihu's settings (auto-prepare, auto-start, the two steps below) in its ⚙ panel (bulk progress
   also shows in the header), the UI in an iframe from `url` in `/api/leihu/status`
   (Leihu sends no frame-blocking headers; only its `/api/remote/open` rejects browser requests). It loads
@@ -272,7 +278,8 @@ vtuber-song-queue/
   the everyday browser. That window's title is fixed (`STREAM_WINDOW_TITLE`, not translated) for OBS's
   "Window title must match". In it, /setup and twitch.tv links go to the usual browser (`POST /api/open-in-browser`,
   only those URLs; it has no Twitch login). The header's 🔊 hint shows until it's opened once (localStorage `streamWindowOpened`)
-- Dashboard Chat tab (chat-log.js): every `channel.chat.message` and redemption becomes a record (user,
+- Dashboard Chat tab (chat-log.js): every `channel.chat.message`, redemption, chat notification (sub,
+  raid…) and follow becomes a record (user,
   badges, text split into text / emote / mention / cheer parts, message_type, bits, reply, `songs` = sheet
   titles named in it — 2+ chars, 4+ for Latin-only titles, longest wins, not for !commands). Records are
   kept in memory (latest 1000, today's log read back on start), appended to chat-logs/<local date>.jsonl
@@ -478,7 +485,8 @@ register it in index.js.
 | POST | `/api/leihu/prepare` | Import / render key for one song now `{title, artist, key}` |
 | GET | `/api/chat/recent` | Chat tab: the latest 1000 chat records `{records, channel}` |
 | GET | `/api/chat/days` | Days with a chat log, newest first |
-| GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, deletions and redemption statuses applied |
+| GET | `/api/chat/log?day=YYYY-MM-DD` | One day's chat records, with deletions, redemption statuses, first messages and ✓ marks applied |
+| GET | `/api/credits` | `{follows, lastAt, groups}` — who `!endingtk` would thank now; follows: `on` / `no-permission` / `failed` |
 | GET | `/api/chat/session` | `{startedAt, live, since, records}` — this stream session's records, for "to announce" |
 | POST | `/api/chat/announced` | `{items: [{id, at}], done}` — ✓ marks |
 | GET | `/api/chat/send` | `{canSend, max}` — whether the token may post (`user:write:chat`) |
@@ -487,6 +495,8 @@ register it in index.js.
 | POST | `/api/redemptions/status` | `{id, rewardId, action: 'done' \| 'refund'}` |
 | GET | `/api/rewards` | Chat ⚙: every reward with `role`, `manageable`, `skipsQueue`, `takeover` |
 | POST | `/api/rewards/takeover` | `{id, action: 'start' \| 'finish' \| 'cancel'}` |
+| POST | `/api/stream-window` | Open the dashboard in its own browser window `{tab?: 'queue', lang?}` (409 until setup is done) |
+| POST | `/api/open-in-browser` | From the stream window: open a /setup or twitch.tv link in the usual browser `{url}` |
 | POST | `/api/leihu/launch` | Start Leihu without its window, or close one the song queue started `{action: 'start' \| 'stop'}` |
 | POST | `/api/leihu/bulk` | Prepare all sheet songs in Leihu `{action: 'start' \| 'stop'}` → bulk status |
 | POST | `/api/leihu/open` | Open the song in Leihu's practice window at its sheet key `{title, artist, key}` |
@@ -599,10 +609,12 @@ Google credentials (drag in JSON) → song sheet (paste URL, click columns) → 
 rewards → history sheet (optional) → OBS instructions → done.
 
 - Progress resumes from what `.env` already has (`/setup/api/status`); if only the Twitch
-  tokens are missing it jumps straight to re-authorization
+  tokens are missing it jumps straight to re-authorization. `/setup?reauth=1` does the same for a
+  finished setup (a scope added later)
 - Client ID is validated by requesting a device code (Twitch answers "invalid client")
 - Re-running the rewards step keeps per-tab random rewards
-- The PowerShell scripts are an alternative path and must write the same `.env` keys
+- The PowerShell scripts are an alternative path and must write the same `.env` keys and ask for
+  the same Twitch scopes
 
 Every step should explain **what** is asked, **why**, and **exactly where** to find it,
 validate before moving on, and show a friendly fix-it error.

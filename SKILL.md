@@ -25,6 +25,26 @@ WRONG:    /helix/channel-points/custom-rewards
 ### Channel Points
 - Since May 2026, Channel Points are available to all streamers (no Affiliate/Partner needed)
 - Creating rewards requires a user token with `channel:manage:redemptions` scope
+- An app can update (fulfil / cancel) only the redemptions of rewards **its own Client ID created**;
+  `custom_rewards?only_manageable_rewards=true` lists those. A reward made on Twitch can't be
+  "adopted" — make a copy through the API and have the streamer delete the original
+- Reward titles must be unique in the channel (45 characters max); apps can't set the icon
+- Updating a redemption that is no longer waiting answers 404
+
+### Chat
+- EventSub `channel.chat.message` has no "first message in the channel" flag: its `user_intro`
+  type is only Twitch's "introduce yourself" prompt. IRC's `first-msg=1` tag has it — an anonymous,
+  read-only IRC login (`NICK justinfan12345`, no token) is enough, and IRC's `id` tag is the same as
+  EventSub's `message_id`. The two arrive in either order
+- Posting: Helix `POST /chat/messages` (`user:write:chat`); `is_sent: false` with `drop_reason`
+  when AutoMod etc. holds it back. The message also comes back through EventSub chat
+- `stream.online` / `stream.offline` need no scope; Helix `/streams?user_id=` gives `started_at`
+  when the server starts mid-stream
+
+### Adding a scope later
+- Existing tokens don't gain it: the streamer has to authorize again. Check what a token has with
+  `GET https://id.twitch.tv/oauth2/validate` (`Authorization: OAuth <token>`, returns `scopes`)
+  and turn the feature off until then instead of failing
 
 ---
 
@@ -66,6 +86,14 @@ WRONG:    /helix/channel-points/custom-rewards
 { type: 'media', ... }             // clip player: play a clip, video or the !tk roll
 { type: 'media-stop' }             // clip player: stop now
 { type: 'preload-avatar', ... }    // clip player: cache a !so avatar for !tk
+{ type: 'song-note', title, artist, days, recent }   // overlay: "last sung N days ago"
+// only to pages that sent { type: 'chat-subscribe' } (the dashboard's Chat tab):
+{ type: 'chat', record }           // a new chat / redemption / notice / follow record
+{ type: 'chat-delete', ... }       // mods deleted messages
+{ type: 'chat-redeem', id, status } // a redemption done or refunded
+{ type: 'chat-first', id }         // a viewer's first message in the channel
+{ type: 'chat-announced', ids, done } // "to announce" checks
+{ type: 'chat-session', startedAt, live } // the stream went live / ended
 // clip player → server
 { type: 'media-ended', mediaId }   // finished; the media queue moves on
 ```
@@ -312,7 +340,7 @@ async function subscribeToRedemptions(sessionId) {
 const res = await axios.post('https://id.twitch.tv/oauth2/device', null, {
   params: {
     client_id: clientId,
-    scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat',
+    scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers',
   }
 });
 const { device_code, user_code, interval, expires_in } = res.data;

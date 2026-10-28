@@ -121,10 +121,13 @@ authorize it from any browser:
 ```powershell
 $res = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
   client_id = "YOUR_CLIENT_ID"
-  scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat"
+  scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers"
 }
 $res.user_code        # e.g. ABCD-1234
 ```
+
+(`user:write:chat`: the dashboard's message box; `moderator:read:followers`: new followers for
+`!endingtk`. Without them those two features are off; the dashboard offers to authorize again.)
 
 Visit **https://www.twitch.tv/activate**, log in as your **broadcaster** account, and
 enter the code shown. Then poll for the token (the device code is valid for ~30 minutes):
@@ -160,6 +163,11 @@ Invoke-RestMethod -Uri "https://api.twitch.tv/helix/users" `
 Copy the `id` field into `.env` as `TWITCH_BROADCASTER_ID`.
 
 ### Create Channel Points rewards
+
+> Twitch lets an app complete or refund only the redemptions of rewards **that app created**. Rewards
+> made by hand on Twitch work for requests, but their redemptions stay in Twitch's own queue — unless
+> you hand them over later in the dashboard (Chat ⚙ → **Channel-point rewards**). The setup wizard
+> creates them through the app instead.
 
 Go to your Twitch Dashboard → **Viewer Rewards → Channel Points → Manage Rewards → +**
 
@@ -206,7 +214,7 @@ a WebSocket, so nothing needs to be publicly reachable.
 6. In your scene, select the source and resize it down to `480 x 681` (50%) —
    this is what makes the 2× render look sharper instead of just bigger
 
-For the chat commands (`!so`, `!watch`, `!tk`), add a second Browser source:
+For the chat commands (`!so`, `!watch`, `!tk`, `!endingtk`), add a second Browser source:
 `http://localhost:3000/clip-player/index.html`, `1920 x 1080`, on top of the scene. It stays
 transparent until something plays.
 
@@ -232,6 +240,7 @@ Expected output:
 [twitch] EventSub WebSocket connected
 [twitch] Subscribed to Channel Points redemptions
 [twitch] Subscribed to chat messages
+[twitch] Subscribed to new followers
 ```
 
 (The order of the lines may differ a little.)

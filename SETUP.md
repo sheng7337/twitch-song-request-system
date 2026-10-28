@@ -96,7 +96,7 @@ Its language (English or 繁體中文) is set in the dashboard: ⚙ → **Overla
 2. URL: `http://localhost:3000/clip-player/index.html`
 3. Width: `1920`, Height: `1080`
 4. Put it at the top of the scene, covering the whole screen
-5. It stays fully transparent, and shows content only for `!so`, `!watch` and `!tk`
+5. It stays fully transparent, and shows content only for `!so`, `!watch`, `!tk` and `!endingtk`
 
 ---
 
@@ -146,7 +146,7 @@ Mods and the broadcaster only — viewers can't trigger them.
 | `!replay` | Replays the last `!so` / `!watch` |
 | `!stop` | Stops what's playing and clears the waiting clips |
 
-**`!tk` backgrounds:** put images (jpg / png / gif / webp) in `clip-player/sponsor-bgs/` and restart
+**`!tk` / `!endingtk` backgrounds:** put images (jpg / png / gif / webp) in `clip-player/sponsor-bgs/` and restart
 the server — one is picked at random each time. With no images the background is dark.
 The Japanese voice line is generated on first start (local VoiceVox if running, else Google TTS).
 
@@ -158,11 +158,11 @@ Open `http://localhost:3000/dashboard` during streams.
 
 | Feature | Description |
 |---|---|
-| 💬 Chat | Live chat with search and filters — songs mentioned (♪ adds one to the queue; it shows when the song was last sung, amber within the random cooldown — and the song overlay briefly lists songs named in chat as "title - 99 days ago" since last sung, coming up from the bottom of the overlay, over its Played list (up to 4 at a time, a new one replaces the oldest; amber within the cooldown; switch "📺 Song notes on overlay"), 📺), commands, mods & VIPs, subscribers, @mentions, first-time chatters, highlighted messages & bits, redemptions, waiting redemptions, one viewer (click a name); bots hidden. **To announce** lists what to thank or greet on stream — subs, gifts, raids, cheers, follows, watch streaks, highlighted messages, first-time chatters and each viewer's first words this stream — and **✓** (or **✓ All**) checks them off; a session starts when your stream goes live. Type in the box at the bottom to post in chat as yourself; **↪ Reply** on a message (shown on hover) answers it (setups from before this ask you to authorize once more). A waiting redemption gets **✓ Done** and **↩ Refund** when the reward was made by this app (song requests also settle themselves: done when you press ✓ Finished, refunded when you remove the song); for a reward made on Twitch, **↗ Twitch queue** opens Twitch's own queue. Chat ⚙ → *Channel-point rewards* can hand a reward made on Twitch over to the app: it makes a hidden copy, you delete the original on Twitch, and the copy takes its place (same settings; only a custom icon has to be uploaded again). Messages mods delete show struck through. Earlier days: pick a date (logs kept on this PC for `CHAT_LOG_DAYS`, default 30). To type in chat, **↗ Twitch chat** opens Twitch's own chat window |
+| 💬 Chat | Live chat with filters, **To announce**, a message box and redemption buttons — see [Chat tab](#chat-tab) below |
 | Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Leihu settings** in its header opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — random cooldown, overlay opacity / brightness / language; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay. Each saves on its own |
+| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — random cooldown, overlay opacity / brightness / language; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now, channel-point rewards. Each saves on its own |
 | EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlay and clip player follow the ⚙ "Overlay language" setting |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
 | Pending column | Weak/unmatched requests — edit and accept manually |
@@ -171,6 +171,51 @@ Open `http://localhost:3000/dashboard` during streams.
 | History info | Each card shows last request date and requester |
 | Key circle | Shows transposition value (+3, -2, etc.) |
 | ♫ badge · 🎤 Sing | Leihu Singsing status of each song — see below |
+
+---
+
+## Chat tab
+
+The 💬 Chat tab shows your Twitch chat live, together with channel-point redemptions, subs, raids and
+follows. It's kept on this PC for `CHAT_LOG_DAYS` days (default 30): pick an earlier day from the date
+list. Messages mods delete show struck through.
+
+- **Filters:** to announce, songs mentioned, commands, mods & VIPs, subscribers, @mentions, first-time
+  chatters, highlighted messages & bits, redemptions, waiting redemptions, and subs, raids & follows.
+  Click a name to see only that viewer. The search box looks in messages and names. Bots are hidden
+  while **Hide bots** is ticked.
+- **To announce:** what to thank or greet on stream — subs, resubs and gifted subs (a gift of several
+  subs as one line), raids, cheers, new followers, watch streaks, highlighted messages, first-time
+  chatters, and each viewer's first message this stream (tagged *first words this stream*; bots and
+  you are left out). **✓** checks one off and **✓ All** checks off everything shown. **Show announced**
+  brings the checked ones back into view; clicking **✓ announced** on one puts it back on the list.
+  The chip shows how many are left. A new session starts when your stream goes live; until then,
+  anything not checked off stays.
+- **First-time chatters** are the viewers Twitch itself highlights: their first message in your channel ever.
+- **Songs mentioned:** **♪** on a sheet song named in chat adds it to the queue with the viewer as
+  requester. It shows when the song was last sung: amber within the random cooldown, 📺 when it was
+  shown on the overlay. The song overlay briefly lists such songs as "title - 99 days ago", coming up
+  from its bottom over the Played list (up to 4 at a time; amber within the cooldown). Turn this off in
+  Chat ⚙ → **📺 Song notes on overlay**.
+- **Posting in chat:** type in the box at the bottom and press Enter — it posts as your Twitch account.
+  **↪ Reply** (shown when you point at a message) answers that message; ✕ or Esc cancels. When Twitch
+  holds a message back (AutoMod, slow mode…), your text stays in the box and the reason is shown.
+  **↗ Twitch chat** still opens Twitch's own chat window.
+- **Redemptions:** a waiting redemption of a reward this app made gets **✓ Done** and **↩ Refund**
+  (Refund asks once more: Twitch can't undo it). Song requests settle themselves: done when you press
+  ✓ Finished (or drag the song to Played), refunded when you remove it from the queue or Pending.
+  **✕ Clear All** leaves them waiting, so the *Waiting redemptions* filter finds them. Twitch lets an
+  app change only the redemptions of rewards it made, so a reward made on Twitch gets **↗ Twitch queue**
+  instead, which opens Twitch's own reward queue.
+- **Chat ⚙:** song notes on the overlay; who `!endingtk` would thank right now, and whether new
+  followers are included; **Channel-point rewards**, which hands a reward made on Twitch over to the
+  app. Click **Let the app manage it**: the app makes a hidden copy with the same settings. Delete the original on
+  Twitch (clear its queue first), and the copy takes its name and place, also as the song request or
+  a random reward. Only a custom icon has to be uploaded again.
+
+**Updating from an earlier version:** new followers (for `!endingtk`) and posting in chat need Twitch
+permissions that older setups didn't ask for. The Chat tab then shows **Authorize again →**, which
+takes you to the wizard's authorization step once; nothing else changes.
 
 ---
 
@@ -250,6 +295,10 @@ vtuber-song-queue/
 ├── queue-state.json          ← current queue, restored after a restart within 6 hours
 ├── song-links.json           ← songs linked to Leihu by hand
 ├── link-search.json          ← link finder progress and decisions
+├── chat-logs/                ← Chat tab log, one file per day (kept CHAT_LOG_DAYS days)
+├── ending-credits.json       ← when !endingtk last ran
+├── reward-takeovers.json     ← rewards handed over to the app (Chat ⚙)
+├── stream-session.json       ← when the stream last went live (Chat tab "To announce")
 ├── server/                   ← the server (see CLAUDE.md for every file)
 │   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk, !endingtk)
 ├── shared/                   ← English / 繁體中文 strings shared by the pages
@@ -270,6 +319,7 @@ vtuber-song-queue/
 - Song list **auto-refreshes every 5 minutes** — no restart needed after adding songs
 - History sheet **updates within ~2 seconds** of each request
 - Your Twitch connection **renews itself automatically** — no token to babysit, no tunnel to restart
+- When an update needs a new Twitch permission, the dashboard says so with an **Authorize again →** link
 
 ---
 
