@@ -224,9 +224,12 @@ vtuber-song-queue/
   `song-links.json` (key `title|artist` lowercased → Leihu song ID), for audio-file imports
 - Dashboard badge per queued song: ready / no lyrics / preparing / failed / prepare (not in
   Leihu) / link broken / link. "No lyrics": Leihu 1.4.7+ finishes processing with blank lyrics
-  when its recognition is unreliable — the streamer picks online lyrics in Leihu
-- Online lyrics for songs **we** imported (Prepare, auto-prepare, "Check with Leihu", Queue +
-  prepare) or whose video is a sheet `YTLink`, once per song per server run (`fillMissingLyrics`):
+  when its recognition is unreliable — the streamer picks online lyrics in Leihu. Leihu 1.6.5+
+  doesn't recognize on import (`auto_recognize_lyrics` off, `lyrics_recognized: false`): it applies
+  the first likely online lyrics in the background, so a song is "no lyrics" until then, or for good
+  when nothing matched. (The removed "Check with Leihu" compared recognized lyrics, so it had nothing
+  to compare from 1.6.5 on.)
+- Online lyrics for songs **we** imported (Prepare, auto-prepare, Queue + prepare) or whose video is a sheet `YTLink`, once per song per server run (`fillMissingLyrics`):
   - when Leihu left the lyrics blank (`nolyrics`), or
   - when Leihu kept its own recognition but flags online lyrics (`lyricsSource` `whisper` +
     `lyricsPending`, Leihu's "有線上歌詞可選") — then the candidate's `similarity` to the
@@ -245,7 +248,7 @@ vtuber-song-queue/
   `POST /api/youtube`, then renders the sheet key via `POST /api/songs/<id>/variant`. Each
   request is sent once per server run. Keys outside whole semitones ±6 are skipped
 - Failed Leihu jobs: `/api/status` keeps each job's `error` for ~10 min; leihu.js passes it on as
-  `failure: { reason, blocked }` (dashboard badge tooltip, "Check with Leihu" result). `blocked` =
+  `failure: { reason, blocked }` (dashboard badge tooltip). `blocked` =
   YouTube's "confirm you're not a bot" refusal of yt-dlp — a temporary block on the PC's
   connection; Leihu cuts the message, so `youtubeBlocked()` matches any part. Fix for users is in
   SETUP ("YouTube blocks downloads": wait, or `--cookies-from-browser firefox` in yt-dlp's own
@@ -266,7 +269,8 @@ vtuber-song-queue/
   on first view and again when Leihu comes back; a dashboard opened from another device shows a note
   instead, since Leihu listens on 127.0.0.1 only
 - Leihu without its window (leihu-launcher.js, `POST /api/leihu/launch {action: 'start'|'stop'}`, ▶/■ in the
-  Leihu tab, `LEIHU_AUTOSTART`): runs Leihu's `app.py --no-browser --parent-pid <this pid>` with its`pythonw`,
+  Leihu tab, `LEIHU_AUTOSTART`): runs Leihu's `app.py --no-browser --parent-pid <this pid>` with its `python.exe` (hidden; like Leihu
+  1.6.7's desktop.py, so ffmpeg runs don't flash console windows — `pythonw` only as a fallback),
   `LIANTAI_PORT` from `LEIHU_URL`, output appended to Leihu's `logs/app.log` — like Leihu's desktop.py minus
   the window, so Leihu closes with the song queue. Folder: `LEIHU_ROOT`, else `leihu-home.json` (`remember()`,
   called from `refresh()` with Leihu's `root`), else `%LOCALAPPDATA%\LeihuLiantai`. ■ closes only a Leihu the
@@ -377,9 +381,6 @@ vtuber-song-queue/
   Songs skipped for a filled cell (`noteCellFilled`) are tried again on every save, so clearing
   the cell in the sheet is enough; the Save button counts them.
   Songs are read from A:Z, so a tab already using all 26 columns can't get the column added
-- "Check with Leihu": imports the video into Leihu (language from the tab), waits for
-  processing, then reads `lyrics/candidates` similarity. Inconclusive when Leihu's recognition
-  is unreliable (usual for 台語). Adds the song to Leihu's library
 
 ### Songs not on the sheet (Pending Review → 🔍 Find)
 - Button only (no automatic search). `linkFinder.identify(text)` runs find-videos.py for the
@@ -507,7 +508,6 @@ register it in index.js.
 | POST | `/api/links/accept-confident` | Accept every confident pick |
 | POST | `/api/links/access` | Check Editor access to the song sheet (no-op write) → `{canEdit, checked, error}` |
 | POST | `/api/links/save` | Write accepted links into empty sheet cells |
-| POST | `/api/links/check` | Verify a candidate with Leihu `{key, videoId}` (imports it) |
 
 Setup wizard (`/setup/api/*`): `status`, `validate-client-id`, `start-device-auth`,
 `poll-device-auth`, `rewards`, `create-rewards`, `upload-credentials`, `validate-sheet`,

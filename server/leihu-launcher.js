@@ -37,11 +37,13 @@ function findRoot() {
     .find(r => r && fs.existsSync(path.join(r, 'app.py'))) || null;
 }
 
-// pythonw: no console window. Packaged Leihu ships python\; a source install runs from .venv or venv.
+// python.exe, like Leihu's own desktop.py since 1.6.7: started hidden (windowsHide), it has a console
+// nobody sees, and the ffmpeg / pip runs Leihu starts share it. Under pythonw each of them would
+// flash a black window of its own. Packaged Leihu ships python\; a source install runs from .venv or venv.
 function findPython(root) {
   const candidates = process.platform === 'win32'
-    ? ['python\\pythonw.exe', '.venv\\Scripts\\pythonw.exe', 'venv\\Scripts\\pythonw.exe',
-      'python\\python.exe', '.venv\\Scripts\\python.exe', 'venv\\Scripts\\python.exe']
+    ? ['python\\python.exe', '.venv\\Scripts\\python.exe', 'venv\\Scripts\\python.exe',
+      'python\\pythonw.exe', '.venv\\Scripts\\pythonw.exe', 'venv\\Scripts\\pythonw.exe']
     : ['.venv/bin/python', 'venv/bin/python'];
   return candidates.map(p => path.join(root, p)).find(p => fs.existsSync(p)) || null;
 }

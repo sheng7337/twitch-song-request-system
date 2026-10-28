@@ -25,10 +25,8 @@ const ROOT = path.join(__dirname, '..');
 const STATE_PATH = process.env.LINK_SEARCH_STATE || path.join(ROOT, 'link-search.json');   // tests use a temp file
 const CREDS_PATH = path.join(ROOT, 'google-credentials.json');
 const HELPER = path.join(ROOT, 'tools', 'find-videos.py');
-const CHECK_POLL_MS = 5000;
-const CHECK_TIMEOUT_MS = 20 * 60 * 1000;
 
-// songs: rowKey → { tab, row, title, artist, raw, decision, videoId, written, note, check }
+// songs: rowKey → { tab, row, title, artist, raw, decision, videoId, written, note }
 //   decision: null | 'accepted' | 'skipped';  written: true once the link is in the sheet
 let state = loadState();
 const job = { running: false, total: 0, done: 0, current: '', error: '', skippedTabs: [] };
@@ -38,7 +36,7 @@ function loadState() {
   let s;
   try { s = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8')); } catch { return { songs: {} }; }
   for (const song of Object.values(s.songs || {})) {
-    if (song.check && song.check.state === 'running') song.check = { ...song.check, state: 'failed', note: 'interrupted by a server restart', noteCode: 'checkInterrupted' };
+    delete song.check;   // "Check with Leihu" results, from before it was removed
   }
   return s;
 }
@@ -247,7 +245,7 @@ function getView() {
     .filter(([, s]) => s.raw && !s.written)
     .map(([key, s]) => ({
       key, tab: s.tab, row: s.row, title: s.title, artist: s.artist,
-      decision: s.decision, videoId: s.videoId || null, check: s.check || null,
+      decision: s.decision, videoId: s.videoId || null,
       note: s.note || '', noteCode: s.note ? s.noteCode || null : null, noteParams: s.noteParams || {},
       ...scoreSong(s.raw, { tab: s.tab, title: s.title }),
     }));
@@ -399,62 +397,6 @@ async function writeLinks(api, pending) {
   console.log(`[links] Wrote ${data.length} links to the sheet, skipped ${skipped}` +
     (createdIn.length ? `, added the ${config.YT_LINK_HEADER} column to ${createdIn.join(', ')}` : ''));
   return { written: data.length, skipped, createdIn };
-}
-
-// ── "Check with Leihu" ───────────────────────────────────────────────────────
-
-// Imports the video into Leihu (or reuses it) and, once processed, compares the
-// lyrics Leihu recognized with the online lyrics it found. Runs in the background;
-// the result lands in song.check:
-//   { state: 'running' | 'match' | 'partial' | 'nomatch' | 'inconclusive' | 'failed', similarity, note }
-async function check(key, videoId) {
-  const s = state.songs[key];
-  if (!s) throw new UserError('unknownSong', {}, 'unknown song');
-  const vid = leihu.videoId(videoId) || videoId;
-  s.check = { state: 'running', videoId: vid, started: Date.now() };
-  saveState();
-  runCheck(s, vid).catch(err => {
-    s.check = { state: 'failed', videoId: vid, note: err.response?.data?.error || err.message,
-      noteCode: err.messageCode || null, noteParams: err.messageParams || {} };
-    saveState();
-  });
-}
-
-async function runCheck(s, vid) {
-  const base = leihu.baseUrl();
-  await leihu.refresh();
-  let id = leihu.findByVideo(vid)?.id;
-  if (!id) id = await leihu.importVideo(vid, s.tab, s);
-  const deadline = Date.now() + CHECK_TIMEOUT_MS;
-  for (;;) {
-    if (Date.now() > deadline) throw new UserError('checkTooLong', {}, 'Leihu took too long to process the song');
-    await new Promise(r => setTimeout(r, CHECK_POLL_MS));
-    await leihu.refresh();
-    const st = leihu.findByVideo(vid)?.state;
-    if (st === 'failed') {
-      const f = leihu.failure(id);
-      if (f && f.blocked) throw new UserError('youtubeBlocked', {}, `YouTube is blocking downloads from this PC: ${f.reason}`);
-      if (f) throw new UserError('checkFailedReason', { reason: f.reason }, `Leihu could not process this video: ${f.reason}`);
-      throw new UserError('checkFailed', {}, 'Leihu could not process this video');
-    }
-    if (st === 'ready' || st === 'nolyrics') break;
-  }
-  const [song, cands] = await Promise.all([
-    axios.get(`${base}/api/songs/${id}`, { timeout: 15000 }),
-    axios.get(`${base}/api/songs/${id}/lyrics/candidates`, { timeout: 60000 }),
-  ]);
-  const meta = song.data;
-  const reliable = meta.lyrics_quality ? meta.lyrics_quality.ok !== false : !meta.lyrics_unreliable;
-  const sims = (cands.data.results || []).map(c => c.similarity).filter(x => typeof x === 'number');
-  const best = sims.length ? Math.max(...sims) : null;
-  let result;
-  if (!reliable || best == null) {
-    result = { state: 'inconclusive', noteCode: 'checkInconclusive', note: 'Leihu could not recognize the sung lyrics reliably (common for 台語) — judge by length and channel' };
-  } else {
-    result = { state: best >= 0.6 ? 'match' : best >= 0.3 ? 'partial' : 'nomatch', similarity: best };
-  }
-  s.check = { ...result, videoId: vid, leihuId: id };
-  saveState();
 }
 
 // ── Songs not on the sheet (Pending Review) ──────────────────────────────────
@@ -644,7 +586,7 @@ async function addToSheet({ title, artist, videoId }) {
 }
 
 module.exports = {
-  start, stop, getJob, getView, decide, acceptConfident, save, check, checkAccess,
+  start, stop, getJob, getView, decide, acceptConfident, save, checkAccess,
   identify, addToSheet, practiceTab, guessTab,
   // for tests
   rowKey, columnLetter, findColumns, pickSong, leihuPython, _setState: s => { state = s; },

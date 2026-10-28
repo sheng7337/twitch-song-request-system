@@ -563,15 +563,6 @@ app.post('/api/links/save', async (req, res) => {
   }
 });
 
-app.post('/api/links/check', async (req, res) => {
-  const { key, videoId } = req.body;
-  try {
-    await linkFinder.check(key, videoId);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json(errorBody(err));
-  }
-});
 
 // ── Songs not on the sheet (Pending Review → 🔍 Find) ────────────────────────
 // The pending entry at `index`; `addedAt` (when sent) must match, so a list that changed

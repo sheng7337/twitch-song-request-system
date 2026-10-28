@@ -127,10 +127,6 @@
     background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
     color: var(--text); padding: 5px 8px; font-family: 'Share Tech Mono', monospace; font-size: 13px;
   }
-  .check { font-size: 13px; color: var(--text-dim); }
-  .check.match { color: var(--green); }
-  .check.partial, .check.inconclusive, .check.running { color: var(--amber); }
-  .check.nomatch, .check.failed { color: var(--red); }
   .note { font-size: 13px; color: var(--amber); }
   .empty { color: var(--text-dim); padding: 30px 0; text-align: center; }
 
@@ -234,7 +230,7 @@ async function load() {
   } catch (_) { return; }
   const json = JSON.stringify(view);
   if (json !== lastJson) { lastJson = json; render(); }
-  const busy = view.job.running || view.songs.some(s => s.check && s.check.state === 'running');
+  const busy = view.job.running;
   clearTimeout(load.timer);
   load.timer = setTimeout(load, busy ? 3000 : 15000);
 }
@@ -351,7 +347,6 @@ function songHtml(s) {
         ${s.decision
           ? `<button class="btn small" onclick="decide(this.dataset.key, null)" data-key="${k}">${esc(t('links.song.undo'))}</button>`
           : `<button class="btn small warn" onclick="decide(this.dataset.key, 'skipped')" data-key="${k}">${esc(t('links.song.skip'))}</button>`}
-        ${checkHtml(s)}
       </div>
       ${s.note ? `<div class="note">${esc(serverText(s.note, s.noteCode, s.noteParams))}</div>` : ''}
     </div>`;
@@ -380,22 +375,8 @@ function candHtml(s, c) {
         ${chosen
           ? `<span class="tag good">${esc(t('links.tag.accepted'))}</span>`
           : `<button class="btn small go" onclick="decide(this.dataset.key, 'accepted', this.dataset.id)" data-key="${esc(s.key)}" data-id="${esc(c.id)}">${esc(t('links.song.useThis'))}</button>`}
-        <button class="btn small" onclick="runCheck(this.dataset.key, this.dataset.id)" data-key="${esc(s.key)}" data-id="${esc(c.id)}"
-          title="${esc(t('links.song.checkTitle'))}">${esc(t('links.song.check'))}</button>
       </div>
     </div>`;
-}
-
-function checkHtml(s) {
-  const c = s.check;
-  if (!c) return '';
-  const which = s.candidates.find(x => x.id === c.videoId);
-  const label = which ? `“${which.title.slice(0, 40)}”` : c.videoId;
-  const note = c.note ? serverText(c.note, c.noteCode, c.noteParams) : '';
-  const text = I18N.has('links.check.' + c.state)
-    ? t('links.check.' + c.state, { p: Math.round((c.similarity || 0) * 100), note })
-    : c.state;
-  return `<span class="check ${esc(c.state)}">${tHtml('links.check.of', { label, text })}</span>`;
 }
 
 function setFilter(f) { filter = f; render(); }
@@ -413,14 +394,6 @@ function useTyped(btn) {
   const val = (typed[key] || '').trim();
   if (!val) return showToast(t('links.toast.pasteFirst'), true);
   decide(key, 'accepted', val);
-}
-
-async function runCheck(key, videoId) {
-  try {
-    await post('check', { key, videoId });
-    showToast(t('links.toast.checking'));
-    await load();
-  } catch (err) { showToast(err.message, true); }
 }
 
 async function startSearch() {

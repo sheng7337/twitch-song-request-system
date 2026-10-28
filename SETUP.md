@@ -274,8 +274,7 @@ the search uses its lyric sites and YouTube tools):
    **Editor**, then click **Check access**. Only saving needs it; searching and reviewing work without it.
 2. **Search songs without a link:** about 8 seconds per song. Stop and resume any time.
 3. **Review:** picks are grouped into *Confident*, *Needs a look* and *Nothing found*. Accept, skip,
-   choose another video or paste a link. **Check with Leihu** imports the video into Leihu and compares
-   its sung lyrics with the online lyrics (adds the song to Leihu's library).
+   choose another video or paste a link.
 4. **Save:** writes accepted links into **empty** YTLink cells only. A tab without the column gets one.
 
 ---
@@ -326,7 +325,7 @@ vtuber-song-queue/
 ## YouTube blocks downloads
 
 Leihu Singsing downloads songs with yt-dlp. Sometimes YouTube refuses with *"Sign in to confirm you're
-not a bot"*: the dashboard badge shows **♫ YouTube blocked**, and "Check with Leihu" says the same.
+not a bot"*: the dashboard badge shows **♫ YouTube blocked**.
 It's a temporary block on your internet connection (often after many YouTube requests from one PC),
 not a problem with the song.
 
