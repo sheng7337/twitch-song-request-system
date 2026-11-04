@@ -360,6 +360,13 @@ router.post('/validate-sheet', async (req, res) => {
     res.json({ ok: true, sheetId, headers: rows[0], preview: rows.slice(1, 5) });
   } catch (err) {
     const msg = err.message || '';
+    // An .xlsx uploaded to Drive and opened in Sheets stays an Excel file: the Sheets API can't read it
+    if (msg.includes('not supported for this document')) {
+      return res.status(400).json(message('sheetIsExcel', {}, 'This is an Excel file in Google Drive, not a Google Sheet. In Google Sheets choose File → Save as Google Sheets, then paste the new address.'));
+    }
+    if (msg.includes('has not been used') || msg.includes('is disabled')) {
+      return res.status(400).json(message('sheetsApiOff', {}, 'The Google Sheets API is not switched on for your Google Cloud project. In console.cloud.google.com search for "Google Sheets API" and click Enable, wait a minute, then try again.'));
+    }
     if (msg.includes('403') || msg.includes('permission')) {
       return res.status(400).json(historyMode
         ? message('sheetDeniedEditor', {}, 'Access denied. Share the sheet with the service account email shown above as an Editor (not Viewer).')

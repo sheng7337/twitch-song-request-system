@@ -67,6 +67,7 @@ app.use('/dashboard', express.static(path.join(__dirname, '..', 'dashboard')));
 app.use('/setup', express.static(path.join(__dirname, '..', 'setup')));
 app.use('/clip-player', express.static(path.join(__dirname, '..', 'clip-player')));
 app.use('/shared', express.static(path.join(__dirname, '..', 'shared')));   // language helper + strings
+app.use('/docs', express.static(path.join(__dirname, '..', 'docs')));       // starter guide, song list template
 
 // ── Setup detection: redirect to wizard if not configured ─────────────────────
 function isSetupComplete() {

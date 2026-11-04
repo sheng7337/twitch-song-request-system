@@ -157,7 +157,7 @@ ol.steps-list {
   line-height: 2;
   color: var(--text);
 }
-ol.steps-list a { color: var(--blue); text-decoration: none; }
+ol.steps-list a, .info-body a { color: var(--blue); text-decoration: none; }
 ol.steps-list a:hover { text-decoration: underline; }
 
 /* ── Form elements ── */

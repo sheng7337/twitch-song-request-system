@@ -536,6 +536,10 @@ function renderSongSheet(el) {
   el.innerHTML = `
     <div class="step-title">${t.title}</div>
     <div class="step-subtitle">${t.subtitle}</div>
+    <div class="info-box amber">
+      <div class="info-label">${t.noSheetTitle}</div>
+      <div class="info-body">${t.noSheet}</div>
+    </div>
     ${state.serviceEmail ? `
       <div class="info-box green">
         <div class="info-label">${t.shareTitle}</div>
@@ -944,10 +948,13 @@ function skipHistory() {
 function renderOBS(el) {
   const t = T().obs;
   const overlayUrl = `${location.origin}/overlay/index.html`;
+  const clipUrl = `${location.origin}/clip-player/index.html`;
   const css = `body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }`;
 
-  const urlBlock = `<div class="code-block"><span>${overlayUrl}</span><button class="copy-btn" onclick="copyText('${overlayUrl}', this)">${T().copy}</button></div>`;
-  const cssBlock = `<div class="code-block"><span>${css}</span><button class="copy-btn" onclick="copyText(\`${css}\`, this)">${T().copy}</button></div>`;
+  const block = (text) => `<div class="code-block"><span>${text}</span><button class="copy-btn" onclick="copyText(\`${text}\`, this)">${T().copy}</button></div>`;
+  // Steps hold {url} / {css} / {clipUrl} where the copyable blocks go
+  const list = (steps) => `<ol class="steps-list" style="margin-bottom:16px">${steps.map(s =>
+    `<li>${s.replace('{url}', block(overlayUrl)).replace('{css}', block(css)).replace('{clipUrl}', block(clipUrl))}</li>`).join('')}</ol>`;
 
   el.innerHTML = `
     <div class="step-title">${t.title}</div>
@@ -957,22 +964,15 @@ function renderOBS(el) {
       <div class="tab" onclick="switchTab('streamlabs-tab', this)">${t.streamlabsTab}</div>
     </div>
     <div class="tab-content active" id="obs-tab">
-      <ol class="steps-list" style="margin-bottom:16px">
-        <li>${t.obsSteps[0]}</li>
-        <li>${t.obsSteps[1]}${urlBlock}</li>
-        <li>${t.obsSteps[2]}</li>
-        <li>${t.obsSteps[3]}${cssBlock}</li>
-        <li>${t.obsSteps[4]}</li>
-      </ol>
+      <div class="info-label">${t.overlayTitle}</div>
+      ${list(t.obsSteps)}
     </div>
     <div class="tab-content" id="streamlabs-tab">
-      <ol class="steps-list" style="margin-bottom:16px">
-        <li>${t.streamlabsSteps[0]}</li>
-        <li>${t.streamlabsSteps[1]}${urlBlock}</li>
-        <li>${t.streamlabsSteps[2]}</li>
-        <li>${t.streamlabsSteps[3]}${cssBlock}</li>
-      </ol>
+      <div class="info-label">${t.overlayTitle}</div>
+      ${list(t.streamlabsSteps)}
     </div>
+    <div class="info-label">${t.clipTitle}</div>
+    ${list(t.clipSteps)}
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
       <button class="btn btn-primary" onclick="goNext()">${t.allDoneBtn}</button>
       <button class="btn btn-ghost" onclick="window.open('${overlayUrl}', '_blank')">${t.previewBtn}</button>

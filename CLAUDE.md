@@ -91,11 +91,14 @@ vtuber-song-queue/
 │   └── sponsor-bgs/       !tk background images (one picked at random each time)
 ├── test/                  node:test suite (`npm test`), stubs Google Sheets
 ├── tools/find-videos.py   Lyric-site + YouTube search, run with Leihu Singsing's bundled Python
+├── tools/make-song-template.py  Builds docs/song-list-template.xlsx (standard library only)
+├── docs/                  Starter guide (STARTER_GUIDE.md / _zh_TW.md, images/), song-list-template.xlsx;
+│                          served at /docs (the wizard links the template)
 ├── tools/build-han-readings.js  Rebuilds server/data/han-readings.json from Unihan_Readings.txt
 ├── setup.ps1 / setup_zh.ps1   Terminal setup wizard (alternative to the web wizard)
 ├── start.ps1 / start_zh.ps1   Every-stream startup: starts server, opens browser when ready
 ├── *.bat                  Double-click launchers (avoid PowerShell execution-policy issues)
-├── SETUP.md / SETUP_zh_TW.md / SETUP_MANUAL.md   User guides
+├── SETUP.md / SETUP_zh_TW.md / SETUP_MANUAL.md   User guides (docs/STARTER_GUIDE*.md for newcomers)
 ├── SKILL.md               Notes on Twitch/Google APIs and PowerShell gotchas
 └── .env.example           All environment variable descriptions (pure ASCII)
 ```
@@ -615,6 +618,10 @@ rewards → history sheet (optional) → OBS instructions → done.
 - Re-running the rewards step keeps per-tab random rewards
 - The PowerShell scripts are an alternative path and must write the same `.env` keys and ask for
   the same Twitch scopes
+- docs/STARTER_GUIDE*.md walk newcomers through the wizard with screenshots (docs/images, taken with
+  fake data): when a wizard step or dashboard label changes, update the guide text (and screenshots)
+- validate-sheet turns two common first-time errors into plain messages: an .xlsx opened from Drive
+  (`sheetIsExcel`) and the Sheets API not enabled (`sheetsApiOff`)
 
 Every step should explain **what** is asked, **why**, and **exactly where** to find it,
 validate before moving on, and show a friendly fix-it error.

@@ -6,6 +6,9 @@ Twitch 頻道點數點歌，附 OBS 顯示層與連麥 Shoutout 功能。
 
 ## 開始使用
 
+**第一次用、還沒有歌單？** 從 [新手入門（從零開始）](docs/STARTER_GUIDE_zh_TW.md) 開始 —— 不需要會寫程式。
+（English: [Starter Guide](docs/STARTER_GUIDE.md)）
+
 **首次安裝**：安裝 [Node.js LTS](https://nodejs.org)，然後雙擊 `start_zh.bat`，跟著瀏覽器的安裝精靈走即可。
 
 **每次直播**：雙擊 `start_zh.bat`，就這樣。

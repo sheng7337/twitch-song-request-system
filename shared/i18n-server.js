@@ -63,6 +63,8 @@
       sheetEmpty: 'The sheet appears to be empty',
       sheetDeniedEditor: 'Access denied. Share the sheet with the service account email shown above as an Editor (not Viewer).',
       sheetDenied: 'Access denied. Make sure you shared the sheet with the service account email shown above.',
+      sheetIsExcel: 'This is an Excel file in Google Drive, not a Google Sheet. In Google Sheets choose File → Save as Google Sheets, then paste the new address.',
+      sheetsApiOff: 'The Google Sheets API is not switched on for your Google Cloud project. In console.cloud.google.com search for "Google Sheets API" and click Enable, wait a minute, then try again.',
     },
   },
   'zh-TW': {
@@ -119,6 +121,8 @@
       sheetEmpty: '試算表看起來是空的',
       sheetDeniedEditor: '存取被拒。請把試算表共用給上方顯示的服務帳戶 Email，權限設為「編輯者」（不是檢視者）。',
       sheetDenied: '存取被拒。請確認已把試算表共用給上方顯示的服務帳戶 Email。',
+      sheetIsExcel: '這是放在 Google 雲端硬碟的 Excel 檔，不是 Google 試算表。請在試算表選「檔案 → 儲存為 Google 試算表」，再貼上新的網址。',
+      sheetsApiOff: '你的 Google Cloud 專案還沒啟用 Google Sheets API。請到 console.cloud.google.com 搜尋「Google Sheets API」並按「啟用」，等一分鐘再試一次。',
     },
   },
 });

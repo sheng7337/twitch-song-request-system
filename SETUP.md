@@ -1,5 +1,8 @@
 # 🎵 VTuber Song Queue — Setup Guide
 
+> **New here, with no song list yet?** Start with the [Starter Guide](docs/STARTER_GUIDE.md): every step from
+> scratch, including making your song list. This page is the full reference.
+
 ## How it works
 
 ```
@@ -88,7 +91,7 @@ Add the overlay to your scene — do this once:
    this is what makes the 2× render look sharper instead of just bigger
 
 The overlay connects automatically when the server is running and updates live.
-Its language (English or 繁體中文) is set in the dashboard: ⚙ → **Overlay language**.
+Its language (English or 繁體中文) is set in the dashboard: Song Queue tab ⚙ → **Overlay language**.
 
 ### Clip player (shoutouts / sponsor roll)
 
@@ -159,7 +162,7 @@ Open `http://localhost:3000/dashboard` during streams.
 | Feature | Description |
 |---|---|
 | 💬 Chat | Live chat with filters, **To announce**, a message box and redemption buttons — see [Chat tab](#chat-tab) below |
-| Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Leihu settings** in its header opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
+| Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Settings** at the right end of its top row opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
 | ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — random cooldown, overlay opacity / brightness / language; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now, channel-point rewards. Each saves on its own |
@@ -251,7 +254,7 @@ dashboard connects to it by itself — nothing to set up. When it isn't running,
 - Each queued song gets a **♫ badge**: ready / no lyrics / preparing / failed / prepare / link.
   **♫ prepare** imports the song from the sheet's YouTube link (column `YTLink`, see below);
   **♫ link** lets you pick a song you already have in Leihu.
-- ⚙ → **Auto-prepare queued songs** imports songs as they are queued and renders their sheet key
+- Leihu tab ⚙ → **Auto-prepare queued songs** imports songs as they are queued and renders their sheet key
   ahead of time. It uses the GPU during the stream.
 - **🎤 Sing** (Now Playing) opens the song in Leihu's practice window at its sheet key. Needs Leihu 1.5.2 or newer.
 - When Leihu leaves a sheet song's lyrics blank, or flags that online lyrics fit better than what it
@@ -266,8 +269,8 @@ dashboard connects to it by itself — nothing to set up. When it isn't running,
 
 ## YouTube link finder
 
-Leihu finds your songs by the YouTube link in the sheet's **YTLink** column. Dashboard ⚙ →
-**🔗 Find YouTube links for the sheet** fills that column for you (Leihu Singsing must be running —
+Leihu finds your songs by the YouTube link in the sheet's **YTLink** column. Leihu tab ⚙ →
+**① Find a YouTube link for each song** → **🔗 Find YouTube links** fills that column for you (Leihu Singsing must be running —
 the search uses its lyric sites and YouTube tools):
 
 1. **Step 1 — Editor access:** share the song sheet with the service-account email shown on the page as
