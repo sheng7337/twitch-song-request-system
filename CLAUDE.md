@@ -65,7 +65,7 @@ vtuber-song-queue/
 │   ├── chat-router.js     Dispatches chat messages to registered commands (mods-only by default)
 │   ├── chat-log.js        Chat + redemption log for the dashboard Chat tab, chat-logs/YYYY-MM-DD.jsonl
 │   ├── song-notes.js      Song overlay note "last sung N days ago" when chat names a sheet song
-│   ├── media-queue.js     Clip player queue (max 3), mediaId matching, watchdog
+│   ├── media-queue.js     Clip player queue (max 3; 10 while a mode holds it), mediaId matching, watchdog
 │   ├── media-history.js   Last played media, for !replay
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
@@ -75,6 +75,9 @@ vtuber-song-queue/
 │   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
 │   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst
 │   ├── chat-send.js       The Chat tab's message box: Helix POST /chat/messages (replies too)
+│   ├── chat-mod.js        The Chat tab's ban / timeout / unban, Twitch Shoutout, raid / cancel, pin / unpin (Helix)
+│   ├── modes.js           Modes (🎛 tab, top-bar buttons): save / apply the streaming app's state + this app's part
+│   ├── stream-app.js      Streamlabs Desktop (Remote Control JSON-RPC) / OBS (obs-websocket 5) on this PC
 │   ├── stream-session.js  When the stream went live (stream.online / Helix /streams), for "to announce"
 │   ├── stream-window.js   The dashboard in its own Chrome / Edge window, so OBS can capture Leihu's sound
 │   └── commands/          shoutout.js (!so), watch.js (!watch), replay.js, stop.js, thanks.js (!tk), ending-thanks.js (!endingtk)
@@ -105,7 +108,7 @@ vtuber-song-queue/
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
 `setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `chat-logs/`, `link-search.json`, `package-lock.json`,
-`ending-credits.json`, `reward-takeovers.json`, `stream-session.json`, `.env` backups.
+`ending-credits.json`, `reward-takeovers.json`, `stream-session.json`, `stream-modes.json`, `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 
 ---
@@ -121,8 +124,9 @@ vtuber-song-queue/
 - `session_reconnect` → reconnect to the given URL; socket close → reconnect after 5s
 - Notifications are deduplicated by `message_id` (Twitch delivers at-least-once)
 - Auth: user access token from **Device Authorization Flow** (public client, no client secret).
-  Scopes: `channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers`
-  (older setups lack the last two: the dashboard links to `/setup?reauth=1`, which jumps to the
+  Scopes: `channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers
+  moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages`
+  (older setups lack the later ones: the dashboard links to `/setup?reauth=1`, which jumps to the
   wizard's authorization step). setup.ps1 / setup_zh.ps1 ask for the same scopes
 - `ensureFreshToken()` refreshes 1 min before expiry. Call it before **every** Helix call.
   Concurrent calls share one refresh (`refreshPromise`) — Twitch rotates the refresh token,
@@ -214,6 +218,32 @@ vtuber-song-queue/
   player can't skip the next item
 - Watchdog: if no end signal arrives within the expected length + 15s (e.g. no clip player
   open), the queue moves on by itself
+- `setHold(true)` (a mode's ⏸ Hold clips): what plays finishes, new items wait (up to 10); `setHold(false)`
+  plays them in turn. Restored after a restart while that mode is the active one
+
+### Modes (modes.js, stream-app.js)
+- stream-app.js: one connection, opened on use, for the `.env` settings (`STREAM_APP` = `streamlabs` | `obs`).
+  `read()` → `{ app, current, canvas, scenes: [{ id, name, group?, items: [{ id, sourceId, name, visible, place }] }],
+  audio: [{ id, name, muted, volume }] }`; `setScene` / `setVisible` / `setPlace` / `setAudio` take those objects.
+  - Streamlabs: `ws://127.0.0.1:59650/api/websocket`, JSON-RPC `{method, params: {resource, args}}`, first
+    `auth` on `TcpServerService` with the token. `getScenes` (nodes; folders skipped), `activeSceneId`,
+    `AudioService.getSources`; `makeSceneActive`, item `setVisibility` / `setTransform` (on its `resourceId`),
+    audio `setMuted` / `setDeflection`. Volume = the mixer slider (deflection) in %
+  - Streamlabs Dual Output: every source has one item per canvas (node `display` = `horizontal` / `vertical`).
+    Items keep `display`; matching other than by ID stays within the same canvas, or both copies would match
+  - OBS 30+ (UUIDs): Hello → Identify (sha256 auth, `obsAuth`; close 4009 = wrong password), requests op 6/7.
+    Groups read as scenes (`GetGroupSceneItemList`). Audio = inputs that answer `GetInputVolume`. Volume in dB.
+    Transforms sent back without read-only sizes, and bounds only when used (0 is refused).
+  - The socket's message handler is attached before it opens: OBS's Hello can arrive in the same tick
+- modes.js: a mode = `{ id, name, icon, app, canvas, scene, items: [{ scene, item: {id, sourceId, name}, visible,
+  place, move }], audio: [{ id, name, muted, volume }], chat, holdClips, tab }` in stream-modes.json. `capture` takes
+  the current scene, the scenes / groups inside it (`sceneTree`) and all audio.
+  - `resolve`: finds things by ID first, then by name (only when one matches). It writes the found IDs and
+    names back into the mode. Missing ones are skipped and listed; `check` also lists `extra` (in the mode's
+    scenes but not in the mode).
+  - `apply`: only what differs is sent (items, 📍 places unless the canvas changed, then the scene, then
+    audio); then hold / chat / active. The `modes` broadcast to dashboards carries `switched.tab`.
+  - A mode saved from the other app gets `modeOtherApp`. Without a streaming app, modes are this app's part only
 
 ### Leihu Singsing integration (leihu.js) — optional
 - Leihu Singsing (雷虎練唱台, github.com/LeihuTW/Leihu-singsing) is a separate local app that
@@ -295,15 +325,26 @@ vtuber-song-queue/
   `channel.chat.message_delete` / `clear_user_messages` / `clear` (same `user:read:chat` scope, each
   optional): chat-log.js marks those records `deleted`, logs a `{kind: 'delete'}` line applied on load,
   and sends `{type: 'chat-delete'}`. All filters (songs, commands, mods/VIP, subs, @mentions of the
-  channel, to announce, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
+  channel, first-time (`first` from IRC's first-msg, or `user_intro`), highlighted / bits, redemptions, waiting redemptions, one viewer, search, bots) run in
   the dashboard. ♪ on a song mention adds it via `/api/add` with the viewer as requester
-- "To announce" (要宣讀): subs / resubs / gifts (a community gift once: its `sub_gift` lines carry
-  `communityGift` and are left out), raids, watch streaks, bits badges, charity, follows, cheers,
+- "To announce" (要宣讀), highlighted in every view (`.to-announce`, not a filter): subs / resubs / gifts (a community gift once: its `sub_gift` lines carry
+  `communityGift` and are left out), raids, watch streaks, bits badges, charity, follows, redemptions
+  (their mark reads "✓ Announce", beside ✓ Done), cheers,
   highlighted messages, first-time chatters, and each viewer's first message this session (`greet`,
   worked out in the dashboard; bots and the streamer left out). The session = since the stream last
   went live (stream-session.js; `/api/chat/session` loads it across day files, 12 h before any go-live
   is known). ✓ / ✓ All → `/api/chat/announced` → `{kind: 'announced', ids, done}` lines → `announced`
-  on load, `{type: 'chat-announced'}` to every dashboard; ✓ again (with "show announced") undoes
+  on load, `{type: 'chat-announced'}` to every dashboard; ✓ removes the highlight, the hover-only
+  "✓ announced" button undoes. The filter row's "To announce: N ↓" scrolls to the oldest left (back to
+  All if a filter hides it). Live, only records since the session start are highlighted; the live list
+  shares the session's record objects (`linkSession`), so `greet` / `first` / `announced` reach both
+- Moderation (chat-mod.js): a name's menu (only this viewer — the old name-click filter — Shoutout, raid,
+  timeout presets + custom, unban, ban with a second click) and 🛡 for any channel name; 📌 on a row pins
+  it. `permissions()` reads the token's scopes (cached 5 min, read again when the token changes);
+  missing ones turn their buttons off with a re-authorize link. The pinned message (GET on load, the pin
+  result after 📌) and a raid's 90-second countdown (from the click) show in `#chat-banners`; neither
+  is pushed between dashboards. Shoutout = commands/shoutout.js `shoutout()` (also `!so`): Twitch's
+  Shoutout, then the clip even when Twitch refused (`twitch` = the refusal as an error body)
 - Message box (chat-send.js): posts as the authorized account (sender = broadcaster), `↪ Reply` on a
   row sets `reply_parent_message_id`. The message comes back through EventSub chat, so nothing is added
   locally. `canSend()` checks the token's scopes via `/oauth2/validate` (true cached 5 min; missing
@@ -432,7 +473,7 @@ vtuber-song-queue/
 
 | Command | Description |
 |---|---|
-| `!so <user>` | Plays a random clip of that channel, remembers them for `!tk` |
+| `!so <user>` | Twitch Shoutout (chat-mod.js; refused unless live), plays a random clip of that channel, remembers them for `!tk` |
 | `!watch <url>` | Plays a Twitch clip, YouTube video or direct video file |
 | `!replay` | Replays the last media |
 | `!stop` | Stops playback and clears the media queue |
@@ -495,6 +536,17 @@ register it in index.js.
 | POST | `/api/chat/announced` | `{items: [{id, at}], done}` — ✓ marks |
 | GET | `/api/chat/send` | `{canSend, max}` — whether the token may post (`user:write:chat`) |
 | POST | `/api/chat/send` | `{text, replyTo?}` → `{id}`; posts to chat as the streamer |
+| GET | `/api/chat/mod` | `{can: {ban, shoutout, raid, pin}, pinned}` — moderation buttons allowed, the pinned message |
+| GET | `/api/chat/mod/channel?login=` | `{login, name, live, viewers, game}` — before a raid |
+| POST | `/api/chat/mod/ban` | `{login, seconds?, reason?}` → `{name, until}`; no seconds = ban |
+| POST | `/api/chat/mod/unban` | `{login}` → `{name}`; ends a ban or timeout |
+| POST | `/api/chat/mod/shoutout` | `{login}` → `{name, twitch, clip}`; Twitch Shoutout + the `!so` clip |
+| POST | `/api/chat/mod/raid` / `raid/cancel` | `{login}` → `{name, login, createdAt}` / cancels |
+| POST | `/api/chat/mod/pin` / `unpin` | `{id, seconds?}` → pinned message / `{id}` |
+| GET | `/api/modes` | `{modes, active, held, connection, live, issues}` — `?live=0` doesn't ask the streaming app |
+| POST | `/api/modes/switch` | `{id}` → `{skipped, failed, appError, chat, tab, canvasChanged?}` |
+| POST | `/api/modes/new` / `save` / `recapture` / `delete` / `order` | `{name, icon}` / `{mode}` / `{id}` / `{id}` / `{ids}` |
+| POST | `/api/modes/connection` | `{app, port?, secret?}` → writes .env, reconnects, answers like GET |
 | GET | `/api/redemptions/manageable` | `{ids, channel}` — rewards whose redemptions the Chat tab can change |
 | POST | `/api/redemptions/status` | `{id, rewardId, action: 'done' \| 'refund'}` |
 | GET | `/api/rewards` | Chat ⚙: every reward with `role`, `manageable`, `skipsQueue`, `takeover` |
@@ -541,6 +593,7 @@ See `.env.example` for full descriptions.
 - `CHAT_LOG_DAYS` — days of chat log kept in chat-logs/ (default 30)
 - `SONG_NOTES` — `0` = no song notes on the song overlay (Chat tab switch; on when unset)
 - `LEIHU_ROOT` — optional: Leihu's folder for starting it; unset = remembered from Leihu's `/api/status` `root`
+- `STREAM_APP` (`streamlabs` / `obs`), `STREAMLABS_TOKEN`, `STREAMLABS_PORT`, `OBS_WS_PORT`, `OBS_WS_PASSWORD` — modes' streaming app (🎛 Modes tab)
 
 ---
 

@@ -269,15 +269,15 @@ channel and type a title. It shows up on the dashboard within seconds.
 | Skip a request | **✕** removes it (with a reward the song queue created, the points are refunded) |
 | Handle Pending Review | Requests the system wasn't sure about. Fix the title → **✓ Accept → Queue**, or ✕ |
 | Re-roll a random pick | 🎲 draws another |
-| Thank viewers | **Chat** tab → **To announce** lists subs, raids, follows, first-time chatters…; ✓ once thanked |
+| Thank viewers | **Chat** tab: subs, raids, follows, redemptions, first-time chatters… are highlighted in amber; ✓ once thanked. **To announce: N ↓** jumps to the next one |
 
-![Chat tab: To announce](images/dashboard-announce-en.png)
+![Chat tab: messages to announce are highlighted](images/dashboard-announce-en.png)
 
 **Chat commands for your mods** (viewers can't use them):
 
 | Command | What it does |
 |---|---|
-| `!so name` | Plays a random clip of that channel and adds it to the sponsor roll |
+| `!so name` | Sends Twitch's Shoutout, plays a random clip of that channel and adds it to the sponsor roll |
 | `!tk` | Japanese-TV-style sponsor roll of every channel `!so`'d this stream |
 | `!endingtk` | Ending roll: raiders, subs, cheers, follows, redeemers, song requesters, top chatters |
 | `!watch link` | Plays a Twitch clip, YouTube video or video link |
@@ -293,8 +293,9 @@ channel and type a title. It shows up on the dashboard within seconds.
   video into a backing track with lyrics, in any key. On the same PC it connects by itself, and the
   dashboard's **Leihu Singsing** tab shows it. The sheet's **YTLink** column is for it: that tab's
   **⚙ Settings → ① Find a YouTube link for each song → 🔗 Find YouTube links** can fill it for you
-- **Posting in chat, completing / refunding redemptions, handing a reward made on Twitch over to the
-  app**: see "Chat tab" in [SETUP.md](../SETUP.md)
+- **Posting in chat; timeout, ban, Shoutout, raid and pin buttons (click a viewer's name); completing /
+  refunding redemptions; handing a reward made on Twitch over to the app**: see "Chat tab" in [SETUP.md](../SETUP.md)
+- **Modes (🎤 Singing / 💬 Talking / ☕ Break): one click switches Streamlabs Desktop or OBS (scene, what shows, sounds), holds clips and posts in chat**: see "Modes" in [SETUP.md](../SETUP.md)
 - Everything else: [SETUP.md](../SETUP.md)
 
 ---

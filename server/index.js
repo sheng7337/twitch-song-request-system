@@ -24,6 +24,9 @@ const endingCredits = require('./ending-credits');
 const redemptions = require('./redemptions');
 const firstChat = require('./first-chat');
 const chatSend = require('./chat-send');
+const chatMod = require('./chat-mod');
+const modes = require('./modes');
+const streamApp = require('./stream-app');
 const streamSession = require('./stream-session');
 const { generateIfMissing: generateSponsorVoice } = require('./sponsor-voice');
 const mediaQueue = require('./media-queue');
@@ -33,7 +36,7 @@ const setupRouter = require('./setup-routes');
 const leihu = require('./leihu');
 const streamWindow = require('./stream-window');
 const linkFinder = require('./link-finder');
-const { errorBody, message } = require('./messages');
+const { errorBody, message, UserError } = require('./messages');
 const { nodeStatus } = require('./node-check');
 
 const app = express();
@@ -155,6 +158,7 @@ setRedemptionHook(redemptions.settle);
 // The stream went live / ended: the Chat tab's "to announce" starts a new session
 setStreamHandler(streamSession.onEvent);
 streamSession.init(session => sendChat({ type: 'chat-session', ...session }));
+modes.init(msg => sendChat(msg));   // after mediaQueue.init: a mode may hold clips
 
 // Returns the matching random-reward config object if the given rewardId is
 // a configured random reward, or null if it isn't.
@@ -764,6 +768,57 @@ app.post('/api/chat/send', async (req, res) => {
     res.status(err.messageCode ? 400 : 500).json(errorBody(err));
   }
 });
+// Moderation buttons (chat-mod.js): GET → { can: { ban, shoutout, raid, pin }, pinned }. Each POST answers
+// what Twitch did, or a translated refusal (400).
+function modRoute(fn) {
+  return async (req, res) => {
+    try {
+      res.json(await fn(req.body || {}, req));
+    } catch (err) {
+      res.status(err.messageCode ? 400 : 500).json(errorBody(err));
+    }
+  };
+}
+app.get('/api/chat/mod', async (req, res) => {
+  const can = await chatMod.permissions();
+  res.json({ can, pinned: can.pin ? await chatMod.pinned() : null });
+});
+app.get('/api/chat/mod/channel', modRoute((b, req) => chatMod.channel(req.query.login)));
+app.post('/api/chat/mod/ban', modRoute(b => chatMod.ban(b.login, { seconds: b.seconds, reason: b.reason })));
+app.post('/api/chat/mod/unban', modRoute(b => chatMod.unban(b.login)));
+app.post('/api/chat/mod/shoutout', modRoute(b => registerShoutout.shoutout(b.login)));   // Twitch's Shoutout + the !so clip
+app.post('/api/chat/mod/raid', modRoute(b => chatMod.raid(b.login)));
+app.post('/api/chat/mod/raid/cancel', modRoute(() => chatMod.cancelRaid()));
+app.post('/api/chat/mod/pin', modRoute(b => chatMod.pin(b.id, b.seconds)));
+app.post('/api/chat/mod/unpin', modRoute(b => chatMod.unpin(b.id)));
+
+// ── Modes (modes.js, stream-app.js) ───────────────────────────────────────────
+// GET → { modes, active, held, connection, live, issues }; live = what Streamlabs / OBS shows now.
+// ?live=0 leaves the streaming app alone. Refusals come back translated (400).
+app.get('/api/modes', async (req, res) => res.json(await modes.view({ live: req.query.live !== '0' })));
+app.post('/api/modes/switch', modRoute(b => modes.apply(b.id)));
+app.post('/api/modes/new', modRoute(b => modes.create(b)));
+app.post('/api/modes/save', modRoute(b => modes.update(b.mode)));
+app.post('/api/modes/recapture', modRoute(b => modes.recapture(b.id)));
+app.post('/api/modes/delete', modRoute(b => { modes.remove(b.id); return { ok: true }; }));
+app.post('/api/modes/order', modRoute(b => { modes.reorder(b.ids); return { ok: true }; }));
+// { app: 'streamlabs' | 'obs' | '', port?, secret? } — secret left out keeps the saved one
+app.post('/api/modes/connection', modRoute(async (b) => {
+  const app = streamApp.APPS[b.app] ? b.app : '';
+  const values = { STREAM_APP: app };
+  if (app) {
+    const port = Number(b.port);
+    if (b.port != null && b.port !== '') {
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new UserError('streamAppBadPort', {}, 'The port is a number from 1 to 65535.');
+      values[app === 'obs' ? 'OBS_WS_PORT' : 'STREAMLABS_PORT'] = String(port);
+    }
+    if (typeof b.secret === 'string') values[app === 'obs' ? 'OBS_WS_PASSWORD' : 'STREAMLABS_TOKEN'] = b.secret.trim();
+  }
+  setupRouter.writeEnvValues(values);
+  streamApp.close();
+  return modes.view();
+}));
+
 // !endingtk: whether new followers come in (needs moderator:read:followers), and who it would thank now
 app.get('/api/credits', async (req, res) => {
   const groups = await endingCredits.gather();

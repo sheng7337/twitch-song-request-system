@@ -198,7 +198,13 @@
   .chat-msg.redeem { background: rgba(255,184,74,0.08); color: var(--amber); }
   .chat-msg.event { background: rgba(74,255,154,0.08); color: var(--green); }
   .chat-msg.deleted .chat-text { text-decoration: line-through; opacity: 0.45; }
-  .chat-msg.announced { opacity: 0.45; }
+  .chat-msg.to-announce { background: rgba(255,184,74,0.14); box-shadow: inset 3px 0 0 var(--amber); }
+  .chat-msg.to-announce:hover { background: rgba(255,184,74,0.22); }
+  .chat-msg.flash { animation: chat-flash 1.2s ease-out; }
+  @keyframes chat-flash { from { background: rgba(255,184,74,0.5); } }
+  .chat-msg .chat-act.undo { visibility: hidden; opacity: 0.7; }
+  .chat-msg:hover .chat-act.undo, .chat-act.undo:focus { visibility: visible; }
+  .chat-filters .chip.announce-next { color: var(--amber); border-color: var(--border-amber); }
   .chat-filters .chip.announce-all { color: var(--green); border-color: var(--border-green); }
   .chat-time { color: var(--text-dim); font-size: 12px; margin-right: 6px; }
   .chat-badge {
@@ -254,6 +260,36 @@
   .chat-msg:hover .chat-reply-btn, .chat-reply-btn:focus { opacity: 1; }
   .chat-reply-btn:hover { color: var(--text); }
   .chat-compose { border-top: 1px solid var(--border); padding: 8px 10px; }
+  .chat-banners { display: flex; flex-direction: column; gap: 4px; padding: 6px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .chat-banners:empty { display: none; }
+  .chat-banner { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .chat-banner .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-banner .when { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+  .chat-banner.pinned .what b { color: var(--purple); }
+  .chat-banner.raid { color: var(--amber); }
+  .chat-banner .chat-act { margin-left: 0; }
+  .mod-menu {
+    position: fixed; z-index: 50; width: 320px; max-width: calc(100vw - 16px); display: flex; flex-direction: column; gap: 8px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 13px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+  }
+  .mod-head { display: flex; align-items: baseline; gap: 8px; font-size: 15px; }
+  .mod-head .mod-login { color: var(--text-dim); font-size: 12px; }
+  .mod-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .mod-row .chat-act { margin-left: 0; }
+  .mod-label { color: var(--text-dim); font-size: 12px; }
+  .mod-menu input, .mod-menu select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 13px;
+  }
+  .mod-menu .mod-n { width: 70px; }
+  .mod-menu .mod-who, .mod-menu .mod-reason { width: 100%; }
+  .mod-item { text-align: left; background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 5px 8px; cursor: pointer; font-size: 13px; }
+  .mod-item:hover { background: var(--bg-hover); }
+  .mod-menu .chat-act.danger { color: var(--red); border-color: rgba(255,90,90,0.4); }
+  .mod-menu .chat-act.danger.sure { color: var(--bg); background: var(--red); }
+  .mod-menu .chat-act:disabled { opacity: 0.4; }
+  .mod-note { color: var(--amber); font-size: 12px; }
+  .mod-note a { color: var(--blue); }
   .chat-compose[hidden], .chat-compose [hidden] { display: none; }
   .chat-replying { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
   .chat-replying span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -709,6 +745,58 @@
   }
   .toast.error { background: linear-gradient(rgba(255,90,90,0.15), rgba(255,90,90,0.15)), var(--bg-panel); border-color: rgba(255,90,90,0.3); color: var(--red); }
   .toast.show { opacity: 1; }
+  .toast.long { white-space: normal; width: max-content; max-width: min(720px, calc(100vw - 32px)); }
+
+  /* ── Modes: buttons in the top bar, the 🎛 Modes tab (server/modes.js) ── */
+  .mode-bar { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .mode-bar[hidden] { display: none; }
+  .mode-bar.busy .mode-chip { opacity: 0.5; pointer-events: none; }
+  .mode-chip.on { color: var(--bg); background: var(--purple); border-color: var(--purple); }
+  .mode-chip.on:hover { background: var(--purple); }
+  .modes-page { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .modes-list { display: flex; flex-direction: column; gap: 10px; }
+  .modes-box { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .modes-box h3, .mode-section h4 {
+    font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--purple);
+  }
+  .modes-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+  .modes-row[hidden] { display: none; }
+  .modes-input {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px;
+    font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--text); outline: none; min-width: 0;
+  }
+  .modes-input:focus { border-color: var(--purple); }
+  .modes-status { font-size: 13px; color: var(--text-dim); }
+  .modes-status:empty { display: none; }
+  .modes-status.ok { color: var(--green); }
+  .modes-status.err { color: var(--red); }
+  .modes-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .modes-head .col-title { flex: 1; }
+  .mode-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; }
+  .mode-card.active { border-color: var(--purple); }
+  .mode-card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+  .mode-icon { width: 52px; text-align: center; }
+  .mode-name { width: 160px; }
+  .mode-sum { flex: 1; min-width: 140px; font-size: 13px; color: var(--text-dim); }
+  .mode-warn { color: var(--amber); }
+  .mode-body { border-top: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 16px; }
+  .mode-section { display: flex; flex-direction: column; gap: 8px; }
+  .mode-table { border-collapse: collapse; font-size: 14px; width: 100%; }
+  .mode-table td { padding: 3px 6px; vertical-align: middle; }
+  .mode-table td.name { width: 100%; overflow-wrap: anywhere; }
+  .mode-table tr.scene-row td { padding-top: 8px; font-size: 12px; color: var(--text-dim); }
+  .mode-table tr.missing td.name { color: var(--amber); }
+  .mode-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--purple); vertical-align: middle; }
+  .mode-table label { white-space: nowrap; cursor: pointer; }
+  .mode-table select { max-width: 220px; }
+  .mode-vol { width: 76px; }
+  .mode-extra { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--text-dim); }
+  .mode-card .btn { font-size: 13px; padding: 3px 9px; }
+  .mode-card .btn:disabled { opacity: 0.35; cursor: default; }
+  .mode-card .btn.sure { color: var(--red); border-color: rgba(255,90,90,0.5); }
+  .mode-chat { flex: 1; min-width: 200px; }
+  .mode-foot { display: flex; gap: 8px; flex-wrap: wrap; }
 
 </style>
 </head>
@@ -718,17 +806,20 @@
   <span class="status-dot off" id="dot"></span>
   <span class="topbar-title" data-i18n="dash.title">Song Queue Dashboard</span>
   <span class="topbar-spacer"></span>
+  <!-- Modes (🎛 Modes tab): one click switches -->
+  <div class="mode-bar" id="mode-bar" role="group" data-i18n-aria-label="dash.modes.bar" hidden></div>
   <span class="lang-switch" role="group" data-i18n-aria-label="dash.set.language"></span>
   <button class="chip" id="leihu-chip" onclick="showTab('leihu')" data-i18n-title="dash.leihuChipTitle">
     🎤 <span id="leihu-state" data-i18n="dash.leihuOffline">Leihu offline</span>
   </button>
 </div>
 
-<!-- Tabs: a button here and a .tab-page below (TABS in the script). Planned: chat room, rewards, OBS / Streamlabs control -->
+<!-- Tabs: a button here and a .tab-page below (TABS in the script) -->
 <nav class="tabs" role="tablist" data-i18n-aria-label="dash.tabs" onkeydown="onTabKey(event)">
   <button class="tab" role="tab" id="tabbtn-queue" data-tab="queue" aria-controls="tab-queue" onclick="showTab('queue')" data-i18n="dash.tab.queue">🎵 Song Queue</button>
   <button class="tab" role="tab" id="tabbtn-leihu" data-tab="leihu" aria-controls="tab-leihu" onclick="showTab('leihu')" data-i18n="dash.tab.leihu">🎤 Leihu Singsing</button>
   <button class="tab" role="tab" id="tabbtn-chat" data-tab="chat" aria-controls="tab-chat" onclick="showTab('chat')"><span data-i18n="dash.tab.chat">💬 Chat</span><span class="tab-count" id="chat-unread" hidden></span></button>
+  <button class="tab" role="tab" id="tabbtn-modes" data-tab="modes" aria-controls="tab-modes" onclick="showTab('modes')" data-i18n="dash.tab.modes">🎛 Modes</button>
 </nav>
 
 <!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
@@ -826,10 +917,12 @@
           <span data-i18n="dash.chat.hideBots">Hide bots</span>
         </label>
         <span class="chat-count" id="chat-count"></span>
+        <button class="btn" type="button" id="chat-mod-btn" onclick="openModMenu(null, this)" data-i18n="dash.chat.mod.open">🛡 Moderate</button>
         <a class="btn" id="chat-popout" target="_blank" rel="noopener" hidden data-i18n="dash.chat.popout">↗ Twitch chat</a>
         <button class="btn tab-config-btn" onclick="toggleTabConfig('chat')" aria-expanded="false" aria-controls="config-chat" data-i18n="dash.settings">⚙ Settings</button>
       </div>
       <div class="chat-filters" id="chat-filters" role="group" data-i18n-aria-label="dash.chat.filters"></div>
+      <div class="chat-banners" id="chat-banners"></div>
       <div class="chat-list" id="chat-list" onscroll="onChatScroll()"></div>
       <button class="chat-more" id="chat-more" onclick="chatToBottom()" hidden></button>
       <form class="chat-compose" id="chat-compose" onsubmit="sendChatMessage(event)" hidden>
@@ -871,6 +964,20 @@
       <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
       <div class="reward-rows" id="reward-rows"></div>
     </section>
+  </div>
+</div>
+
+<div class="tab-page" id="tab-modes" role="tabpanel" aria-labelledby="tabbtn-modes" hidden>
+  <div class="modes-page">
+    <section class="modes-box" id="modes-connection"></section>
+    <div class="modes-head">
+      <span class="col-title purple" data-i18n="dash.modes.title">Modes</span>
+      <button class="btn" onclick="loadModes(true)" data-i18n="dash.modes.refresh">↻ Read again</button>
+      <button class="btn add" onclick="newMode()" data-i18n="dash.modes.new">＋ New mode from what's on now</button>
+    </div>
+    <p class="setting-hint" data-i18n="dash.modes.intro"></p>
+    <div class="modes-row" id="modes-presets" hidden></div>
+    <div class="modes-list" id="modes-list"></div>
   </div>
 </div>
 
@@ -1008,6 +1115,7 @@ function connect() {
     document.getElementById('dot').classList.remove('off'); clearTimeout(reconnectTimer);
     ws.send(JSON.stringify({ type: 'chat-subscribe' }));
     loadChat();   // fills in chat missed while disconnected
+    loadModes(currentTab === 'modes');
   };
   ws.onclose = () => { document.getElementById('dot').classList.add('off'); reconnectTimer = setTimeout(connect, 3000); };
   ws.onmessage = (e) => {
@@ -1019,7 +1127,8 @@ function connect() {
       else if (m.type === 'chat-redeem') onChatRedeem(m);
       else if (m.type === 'chat-first') onChatFirst(m);
       else if (m.type === 'chat-announced') applyAnnounced(m.ids, m.done);
-      else if (m.type === 'chat-session') loadChatSession().then(rerenderChat);
+      else if (m.type === 'chat-session') loadChatSession().then(() => { linkSession(); rerenderChat(); });
+      else if (m.type === 'modes') onModesMessage(m);
     } catch(_){}
   };
 }
@@ -1449,6 +1558,7 @@ async function loadSettings() {
 // `open` undefined toggles. ✕, Esc and switching tabs close it.
 function toggleTabConfig(tab, open) {
   const panel = document.getElementById('config-' + tab);
+  if (!panel) return;   // a tab without settings
   panel.hidden = open === undefined ? !panel.hidden : !open;
   if (tab === 'chat' && !panel.hidden) { loadCredits(); loadRewards(); }
   const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
@@ -1660,12 +1770,12 @@ async function submitRequest() {
   titleInput.focus();
 }
 
-function showToast(msg, isError = false) {
+function showToast(msg, isError = false, ms = 2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  t.className = 'toast' + (isError ? ' error' : '') + (msg.length > 80 ? ' long' : '') + ' show';
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+  t._timer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 
@@ -1782,7 +1892,7 @@ async function pollLeihu() {
 
 // ── Tabs ── Each tab is a button in .tabs and a .tab-page; #leihu in the address keeps the tab
 // on reload. Planned: chat room, rewards, OBS / Streamlabs control — add them here and in the markup.
-const TABS = ['queue', 'leihu', 'chat'];
+const TABS = ['queue', 'leihu', 'chat', 'modes'];
 let currentTab = 'queue';
 
 function showTab(name) {
@@ -1799,6 +1909,7 @@ function showTab(name) {
   closeTabConfigs();
   paintLeihuView();
   if (name === 'chat') onChatShown();
+  if (name === 'modes') loadModes(true);
 }
 
 // Arrow keys move between tabs (the usual tab-list keys)
@@ -2067,7 +2178,7 @@ async function openPicker(entry, st) {
 
 // ── Chat tab ── Live chat comes over the WebSocket (server/chat-log.js); earlier days load from
 // their log. Every filter runs here, on the records in memory.
-const CHAT_FILTERS = ['all', 'announce', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems', 'waiting', 'events'];
+const CHAT_FILTERS = ['all', 'songs', 'commands', 'mods', 'subs', 'mentions', 'first', 'highlight', 'redeems', 'waiting', 'events'];
 // Common chat bots (logins), hidden while "Hide bots" is on
 const CHAT_BOTS = ['nightbot', 'streamelements', 'moobot', 'fossabot', 'wizebot', 'streamlabs', 'soundalerts',
   'sery_bot', 'botrixoficial', 'kofistreambot', 'commanderroot', 'streamstickers', 'pokemoncommunitygame'];
@@ -2077,18 +2188,19 @@ const chat = {
   hideBots: true, unread: 0, newCount: 0, atBottom: true,
   manageable: new Set(),   // rewards whose redemptions ✓ / ↩ can change (the app made them)
   session: { since: null, records: [], seen: new Set() },   // this stream session, for "to announce"
-  showAnnounced: false,
   canSend: false, sendMax: 500, replyTo: null,   // the message box (needs user:write:chat); the message it answers
+  mod: { can: {}, pinned: null, raid: null },   // moderation buttons allowed, the pinned message, a raid on its way
 };
 try { chat.hideBots = localStorage.getItem('chatHideBots') !== '0'; } catch(_) {}
 
 async function loadChat() {
-  await Promise.all([loadManageable(), loadChatSend(), loadChatSession()]);
+  await Promise.all([loadManageable(), loadChatSend(), loadChatSession(), loadChatMod()]);
   try {
     const data = await (await fetch('/api/chat/recent')).json();
     chat.live = data.records || [];
     chat.channel = data.channel || chat.channel;
   } catch(_) {}
+  linkSession();
   if (!chat.day) renderChat();
 }
 
@@ -2153,7 +2265,6 @@ function chatMatches(rec) {
     case 'redeems': return rec.kind === 'redeem';
     case 'waiting': return rec.kind === 'redeem' && rec.status === 'unfulfilled';
     case 'events': return rec.kind === 'notice' || rec.kind === 'follow';
-    case 'announce': return isAnnounce(rec) && (chat.showAnnounced || !rec.announced);
     default: return true;
   }
 }
@@ -2177,15 +2288,15 @@ function chatRowHtml(rec) {
   const color = /^#[0-9a-f]{6}$/i.test(rec.user.color || '') ? rec.user.color : 'var(--purple)';
   const name = `<span class="chat-name" data-login="${esc(rec.user.login)}" style="color:${color}">${esc(rec.user.name)}</span>`;
   const time = `<span class="chat-time">${chatTime(rec.at)}</span>`;
-  const done = chat.filter === 'announce' && rec.announced ? ' announced' : '';
+  const mark = announceClass(rec);
   if (rec.kind === 'notice' || rec.kind === 'follow') {
     const what = rec.kind === 'follow' ? t('dash.chat.followed', { name: rec.user.name }) : (rec.system || rec.notice);
-    return `<div class="chat-msg event${done}" data-id="${esc(rec.id)}">${time}${markWords(what, words)}`
+    return `<div class="chat-msg event${mark}" data-id="${esc(rec.id)}">${time}${markWords(what, words)}`
       + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}${announceMark(rec)}</div>`;
   }
   if (rec.kind === 'redeem') {
-    return `<div class="chat-msg redeem${rec.status === 'unfulfilled' ? ' waiting' : ''}" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
-      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}${redeemActions(rec)}</div>`;
+    return `<div class="chat-msg redeem${rec.status === 'unfulfilled' ? ' waiting' : ''}${mark}" data-id="${esc(rec.id)}">${time}${esc(t('dash.chat.redeemed', { name: rec.user.name, reward: rec.reward }))}`
+      + `${rec.text ? `: <span class="chat-text">${markWords(rec.text, words)}</span>` : ''}${announceMark(rec)}${redeemActions(rec)}</div>`;
   }
   const badges = (rec.user.badges || []).filter(b => CHAT_BADGE_LABELS[b])
     .map(b => `<span class="chat-badge ${b}" title="${esc(t('dash.chat.badge.' + b))}">${CHAT_BADGE_LABELS[b]}</span>`).join('');
@@ -2195,10 +2306,10 @@ function chatRowHtml(rec) {
     return markWords(p.text, words);
   }).join('');
   const cls = ['chat-msg', mentionsMe(rec) && 'me-mention', rec.type === 'channel_points_highlighted' && 'highlight',
-    isFirstChat(rec) && 'intro', rec.deleted && 'deleted', done.trim()].filter(Boolean).join(' ');
+    isFirstChat(rec) && 'intro', rec.deleted && 'deleted', mark.trim()].filter(Boolean).join(' ');
   const reply = rec.reply ? `<span class="chat-reply">↪ ${esc(rec.reply.name)}: ${esc(rec.reply.text)}</span>` : '';
   const tags = (isFirstChat(rec) ? `<span class="chat-tag">${esc(t('dash.chat.tag.first'))}</span>` : '')
-    + (chat.filter === 'announce' && rec.greet && !isFirstChat(rec) ? `<span class="chat-tag">${esc(t('dash.chat.tag.greet'))}</span>` : '')
+    + (rec.greet && !isFirstChat(rec) && mark ? `<span class="chat-tag">${esc(t('dash.chat.tag.greet'))}</span>` : '')
     + (rec.bits ? `<span class="chat-tag">${esc(t('dash.chat.tag.bits', { bits: rec.bits }))}</span>` : '')
     + (rec.deleted ? `<span class="chat-tag">${esc(t('dash.chat.tag.deleted'))}</span>` : '');
   const songs = (rec.songs || []).map((s, i) => {
@@ -2208,9 +2319,11 @@ function chatRowHtml(rec) {
     return `<button class="chat-song${sung.recent ? ' recent' : ''}" data-id="${esc(rec.id)}" data-song="${i}" title="${esc(tip)}">`
       + `♪ ${esc(s.title)}${sung.label ? ` · ${esc(sung.label)}` : ''}${s.onStream ? ' 📺' : ''}</button>`;
   }).join('');
-  const answer = chat.canSend && !chat.day && !rec.deleted
-    ? `<button class="chat-reply-btn" data-reply="${esc(rec.id)}">${esc(t('dash.chat.reply'))}</button>` : '';
-  return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}${answer}${announceMark(rec)}</div>`;
+  const answer = (chat.canSend && !chat.day && !rec.deleted
+    ? `<button class="chat-reply-btn" data-reply="${esc(rec.id)}">${esc(t('dash.chat.reply'))}</button>` : '')
+    + (chat.mod.can.pin && !chat.day && !rec.deleted
+      ? `<button class="chat-reply-btn" data-pin="${esc(rec.id)}" title="${esc(t('dash.chat.mod.pin'))}">📌</button>` : '');
+  return `<div class="${cls}" data-id="${esc(rec.id)}">${reply}${time}${badges}${name}: <span class="chat-text">${parts}</span>${tags}${songs}${announceMark(rec)}${answer}</div>`;
 }
 
 // A redemption's state: waiting ones get ✓ done / ↩ refund (rewards the app made) or a link to Twitch's
@@ -2238,8 +2351,7 @@ function chatSungInfo(rec, s) {
 }
 
 function chatSource() {
-  if (chat.day) return chat.dayRecords || [];
-  return chat.filter === 'announce' ? chat.session.records : chat.live;
+  return chat.day ? chat.dayRecords || [] : chat.live;
 }
 
 function renderChat() {
@@ -2262,32 +2374,34 @@ function renderChat() {
 
 function paintChatFilters() {
   const box = document.getElementById('chat-filters');
-  const left = announceLeft().length;
-  box.innerHTML = CHAT_FILTERS.map(f => {
-    const label = t('dash.chat.f.' + f) + (f === 'announce' && left ? ` (${left})` : '');
-    return `<button class="chip${chat.filter === f ? ' on' : ''}" data-filter="${f}" aria-pressed="${chat.filter === f}">${esc(label)}</button>`;
-  }).join('')
+  box.innerHTML = CHAT_FILTERS.map(f =>
+    `<button class="chip${chat.filter === f ? ' on' : ''}" data-filter="${f}" aria-pressed="${chat.filter === f}">${esc(t('dash.chat.f.' + f))}</button>`
+  ).join('')
     + (chat.user ? `<button class="chip user" data-clear-user="1" title="${esc(t('dash.chat.clearUser'))}">👤 ${esc(chat.userName || chat.user)} ✕</button>` : '')
-    + (chat.filter === 'announce' ? announceTools() : '');
+    + announceTools();
 }
 
 document.getElementById('chat-filters').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
-  if (b.dataset.announceAll) { markAnnounced(chatSource().filter(r => chatMatches(r) && !r.announced), true); return; }
-  if (b.dataset.showAnnounced) chat.showAnnounced = !chat.showAnnounced;
+  if (b.dataset.announceAll) { markAnnounced(announceLeft(), true); return; }
+  if (b.dataset.announceNext) { showNextAnnounce(); return; }
   if (b.dataset.filter) chat.filter = b.dataset.filter;
   if (b.dataset.clearUser) chat.user = null;
   renderChat();
 });
 
-// Click a name: only that viewer (click again to show everyone). ♪: add the song to the queue.
+// Click a name: its menu (only that viewer, Shoutout, raid, timeout, ban). ♪: add the song to the queue.
 document.getElementById('chat-list').addEventListener('click', (e) => {
   const name = e.target.closest('.chat-name');
   if (name) {
-    chat.user = chat.user === name.dataset.login ? null : name.dataset.login;
-    chat.userName = name.textContent;
-    renderChat();
+    openModMenu({ login: name.dataset.login, name: name.textContent, color: name.style.color }, name);
+    return;
+  }
+  const pinBtn = e.target.closest('[data-pin]');
+  if (pinBtn) {
+    const rec = chatSource().find(r => r.id === pinBtn.dataset.pin);
+    if (rec) openPinMenu(rec, pinBtn);
     return;
   }
   const act = e.target.closest('[data-redeem]');
@@ -2579,9 +2693,7 @@ function onChatRecord(rec) {
     markGreet(rec, chat.session.seen);
     chat.session.records.push(rec);
   }
-  if (chat.day === '' && chat.filter === 'announce') {
-    if (currentTab === 'chat' && isAnnounce(rec)) rerenderChat();
-  } else if (chat.day === '' && currentTab === 'chat' && chatMatches(rec)) {
+  if (chat.day === '' && currentTab === 'chat' && chatMatches(rec)) {
     const list = document.getElementById('chat-list');
     const empty = list.querySelector('.chat-empty');
     if (empty) empty.remove();
@@ -2593,22 +2705,284 @@ function onChatRecord(rec) {
     const shown = chat.live.filter(chatMatches).length;
     document.getElementById('chat-count').textContent = t('dash.chat.count', { shown, total: chat.live.length });
   }
-  if (currentTab === 'chat' && chat.filter !== 'announce' && isAnnounce(rec)) paintChatFilters();
+  if (currentTab === 'chat' && chat.day === '' && isAnnounce(rec)) paintChatFilters();
   if (currentTab !== 'chat' && rec.kind === 'chat' && !isBot(rec)) { chat.unread++; paintChatUnread(); }
 }
 
-// "To announce": support to thank on stream, and viewers to greet — a first message in the channel,
+// ── Moderation (server/chat-mod.js): a name's menu, 🛡 for anyone not in the chat, 📌 on a message.
+// The pinned message and a raid on its way show above the chat. Buttons the token isn't allowed
+// (setups from before these scopes) stay off, with a link to authorize again.
+const MOD_TIMEOUTS = [60, 600, 3600, 86400];
+const MOD_UNITS = { s: 1, m: 60, h: 3600, d: 86400 };
+const PIN_TIMES = [60, 300, 1800, 0];   // 0 = until the stream ends
+const RAID_COUNTDOWN_MS = 90000;        // Twitch's, before the raid goes
+
+async function loadChatMod() {
+  try {
+    const m = await (await fetch('/api/chat/mod')).json();
+    chat.mod.can = m.can || {};
+    chat.mod.pinned = m.pinned || null;
+  } catch(_) {}
+  paintChatBanners();
+}
+
+async function modPost(path, body) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(I18N.server(data, 'dash.toast.requestFailed')), { code: data.code });
+  return data;
+}
+
+// 600 → "10m" / "10 分"
+function modDuration(s) {
+  const unit = ['d', 'h', 'm'].find(u => s % MOD_UNITS[u] === 0) || 's';
+  return t('dash.chat.mod.dur.' + unit, { n: s / MOD_UNITS[unit] });
+}
+
+function modClock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function closeModMenu() {
+  const menu = document.getElementById('mod-menu');
+  if (menu) menu.remove();
+}
+
+// Below the button or name it opened from, kept inside the window
+function placeModMenu(menu, anchor) {
+  document.body.appendChild(menu);
+  const r = anchor.getBoundingClientRect();
+  const w = menu.offsetWidth, h = menu.offsetHeight;
+  let top = r.bottom + 4;
+  if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 4);
+  menu.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  menu.style.top = `${top}px`;
+}
+
+// First click: the button asks to be sure (4 s); second click: go
+function modArmed(btn, label, ms = 4000) {
+  if (btn.classList.contains('sure')) return true;
+  btn.dataset.label = btn.textContent;
+  btn.classList.add('sure');
+  btn.textContent = label;
+  setTimeout(() => { if (btn.isConnected) { btn.classList.remove('sure'); btn.textContent = btn.dataset.label; } }, ms);
+  return false;
+}
+
+// user = { login, name, color } from a message, or null: a box for the channel name
+function openModMenu(user, anchor) {
+  closeModMenu();
+  const can = chat.mod.can;
+  const off = (k) => can[k] ? '' : ' disabled';
+  const menu = document.createElement('div');
+  menu.id = 'mod-menu';
+  menu.className = 'mod-menu';
+  menu.setAttribute('role', 'dialog');
+  const head = user
+    ? `<div class="mod-head"><b style="color:${esc(user.color || 'var(--purple)')}">${esc(user.name)}</b><span class="mod-login">${esc(user.login)}</span></div>`
+      + `<button class="mod-item" data-mod="filter">${esc(t(chat.user === user.login ? 'dash.chat.mod.showAll' : 'dash.chat.mod.onlyThis'))}</button>`
+    : `<input type="text" class="mod-who" autocomplete="off" placeholder="${esc(t('dash.chat.mod.who'))}" aria-label="${esc(t('dash.chat.mod.who'))}" />`;
+  const units = Object.keys(MOD_UNITS).map(u => `<option value="${u}"${u === 'm' ? ' selected' : ''}>${esc(t('dash.chat.mod.unit.' + u))}</option>`).join('');
+  menu.innerHTML = head
+    + `<div class="mod-row"><button class="chat-act" data-mod="shoutout"${off('shoutout')}>📣 Shoutout</button>`
+    + `<button class="chat-act" data-mod="raid"${off('raid')}>🚀 ${esc(t('dash.chat.mod.raid'))}</button></div>`
+    + `<div class="mod-label">${esc(t('dash.chat.mod.timeout'))}</div>`
+    + `<div class="mod-row">${MOD_TIMEOUTS.map(s => `<button class="chat-act" data-mod="timeout" data-s="${s}"${off('ban')}>${esc(modDuration(s))}</button>`).join('')}</div>`
+    + `<div class="mod-row"><input type="number" class="mod-n" min="1" step="1"${off('ban')} aria-label="${esc(t('dash.chat.mod.timeout'))}" />`
+    + `<select class="mod-unit"${off('ban')}>${units}</select>`
+    + `<button class="chat-act" data-mod="timeout"${off('ban')}>${esc(t('dash.chat.mod.timeoutGo'))}</button></div>`
+    + `<input type="text" class="mod-reason" maxlength="500" placeholder="${esc(t('dash.chat.mod.reason'))}"${off('ban')} />`
+    + `<div class="mod-row"><button class="chat-act done" data-mod="unban"${off('ban')}>${esc(t('dash.chat.mod.unban'))}</button>`
+    + `<button class="chat-act danger" data-mod="ban"${off('ban')}>🚫 ${esc(t('dash.chat.mod.ban'))}</button></div>`
+    + (['ban', 'shoutout', 'raid'].some(k => !can[k])
+      ? `<div class="mod-note">${esc(t('dash.chat.mod.needAuth'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a></div>` : '');
+  placeModMenu(menu, anchor);
+  menu.addEventListener('click', (e) => onModMenuClick(e, user, menu));
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.classList.contains('mod-n')) { e.preventDefault(); menu.querySelector('.mod-unit + [data-mod]').click(); }
+  });
+  (menu.querySelector('.mod-who') || menu.querySelector('button:not(:disabled)'))?.focus();
+}
+
+async function onModMenuClick(e, user, menu) {
+  const b = e.target.closest('[data-mod]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.mod;
+  if (act === 'filter') {
+    chat.user = chat.user === user.login ? null : user.login;
+    chat.userName = user.name;
+    closeModMenu();
+    renderChat();
+    return;
+  }
+  const login = user ? user.login : menu.querySelector('.mod-who').value.trim().replace(/^@/, '');
+  if (!login) { showToast(t('dash.chat.mod.whoFirst'), true); menu.querySelector('.mod-who').focus(); return; }
+  const shown = user ? user.name : login;
+  let seconds;
+  if (act === 'timeout') {
+    seconds = b.dataset.s ? Number(b.dataset.s)
+      : Math.round(Number(menu.querySelector('.mod-n').value) * MOD_UNITS[menu.querySelector('.mod-unit').value]);
+    if (!(seconds > 0)) { showToast(t('dash.chat.mod.howLong'), true); menu.querySelector('.mod-n').focus(); return; }
+  }
+  if (act === 'ban' && !modArmed(b, t('dash.chat.mod.banSure', { name: shown }))) return;
+  if (act === 'raid' && !b.classList.contains('sure')) {
+    // Say where the viewers would go before they go
+    b.disabled = true;
+    try {
+      const res = await fetch(`/api/chat/mod/channel?login=${encodeURIComponent(login)}`);
+      const ch = await res.json();
+      if (!res.ok) throw new Error(I18N.server(ch, 'dash.toast.requestFailed'));
+      b.disabled = false;
+      modArmed(b, t(ch.live ? 'dash.chat.mod.raidSureLive' : 'dash.chat.mod.raidSureOffline', { name: ch.name, n: ch.viewers }), 8000);
+    } catch (err) {
+      b.disabled = false;
+      showToast(err.message, true);
+    }
+    return;
+  }
+  b.disabled = true;
+  try {
+    if (act === 'ban' || act === 'timeout') {
+      const reason = menu.querySelector('.mod-reason').value.trim();
+      const r = await modPost('/api/chat/mod/ban', { login, seconds, reason });
+      showToast(seconds ? t('dash.chat.mod.timedOut', { name: r.name, time: modDuration(seconds) }) : t('dash.chat.mod.banned', { name: r.name }));
+    } else if (act === 'unban') {
+      const r = await modPost('/api/chat/mod/unban', { login });
+      showToast(t('dash.chat.mod.unbanned', { name: r.name }));
+    } else if (act === 'shoutout') {
+      const r = await modPost('/api/chat/mod/shoutout', { login });
+      const reason = r.twitch ? I18N.server(r.twitch, 'dash.toast.requestFailed') : '';
+      const key = r.twitch ? (r.clip ? 'shoutoutClipOnly' : 'shoutoutNothing') : (r.clip ? 'shoutoutBoth' : 'shoutoutNoClip');
+      showToast(t('dash.chat.mod.' + key, { name: r.name, reason }), !!r.twitch && !r.clip);
+    } else if (act === 'raid') {
+      const r = await modPost('/api/chat/mod/raid', { login });
+      chat.mod.raid = { name: r.name, until: Date.now() + RAID_COUNTDOWN_MS };
+      paintChatBanners();
+      showToast(t('dash.chat.mod.raidStarted', { name: r.name }));
+    }
+    closeModMenu();
+  } catch (err) {
+    b.disabled = false;
+    if (b.classList.contains('sure')) { b.classList.remove('sure'); b.textContent = b.dataset.label; }
+    showToast(err.message, true);
+  }
+}
+
+// 📌 on a message: how long it stays pinned
+function openPinMenu(rec, anchor) {
+  closeModMenu();
+  const menu = document.createElement('div');
+  menu.id = 'mod-menu';
+  menu.className = 'mod-menu';
+  menu.setAttribute('role', 'dialog');
+  menu.innerHTML = `<div class="mod-label">${esc(t('dash.chat.mod.pinFor'))}</div><div class="mod-row">`
+    + PIN_TIMES.map(s => `<button class="chat-act" data-pin-s="${s}">${esc(s ? modDuration(s) : t('dash.chat.mod.pinStream'))}</button>`).join('') + '</div>';
+  placeModMenu(menu, anchor);
+  menu.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-pin-s]');
+    if (!b) return;
+    const seconds = Number(b.dataset.pinS);
+    b.disabled = true;
+    try {
+      const r = await modPost('/api/chat/mod/pin', { id: rec.id, ...(seconds ? { seconds } : {}) });
+      // Twitch may not list it straight away: show it from the message meanwhile
+      chat.mod.pinned = r && r.id ? r : { id: rec.id, name: rec.user.name, text: rec.text, endsAt: seconds ? Date.now() + seconds * 1000 : null };
+      paintChatBanners();
+      closeModMenu();
+      showToast(t('dash.chat.mod.pinned', { name: rec.user.name }));
+    } catch (err) {
+      b.disabled = false;
+      showToast(err.message, true);
+    }
+  });
+  menu.querySelector('button').focus();
+}
+
+document.addEventListener('mousedown', (e) => {
+  const menu = document.getElementById('mod-menu');
+  if (menu && !menu.contains(e.target)) closeModMenu();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModMenu(); });
+
+// The pinned message and a raid on its way; their countdowns tick in place
+let chatBannerTick = null;
+function paintChatBanners() {
+  const box = document.getElementById('chat-banners');
+  const p = chat.mod.pinned, raid = chat.mod.raid;
+  box.innerHTML = (p
+    ? `<div class="chat-banner pinned">📌 <span class="what"><b>${esc(p.name)}</b>: ${esc(p.text)}</span>`
+      + `<span class="when"${p.endsAt ? ` data-ends="${p.endsAt}" data-key="dash.chat.mod.pinLeft"` : ''}>${esc(p.endsAt ? '' : t('dash.chat.mod.pinUntilEnd'))}</span>`
+      + (chat.mod.can.pin ? `<button class="chat-act" data-unpin="${esc(p.id)}">${esc(t('dash.chat.mod.unpin'))}</button>` : '') + '</div>'
+    : '')
+    + (raid
+      ? `<div class="chat-banner raid">🚀 <span class="what" data-ends="${raid.until}" data-key="dash.chat.mod.raiding" data-name="${esc(raid.name)}"></span>`
+        + `<button class="chat-act" data-cancel-raid="1">${esc(t('dash.chat.mod.cancelRaid'))}</button></div>`
+      : '');
+  clearInterval(chatBannerTick);
+  chatBannerTick = box.querySelector('[data-ends]') ? setInterval(tickChatBanners, 1000) : null;
+  tickChatBanners();
+}
+
+function tickChatBanners() {
+  const now = Date.now();
+  let ended = false;
+  for (const el of document.querySelectorAll('#chat-banners [data-ends]')) {
+    const left = Number(el.dataset.ends) - now;
+    if (left <= 0) ended = true;
+    el.textContent = t(el.dataset.key, { time: modClock(left), name: el.dataset.name || '' });
+  }
+  if (!ended) return;
+  if (chat.mod.pinned && chat.mod.pinned.endsAt && chat.mod.pinned.endsAt <= now) chat.mod.pinned = null;
+  if (chat.mod.raid && chat.mod.raid.until <= now) chat.mod.raid = null;
+  paintChatBanners();
+}
+
+document.getElementById('chat-banners').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-unpin], [data-cancel-raid]');
+  if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.unpin) {
+      await modPost('/api/chat/mod/unpin', { id: b.dataset.unpin }).catch(err => { if (err.code !== 'pinGone') throw err; });
+      chat.mod.pinned = null;
+      showToast(t('dash.chat.mod.unpinned'));
+    } else {
+      await modPost('/api/chat/mod/raid/cancel');
+      chat.mod.raid = null;
+      showToast(t('dash.chat.mod.raidCanceled'));
+    }
+  } catch (err) {
+    b.disabled = false;
+    showToast(err.message, true);
+    if (err.code === 'modNoRaid') chat.mod.raid = null;   // nothing left to cancel
+  }
+  paintChatBanners();
+});
+
+// "To announce": support to thank on stream (redemptions too), and viewers to greet — a first message in the channel,
 // or a viewer's first words this stream (greet, worked out here: per session live, per day otherwise).
-// ✓ marks them announced (kept in the chat log); the session is from server/stream-session.js.
+// They're highlighted in the chat until ✓ marks them announced (kept in the chat log); the session is
+// from server/stream-session.js.
 const ANNOUNCE_NOTICES = ['sub', 'resub', 'sub_gift', 'community_sub_gift', 'gift_paid_upgrade', 'prime_paid_upgrade',
   'pay_it_forward', 'raid', 'watch_streak', 'bits_badge_tier', 'charity_donation'];
 
 function isAnnounce(rec) {
-  if (rec.kind === 'follow') return true;
+  if (rec.kind === 'follow' || rec.kind === 'redeem') return true;
   // A gift of several subs: the one community_sub_gift line, not each viewer's
   if (rec.kind === 'notice') return ANNOUNCE_NOTICES.includes(rec.notice) && !(rec.notice === 'sub_gift' && rec.communityGift);
   if (rec.kind !== 'chat' || rec.deleted) return false;
   return !!rec.bits || rec.type === 'channel_points_highlighted' || isFirstChat(rec) || !!rec.greet;
+}
+
+// Live: only this session's; an earlier day: that day's
+function toAnnounce(rec) {
+  if (!isAnnounce(rec)) return false;
+  return !!chat.day || (chat.session.since !== null && rec.at >= chat.session.since);
+}
+
+function announceClass(rec) {
+  return toAnnounce(rec) && !rec.announced ? ' to-announce' : '';
 }
 
 function isMe(rec) {
@@ -2638,25 +3012,54 @@ async function loadChatSession() {
   } catch(_) {}
 }
 
+// The live list and the session share records, so marks (greet, first, announced) reach both
+function linkSession() {
+  const byId = new Map(chat.session.records.map(r => [r.id, r]));
+  chat.live = chat.live.map(r => byId.get(r.id) || r);
+}
+
 // Still to announce: this session's, or the day's when looking at an earlier day
 function announceLeft() {
   return (chat.day ? chat.dayRecords || [] : chat.session.records)
     .filter(r => isAnnounce(r) && !r.announced && !(chat.hideBots && isBot(r)));
 }
 
-// "✓ All" for what's shown; announced ones hidden or shown again
+// The count jumps to the oldest one still to announce; ✓ marks them all
 function announceTools() {
-  const shown = chatSource().filter(r => chatMatches(r) && !r.announced).length;
-  const done = chatSource().filter(r => isAnnounce(r) && r.announced).length;
-  return (shown ? `<button class="chip announce-all" data-announce-all="1">${esc(t('dash.chat.announceAll', { n: shown }))}</button>` : '')
-    + (done ? `<button class="chip" data-show-announced="1" aria-pressed="${chat.showAnnounced}">${esc(t(chat.showAnnounced ? 'dash.chat.hideAnnounced' : 'dash.chat.showAnnounced', { n: done }))}</button>` : '');
+  const left = announceLeft().length;
+  if (!left) return '';
+  return `<button class="chip announce-next" data-announce-next="1" title="${esc(t('dash.chat.announceNextTip'))}">${esc(t('dash.chat.announceNext', { n: left }))}</button>`
+    + `<button class="chip announce-all" data-announce-all="1">${esc(t('dash.chat.announceAll', { n: left }))}</button>`;
 }
 
+// Scrolls to the oldest one still to announce, showing all chat first if a filter hides it
+function showNextAnnounce() {
+  const rec = announceLeft()[0];
+  if (!rec) return;
+  const list = document.getElementById('chat-list');
+  const find = () => list.querySelector(`.chat-msg[data-id="${CSS.escape(rec.id)}"]`);
+  if (!find()) {
+    chat.filter = 'all';
+    chat.user = null;
+    chat.query = '';
+    document.getElementById('chat-search').value = '';
+    renderChat();
+  }
+  const row = find();
+  if (!row) return;
+  row.scrollIntoView({ block: 'center' });
+  row.classList.remove('flash');
+  void row.offsetWidth;
+  row.classList.add('flash');
+}
+
+// ✓ on what's still to announce (worded on redemptions, beside their ✓ Done); once announced, a hover
+// button brings it back
 function announceMark(rec) {
-  if (chat.filter !== 'announce' || !isAnnounce(rec)) return '';
+  if (!toAnnounce(rec)) return '';
   return rec.announced
-    ? `<button class="chat-act" data-announce="${esc(rec.id)}" data-done="0" title="${esc(t('dash.chat.unannounceTip'))}">${esc(t('dash.chat.announced'))}</button>`
-    : `<button class="chat-act done" data-announce="${esc(rec.id)}" data-done="1" title="${esc(t('dash.chat.announceTip'))}">✓</button>`;
+    ? `<button class="chat-act undo" data-announce="${esc(rec.id)}" data-done="0" title="${esc(t('dash.chat.unannounceTip'))}">${esc(t('dash.chat.announced'))}</button>`
+    : `<button class="chat-act done" data-announce="${esc(rec.id)}" data-done="1" title="${esc(t('dash.chat.announceTip'))}">${rec.kind === 'redeem' ? esc(t('dash.chat.announceRedeem')) : '✓'}</button>`;
 }
 
 // Shown at once; the server tells every open dashboard (chat-announced)
@@ -2748,6 +3151,400 @@ I18N.onChange(() => {
   paintRewards();
   if (filteredSongs.length) renderSuggest();
   if (!document.getElementById('node-warn').hidden) paintNodeWarning();
+  paintModeBar();
+  if (currentTab === 'modes') paintModes();
+});
+
+// ── Modes (server/modes.js, stream-app.js) ─────────────────────────────────────
+// The top bar's buttons switch; the 🎛 Modes tab connects Streamlabs / OBS and edits modes, saved as
+// they're made. view = GET /api/modes: live = what the streaming app shows (read when the tab opens,
+// or ↻), issues = what each mode no longer finds and what's new in its scenes.
+const modes = { view: null, open: new Set(), busy: false };
+const MODE_PRESETS = [['🎤', 'sing', { holdClips: true, tab: 'queue' }], ['💬', 'talk', { tab: 'chat' }], ['☕', 'break', {}]];
+const appName = app => ({ streamlabs: 'Streamlabs Desktop', obs: 'OBS Studio' })[app] || app;
+const modeById = id => modes.view && modes.view.modes.find(m => m.id === id);
+const modeUnit = m => m.app === 'obs' ? 'dB' : '%';
+
+async function loadModes(live) {
+  try {
+    const v = await (await fetch('/api/modes' + (live ? '' : '?live=0'))).json();
+    if (live || !modes.view) modes.view = v;
+    else Object.assign(modes.view, { modes: v.modes, active: v.active, held: v.held });
+    paintModeBar();
+    // Not while editing there: a repaint would take the cursor out of the field
+    if (currentTab === 'modes' && (live || !document.getElementById('modes-list').contains(document.activeElement))) paintModes();
+  } catch (_) {}
+}
+
+// Another dashboard (or this one) switched or edited a mode
+function onModesMessage(m) {
+  if (m.switched && m.switched.tab && TABS.includes(m.switched.tab)) showTab(m.switched.tab);
+  loadModes(false);
+}
+
+// Why a mode can't fully apply now (from the last read), or ''
+function modeIssue(m) {
+  const is = modes.view && modes.view.issues && modes.view.issues[m.id];
+  if (!is) return '';
+  if (is.otherApp) return t('dash.modes.otherApp', { app: appName(is.otherApp) });
+  return is.missing.length ? t('dash.modes.missingTip', { list: is.missing.map(x => x.name).join(', ') }) : '';
+}
+
+function paintModeBar() {
+  const bar = document.getElementById('mode-bar');
+  const v = modes.view;
+  const list = v ? v.modes : [];
+  bar.hidden = !list.length;
+  bar.innerHTML = list.map((m) => {
+    const on = v.active === m.id;
+    const issue = modeIssue(m);
+    const tip = [on ? t('dash.modes.activeTip') : t('dash.modes.switchTip', { name: m.name }), on && v.held ? t('dash.modes.heldTip') : '', issue].filter(Boolean).join('\n');
+    return `<button class="chip mode-chip${on ? ' on' : ''}" data-mode="${esc(m.id)}" aria-pressed="${on}" title="${esc(tip)}">${esc(m.icon)} ${esc(m.name)}${issue ? ' ⚠' : ''}${on && v.held ? ' ⏸' : ''}</button>`;
+  }).join('');
+}
+
+document.getElementById('mode-bar').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-mode]');
+  if (btn) switchMode(btn.dataset.mode);
+});
+
+async function switchMode(id) {
+  if (modes.busy) return;
+  const bar = document.getElementById('mode-bar');
+  modes.busy = true;
+  bar.classList.add('busy');
+  try {
+    const r = await modPost('/api/modes/switch', { id });
+    const m = modeById(id);
+    const name = `${m && m.icon ? m.icon + ' ' : ''}${r.name}`;
+    const problems = [];
+    if (r.appError) problems.push(I18N.server(r.appError, 'dash.toast.requestFailed'));
+    if (r.skipped.length) problems.push(t('dash.modes.skipped', { list: r.skipped.join(', ') }));
+    if (r.failed.length) problems.push(t('dash.modes.failed', { list: r.failed.join(', ') }));
+    if (r.canvasChanged) problems.push(t('dash.modes.canvasChanged'));
+    if (r.chat) problems.push(t('dash.modes.chatFailed', { message: I18N.server(r.chat, 'dash.toast.requestFailed') }));
+    if (problems.length) {
+      showToast(`${name} — ${problems.join(' · ')}`, true, 8000);
+      loadModes(true);
+    } else {
+      showToast(t('dash.modes.switched', { name }));
+    }
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    modes.busy = false;
+    bar.classList.remove('busy');
+  }
+}
+
+// ── The 🎛 Modes tab ──
+
+function paintModes() {
+  paintModeConnection();
+  const v = modes.view;
+  const list = document.getElementById('modes-list');
+  const presets = document.getElementById('modes-presets');
+  if (!v) { list.innerHTML = ''; presets.hidden = true; return; }
+  presets.hidden = v.modes.length > 0;
+  presets.innerHTML = `<span class="setting-hint">${esc(t('dash.modes.presets'))}</span>` + MODE_PRESETS.map(([icon, key]) =>
+    `<button class="btn add" onclick="newMode('${key}')">＋ ${icon} ${esc(t('dash.modes.preset.' + key))}</button>`).join('');
+  list.innerHTML = v.modes.map(modeCard).join('');
+}
+
+function paintModeConnection() {
+  const box = document.getElementById('modes-connection');
+  const c = modes.view ? modes.view.connection : { app: null, hasSecret: false };
+  const app = box.dataset.app != null ? box.dataset.app : (c.app || '');
+  const same = app === (c.app || '');
+  const status = !same ? ['', '']
+    : !c.app ? ['', t('dash.modes.conn.notSet')]
+    : c.error ? ['err', I18N.server(c.error, 'dash.toast.requestFailed')]
+    : c.connected ? ['ok', t('dash.modes.conn.ok', { app: appName(c.app) })] : ['', ''];
+  const secretName = t(app === 'obs' ? 'dash.modes.conn.password' : 'dash.modes.conn.token');
+  box.innerHTML = `
+    <h3>${esc(t('dash.modes.conn.title'))}</h3>
+    <div class="modes-row">
+      <select class="lang-select" id="mc-app" onchange="onModeAppPick(this.value)" aria-label="${esc(t('dash.modes.conn.title'))}">
+        <option value="">${esc(t('dash.modes.conn.none'))}</option>
+        <option value="streamlabs"${app === 'streamlabs' ? ' selected' : ''}>Streamlabs Desktop</option>
+        <option value="obs"${app === 'obs' ? ' selected' : ''}>OBS Studio</option>
+      </select>
+      ${app ? `
+      <label>${esc(t('dash.modes.conn.port'))} <input class="modes-input" id="mc-port" type="number" min="1" max="65535" style="width:90px"
+        value="${same && c.port ? c.port : (app === 'obs' ? 4455 : 59650)}"></label>
+      <input class="modes-input" id="mc-secret" type="password" autocomplete="off" style="width:min(280px,100%)" aria-label="${esc(secretName)}"
+        placeholder="${esc(same && c.hasSecret ? t('dash.modes.conn.saved') : secretName)}">` : ''}
+      <button class="btn" onclick="saveModeConnection()">${esc(t(app ? 'dash.modes.conn.save' : 'dash.modes.conn.saveNone'))}</button>
+    </div>
+    ${app ? `<p class="setting-hint">${esc(t(app === 'obs' ? 'dash.modes.conn.helpObs' : 'dash.modes.conn.helpStreamlabs'))}</p>` : ''}
+    <p class="modes-status ${status[0]}">${esc(status[1])}</p>`;
+}
+
+// Picking another app only changes the form; Connect saves it
+function onModeAppPick(app) {
+  document.getElementById('modes-connection').dataset.app = app;
+  paintModeConnection();
+}
+
+async function saveModeConnection() {
+  const box = document.getElementById('modes-connection');
+  const app = document.getElementById('mc-app').value;
+  const body = { app };
+  if (app) {
+    body.port = document.getElementById('mc-port').value;
+    const secret = document.getElementById('mc-secret').value;
+    if (secret) body.secret = secret;
+  }
+  box.querySelector('.modes-status').textContent = '…';
+  try {
+    modes.view = await modPost('/api/modes/connection', body);
+    delete box.dataset.app;
+    paintModeBar();
+    paintModes();
+  } catch (err) {
+    showToast(err.message, true);
+    paintModeConnection();
+  }
+}
+
+function modeCard(m, i) {
+  const v = modes.view;
+  const is = (v.issues && v.issues[m.id]) || { missing: [], extra: [] };
+  const open = modes.open.has(m.id);
+  const issue = modeIssue(m);
+  const sum = m.app
+    ? t('dash.modes.summary', { scene: m.scene ? m.scene.name : t('dash.modes.noScene'), items: m.items.length, audio: m.audio.length })
+    : t('dash.modes.appOnly');
+  return `
+  <div class="mode-card${v.active === m.id ? ' active' : ''}" data-id="${esc(m.id)}">
+    <div class="mode-card-head">
+      <input class="modes-input mode-icon" data-f="icon" maxlength="8" value="${esc(m.icon)}" aria-label="${esc(t('dash.modes.iconLabel'))}">
+      <input class="modes-input mode-name" data-f="name" maxlength="30" value="${esc(m.name)}" aria-label="${esc(t('dash.modes.nameLabel'))}">
+      <span class="mode-sum">${esc(sum)}${issue ? ` <span class="mode-warn">⚠ ${esc(issue)}</span>` : ''}</span>
+      <button class="btn" data-act="switch">${esc(t('dash.modes.switch'))}</button>
+      <button class="btn" data-act="toggle" aria-expanded="${open}">${esc(t(open ? 'dash.modes.close' : 'dash.modes.edit'))}</button>
+    </div>
+    ${open ? `<div class="mode-body">${modeStreamPart(m, is)}${modeAppPart(m)}
+      <div class="mode-foot">
+        <button class="btn" data-act="up"${i === 0 ? ' disabled' : ''} title="${esc(t('dash.modes.up'))}" aria-label="${esc(t('dash.modes.up'))}">↑</button>
+        <button class="btn" data-act="down"${i === v.modes.length - 1 ? ' disabled' : ''} title="${esc(t('dash.modes.down'))}" aria-label="${esc(t('dash.modes.down'))}">↓</button>
+        <span class="topbar-spacer"></span>
+        <button class="btn danger" data-act="delete">${esc(t('dash.modes.delete'))}</button>
+      </div></div>` : ''}
+  </div>`;
+}
+
+// Dual Output: which canvas an item is on ('' without it)
+const canvasTag = i => i.display ? t('dash.modes.display.' + i.display) : '';
+const sameCanvas = (a, b) => (a.display || '') === (b.display || '');
+// An item as a mode names it
+const modeItemRef = i => ({ id: i.id, sourceId: i.sourceId, name: i.name, ...(i.display ? { display: i.display } : {}) });
+
+// What the streaming app shows now, as <option>s by scene (and canvas), to replace a missing item
+function liveItemOptions() {
+  return modes.view.live.scenes.filter(s => s.items.length).map(s => `<optgroup label="${esc(s.name)}">${s.items.map(i =>
+    `<option value="${esc(s.id)}|${esc(i.id)}">${esc(i.name)}${i.display ? ' · ' + esc(canvasTag(i)) : ''}</option>`).join('')}</optgroup>`).join('');
+}
+
+const dropBtn = () => `<button class="btn" data-act="drop" title="${esc(t('dash.modes.drop'))}" aria-label="${esc(t('dash.modes.drop'))}">✕</button>`;
+
+function modeStreamPart(m, is) {
+  const { live, connection: conn } = modes.view;
+  const recapture = conn.app
+    ? `<div><button class="btn" data-act="recapture" title="${esc(t('dash.modes.recaptureTip'))}">${esc(t('dash.modes.recapture', { app: appName(conn.app) }))}</button></div>` : '';
+  if (!m.app || is.otherApp) {
+    const why = is.otherApp ? t('dash.modes.otherApp', { app: appName(is.otherApp) }) : t(conn.app ? 'dash.modes.noStreamPart' : 'dash.modes.conn.notSet');
+    return `<div class="mode-section"><h4>${esc(conn.app ? appName(conn.app) : t('dash.modes.conn.title'))}</h4>
+      <p class="setting-hint">${esc(why)}</p>${recapture}</div>`;
+  }
+  const missingItem = new Set(is.missing.filter(x => x.kind === 'item').map(x => `${x.sceneId}/${x.itemId}`));
+  const missingAudio = new Set(is.missing.filter(x => x.kind === 'audio').map(x => x.id));
+  const sceneMissing = is.missing.some(x => x.kind === 'scene');
+  const pick = `<option value="">${esc(t('dash.modes.pick'))}</option>`;
+  const notFound = name => `${esc(name)} <small>(${esc(t('dash.modes.notFound'))})</small>`;
+
+  let html = `<div class="mode-section"><h4>${esc(t('dash.modes.streamPart', { app: appName(m.app) }))}</h4>
+    <div class="modes-row">${esc(t('dash.modes.scene'))}
+      ${m.scene ? `<b class="${sceneMissing ? 'mode-warn' : ''}">${sceneMissing ? '⚠ ' + notFound(m.scene.name) : esc(m.scene.name)}</b>` : esc(t('dash.modes.noScene'))}
+      ${live && (sceneMissing || !m.scene) ? `<select class="lang-select" data-fix="scene">${pick}${live.scenes.filter(s => !s.group).map(s =>
+        `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select>` : ''}</div>`;
+
+  // Items, under the scene (or group) they're in, and the canvas with Dual Output
+  html += '<table class="mode-table"><tbody>';
+  let lastGroup = null;
+  const group = it => `${it.scene.id}/${it.item.display || ''}`;
+  const groups = [...new Set(m.items.map(group))].sort((a, b) => a.endsWith('/vertical') - b.endsWith('/vertical'));
+  const order = m.items.map((it, n) => n).sort((a, b) => groups.indexOf(group(m.items[a])) - groups.indexOf(group(m.items[b])) || a - b);
+  order.forEach((n) => {
+    const it = m.items[n];
+    if (`${it.scene.id}/${it.item.display || ''}` !== lastGroup) {
+      lastGroup = `${it.scene.id}/${it.item.display || ''}`;
+      html += `<tr class="scene-row"><td colspan="4">${esc(t('dash.modes.inScene', { scene: it.scene.name }))}${it.item.display ? ` · ${esc(canvasTag(it.item))}` : ''}</td></tr>`;
+    }
+    html += missingItem.has(`${it.scene.id}/${it.item.id}`)
+      ? `<tr class="missing" data-i="${n}"><td>⚠</td><td class="name">${notFound(it.item.name)}</td>
+          <td>${live ? `<select class="lang-select" data-fix="item">${pick}${liveItemOptions()}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
+      : `<tr data-i="${n}"><td><label title="${esc(t('dash.modes.visible'))}"><input type="checkbox" data-f="visible"${it.visible ? ' checked' : ''}> 👁</label></td>
+          <td class="name">${esc(it.item.name)}</td>
+          <td><label title="${esc(t('dash.modes.move'))}"><input type="checkbox" data-f="move"${it.move ? ' checked' : ''}${it.place ? '' : ' disabled'}> 📍</label></td>
+          <td>${dropBtn()}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  const extraItems = live ? is.extra.filter(x => x.itemId) : [];
+  html += extraRow(extraItems.map((x) => {
+    const s = live.scenes.find(sc => sc.id === x.sceneId);
+    const i = s && s.items.find(it => it.id === x.itemId);
+    return i && `<button class="btn add" data-act="add-item" data-scene="${esc(s.id)}" data-item="${esc(i.id)}" title="${esc(t('dash.modes.add', { name: i.name }))}">＋ ${esc(i.name)} <small>(${esc(s.name)}${i.display ? ' · ' + esc(canvasTag(i)) : ''})</small></button>`;
+  }));
+
+  // Sounds
+  const unit = modeUnit(m);
+  html += `<h4>${esc(t('dash.modes.sounds'))}</h4><table class="mode-table"><tbody>`;
+  m.audio.forEach((a, n) => {
+    html += missingAudio.has(a.id)
+      ? `<tr class="missing" data-a="${n}"><td>⚠</td><td class="name">${notFound(a.name)}</td>
+          <td colspan="2">${live ? `<select class="lang-select" data-fix="audio">${pick}${live.audio.map(x =>
+            `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
+      : `<tr data-a="${n}"><td><label title="${esc(t('dash.modes.muted'))}"><input type="checkbox" data-f="muted"${a.muted ? ' checked' : ''}> 🔇</label></td>
+          <td class="name">${esc(a.name)}</td>
+          <td><input class="modes-input mode-vol" type="number" data-f="volume" value="${a.volume == null ? '' : a.volume}"
+            ${unit === 'dB' ? 'min="-100" max="26" step="0.5"' : 'min="0" max="100" step="1"'} aria-label="${esc(t('dash.modes.volume', { unit }))}"></td>
+          <td>${unit}</td><td>${dropBtn()}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  const extraAudio = live ? is.extra.filter(x => x.audioId) : [];
+  html += extraRow(extraAudio.map((x) => {
+    const a = live.audio.find(s => s.id === x.audioId);
+    return a && `<button class="btn add" data-act="add-audio" data-audio="${esc(a.id)}" title="${esc(t('dash.modes.add', { name: a.name }))}">＋ ${esc(a.name)}</button>`;
+  }));
+  return html + recapture + '</div>';
+}
+
+function extraRow(buttons) {
+  buttons = buttons.filter(Boolean);
+  return buttons.length ? `<div class="mode-extra">${esc(t('dash.modes.extra'))} ${buttons.join('')}</div>` : '';
+}
+
+function modeAppPart(m) {
+  return `<div class="mode-section"><h4>${esc(t('dash.modes.appPart'))}</h4>
+    <div class="modes-row"><span>${esc(t('dash.modes.chat'))}</span>
+      <input class="modes-input mode-chat" data-f="chat" maxlength="500" value="${esc(m.chat)}" placeholder="${esc(t('dash.modes.chatPlaceholder'))}"></div>
+    <label class="setting"><input type="checkbox" data-f="holdClips"${m.holdClips ? ' checked' : ''}> <span>${esc(t('dash.modes.hold'))}</span></label>
+    <p class="setting-hint">${esc(t('dash.modes.holdHint'))}</p>
+    <div class="modes-row"><span>${esc(t('dash.modes.tab'))}</span>
+      <select class="lang-select" data-f="tab">${['', 'queue', 'leihu', 'chat'].map(tab =>
+        `<option value="${tab}"${m.tab === tab ? ' selected' : ''}>${esc(tab ? t('dash.tab.' + tab) : t('dash.modes.tabNone'))}</option>`).join('')}</select></div>
+  </div>`;
+}
+
+// Saves a mode; `reread` reads the streaming app again (what's missing or new may have changed)
+async function saveMode(m, reread) {
+  try {
+    Object.assign(m, await modPost('/api/modes/save', { mode: m }));
+    paintModeBar();
+    if (reread) await loadModes(true);
+  } catch (err) {
+    showToast(err.message, true);
+    loadModes(true);
+  }
+}
+
+async function newMode(preset) {
+  const p = MODE_PRESETS.find(x => x[1] === preset);
+  const n = modes.view ? modes.view.modes.length + 1 : 1;
+  try {
+    const m = await modPost('/api/modes/new', p ? { icon: p[0], name: t('dash.modes.preset.' + p[1]) } : { icon: '⭐', name: t('dash.modes.newName', { n }) });
+    if (p) await modPost('/api/modes/save', { mode: { ...m, ...p[2] } });
+    modes.open.add(m.id);
+  } catch (err) {
+    showToast(err.message, true);
+  }
+  await loadModes(true);
+}
+
+const modesList = document.getElementById('modes-list');
+
+modesList.addEventListener('change', (e) => {
+  const card = e.target.closest('.mode-card');
+  const m = card && modeById(card.dataset.id);
+  if (!m) return;
+  const el = e.target;
+  const row = el.closest('tr');
+  const live = modes.view.live;
+  if (el.dataset.fix) {
+    if (!el.value) return;
+    if (el.dataset.fix === 'scene') {
+      const s = live.scenes.find(x => x.id === el.value);
+      m.scene = { id: s.id, name: s.name };
+    } else if (el.dataset.fix === 'item') {
+      const [sceneId, itemId] = el.value.split('|');
+      const s = live.scenes.find(x => x.id === sceneId);
+      const li = s.items.find(x => x.id === itemId);
+      Object.assign(m.items[row.dataset.i], { scene: { id: s.id, name: s.name }, item: modeItemRef(li), place: li.place || null });
+    } else {
+      const la = live.audio.find(x => x.id === el.value);
+      Object.assign(m.audio[row.dataset.a], { id: la.id, name: la.name });
+    }
+    return saveMode(m, true);
+  }
+  const f = el.dataset.f;
+  if (!f) return;
+  if (row && row.dataset.i != null) m.items[row.dataset.i][f] = el.checked;
+  else if (row && row.dataset.a != null) m.audio[row.dataset.a][f] = f === 'volume' ? (el.value === '' ? null : Number(el.value)) : el.checked;
+  else m[f] = el.type === 'checkbox' ? el.checked : el.value;
+  saveMode(m, false);
+});
+
+modesList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act]');
+  const card = btn && btn.closest('.mode-card');
+  const m = card && modeById(card.dataset.id);
+  if (!m) return;
+  const act = btn.dataset.act;
+  const live = modes.view.live;
+  const row = btn.closest('tr');
+  if (act === 'switch') return switchMode(m.id);
+  if (act === 'toggle') {
+    if (modes.open.has(m.id)) modes.open.delete(m.id); else modes.open.add(m.id);
+    return paintModes();
+  }
+  if (act === 'drop') {
+    if (row.dataset.i != null) m.items.splice(row.dataset.i, 1); else m.audio.splice(row.dataset.a, 1);
+    return saveMode(m, true);
+  }
+  if (act === 'add-item') {
+    const s = live.scenes.find(x => x.id === btn.dataset.scene);
+    const li = s && s.items.find(x => x.id === btn.dataset.item);
+    if (!li) return;
+    const at = m.items.map(x => x.scene.id === s.id && sameCanvas(x.item, li)).lastIndexOf(true);   // next to the others from its scene and canvas
+    m.items.splice(at < 0 ? m.items.length : at + 1, 0, { scene: { id: s.id, name: s.name }, item: modeItemRef(li), visible: li.visible, place: li.place || null, move: false });
+    return saveMode(m, true);
+  }
+  if (act === 'add-audio') {
+    const la = live.audio.find(x => x.id === btn.dataset.audio);
+    if (la) m.audio.push({ id: la.id, name: la.name, muted: la.muted, volume: la.volume });
+    return saveMode(m, true);
+  }
+  if (act === 'recapture') {
+    try {
+      await modPost('/api/modes/recapture', { id: m.id });
+      showToast(t('dash.modes.recaptured', { name: `${m.icon} ${m.name}`.trim(), app: appName(modes.view.connection.app) }));
+    } catch (err) { showToast(err.message, true); }
+    return loadModes(true);
+  }
+  if (act === 'up' || act === 'down') {
+    const ids = modes.view.modes.map(x => x.id);
+    const i = ids.indexOf(m.id), j = i + (act === 'up' ? -1 : 1);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try { await modPost('/api/modes/order', { ids }); } catch (err) { showToast(err.message, true); }
+    return loadModes(true);
+  }
+  if (act === 'delete') {
+    if (!modArmed(btn, t('dash.modes.deleteConfirm'))) return;
+    try { await modPost('/api/modes/delete', { id: m.id }); } catch (err) { showToast(err.message, true); }
+    modes.open.delete(m.id);
+    return loadModes(true);
+  }
 });
 
 showTab(location.hash.slice(1));

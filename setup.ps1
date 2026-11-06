@@ -95,7 +95,7 @@ Write-Step "Requesting authorization code..."
 
 $deviceRes = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
     client_id = $clientId
-    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers"
+    scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages"
 }
 $deviceCode   = $deviceRes.device_code
 $userCode     = $deviceRes.user_code

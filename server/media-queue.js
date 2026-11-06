@@ -1,4 +1,5 @@
 const MAX_QUEUE = 3;
+const MAX_HELD = 10;   // while a mode holds clips (modes.js), e.g. during a song
 // Extra wait on top of an item's expected length before the server stops
 // waiting for the clip player (e.g. none is open) and moves on by itself.
 const WATCHDOG_GRACE_MS = 15000;
@@ -9,6 +10,7 @@ let current = null; // item on screen, or null when idle
 let nextId = 0;
 let watchdog = null;
 let broadcast = null;
+let held = false;   // true: nothing new starts; the queue waits
 
 function init(broadcastRaw) {
   broadcast = broadcastRaw;
@@ -39,7 +41,9 @@ function advance() {
   clearTimeout(watchdog);
   watchdog = null;
   current = null;
-  if (queue.length > 0) {
+  if (held) {
+    if (queue.length) console.log(`[media-queue] Holding ${queue.length} until the mode changes`);
+  } else if (queue.length > 0) {
     const next = queue.shift();
     play(next);
     console.log(`[media-queue] Playing next: "${next.title}" (${queue.length} remaining)`);
@@ -49,17 +53,18 @@ function advance() {
 }
 
 function enqueue(payload) {
-  if (!current) {
+  if (!current && !held) {
     play(payload);
     console.log(`[media-queue] Playing: "${payload.title}"`);
     return;
   }
-  if (queue.length >= MAX_QUEUE) {
-    console.log(`[media-queue] Queue full (${MAX_QUEUE}/${MAX_QUEUE}), dropping: "${payload.title}"`);
+  const max = held ? MAX_HELD : MAX_QUEUE;
+  if (queue.length >= max) {
+    console.log(`[media-queue] Queue full (${max}/${max}), dropping: "${payload.title}"`);
     return;
   }
   queue.push(payload);
-  console.log(`[media-queue] Queued (${queue.length}/${MAX_QUEUE}): "${payload.title}"`);
+  console.log(`[media-queue] Queued (${queue.length}/${max})${held ? ' — held' : ''}: "${payload.title}"`);
 }
 
 // A second clip player (e.g. OBS plus a preview tab) reports the same item
@@ -81,4 +86,12 @@ function stopAll() {
   console.log(`[media-queue] Stopped and cleared (dropped ${had} queued)`);
 }
 
-module.exports = { init, enqueue, onEnded, stopAll };
+// Holding: what plays now finishes, new items wait (up to MAX_HELD); letting go plays them in turn
+function setHold(on) {
+  held = !!on;
+  if (!held && !current && queue.length) advance();
+}
+
+const isHeld = () => held;
+
+module.exports = { init, enqueue, onEnded, stopAll, setHold, isHeld };

@@ -121,13 +121,15 @@ authorize it from any browser:
 ```powershell
 $res = Invoke-RestMethod -Method Post -Uri "https://id.twitch.tv/oauth2/device" -Body @{
   client_id = "YOUR_CLIENT_ID"
-  scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers"
+  scopes    = "channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages"
 }
 $res.user_code        # e.g. ABCD-1234
 ```
 
 (`user:write:chat`: the dashboard's message box; `moderator:read:followers`: new followers for
-`!endingtk`. Without them those two features are off; the dashboard offers to authorize again.)
+`!endingtk`; `moderator:manage:banned_users`, `moderator:manage:shoutouts`, `channel:manage:raids`,
+`moderator:manage:chat_messages`: the Chat tab's ban / timeout, Shoutout, raid and pin buttons. Without
+them those features are off; the dashboard offers to authorize again.)
 
 Visit **https://www.twitch.tv/activate**, log in as your **broadcaster** account, and
 enter the code shown. Then poll for the token (the device code is valid for ~30 minutes):

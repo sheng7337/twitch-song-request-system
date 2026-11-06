@@ -38,6 +38,14 @@ WRONG:    /helix/channel-points/custom-rewards
   EventSub's `message_id`. The two arrive in either order
 - Posting: Helix `POST /chat/messages` (`user:write:chat`); `is_sent: false` with `drop_reason`
   when AutoMod etc. holds it back. The message also comes back through EventSub chat
+- Moderating (chat-mod.js), all with the broadcaster as `moderator_id`: ban / timeout = POST
+  `/moderation/bans` body `{data: {user_id, reason, duration?}}` (no duration = ban; 1 s – 14 days),
+  unban and end timeout = the same DELETE. Shoutout POST `/chat/shoutouts` only while live with viewers
+  (400 otherwise), every 2 min, same channel hourly (429). Raid POST `/raids` starts Twitch's 90-second
+  countdown; DELETE cancels (404 = none pending, e.g. already gone). Pin PUT `/chat/pins`
+  (`duration_seconds` 30–1800, none = until the stream ends; one pin per channel, a new one replaces it),
+  DELETE unpins, GET reads it (`moderator:manage:chat_messages`). Twitch's 400s are told apart by their
+  message text ("already banned", "not banned", "may not be banned")
 - `stream.online` / `stream.offline` need no scope; Helix `/streams?user_id=` gives `started_at`
   when the server starts mid-stream
 
@@ -340,7 +348,7 @@ async function subscribeToRedemptions(sessionId) {
 const res = await axios.post('https://id.twitch.tv/oauth2/device', null, {
   params: {
     client_id: clientId,
-    scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers',
+    scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages',
   }
 });
 const { device_code, user_code, interval, expires_in } = res.data;

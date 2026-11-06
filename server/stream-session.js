@@ -1,5 +1,5 @@
 // server/stream-session.js
-// The stream session, for the Chat tab's "to announce" filter: from when the stream went live
+// The stream session, for the Chat tab's "to announce" highlights: from when the stream went live
 // (EventSub stream.online, no permission needed) until the next go-live. While offline the last
 // stream's session stays, so a follow after the stream still waits to be thanked. If the server
 // starts mid-stream, Helix /streams says when it went live. Kept in stream-session.json:

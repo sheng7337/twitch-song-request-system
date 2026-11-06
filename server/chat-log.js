@@ -18,7 +18,7 @@
 //   { kind: 'redeem-status', at, id, status }      — a redemption done or refunded later; in the
 //       redemption's day file (at = the redemption's), applied on load
 //   { kind: 'chat-first', at, id }                  — the flag arrived after the message; applied on load
-//   { kind: 'announced', at, ids, done }            — ✓ in the Chat tab's "to announce" (done: false = undone);
+//   { kind: 'announced', at, ids, done }            — ✓ on a Chat tab "to announce" highlight (done: false = undone);
 //       in the records' day file, applied on load as `announced: true`
 // user = { id, login, name, color, badges: ['moderator', 'subscriber', ...] }
 // parts = the message split into text / emote / mention / cheer, for drawing emotes.
@@ -251,7 +251,7 @@ function markFirst(id) {
   send({ type: 'chat-first', id });
 }
 
-// Records marked announced (✓ in the Chat tab's "to announce"), or brought back. One line per day
+// Records marked announced (✓ on a Chat tab "to announce" highlight), or brought back. One line per day
 // file (at = the records'), applied on load.
 function setAnnounced(items, done) {
   const byDay = new Map();

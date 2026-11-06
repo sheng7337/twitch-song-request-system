@@ -35,3 +35,22 @@ test('!stop clears the queue and cancels the watchdog', () => {
   assert.strictEqual(sent.length, count);
   assert.strictEqual(last().type, 'media-stop');
 });
+
+test('a mode holding clips: the one on screen finishes, new ones wait, letting go plays them', () => {
+  mediaQueue.enqueue({ title: 'E', kind: 'video', duration: 10 });
+  mediaQueue.setHold(true);
+  assert.strictEqual(mediaQueue.isHeld(), true);
+  for (const title of ['F', 'G', 'H', 'I']) mediaQueue.enqueue({ title, kind: 'video', duration: 10 });   // more than 3 while held
+  mediaQueue.onEnded(last().mediaId);
+  assert.strictEqual(last().title, 'E');
+  const count = sent.length;
+  test.mock.timers.tick(10 * 60_000);
+  assert.strictEqual(sent.length, count);
+  mediaQueue.setHold(false);
+  assert.strictEqual(last().title, 'F');
+  for (const title of ['G', 'H', 'I']) {
+    mediaQueue.onEnded(last().mediaId);
+    assert.strictEqual(last().title, title);
+  }
+  mediaQueue.stopAll();
+});

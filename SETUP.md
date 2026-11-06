@@ -142,7 +142,7 @@ Mods and the broadcaster only — viewers can't trigger them.
 
 | Command | Description |
 |---|---|
-| `!so <user>` | Plays a random clip of that channel and adds it to the sponsor roll |
+| `!so <user>` | Sends Twitch's Shoutout (while you're live), plays a random clip of that channel and adds it to the sponsor roll |
 | `!tk` | Japanese-TV-style sponsor roll of every channel `!so`'d this stream, then clears the list |
 | `!endingtk` | The same roll for everyone who supported this stream, one heading each: raiders, subscribers (gifters and gifted viewers), cheers, new followers, channel-point redeemers, song requesters and the 8 most active chatters — since the last `!endingtk`. Who it would thank now: Chat tab ⚙ |
 | `!watch <url>` | Plays a Twitch clip, a YouTube video or a video file link (mp4/webm) |
@@ -161,7 +161,7 @@ Open `http://localhost:3000/dashboard` during streams.
 
 | Feature | Description |
 |---|---|
-| 💬 Chat | Live chat with filters, **To announce**, a message box and redemption buttons — see [Chat tab](#chat-tab) below |
+| 💬 Chat | Live chat with filters, highlighted messages to announce, a message box and redemption buttons — see [Chat tab](#chat-tab) below |
 | Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Settings** at the right end of its top row opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
@@ -183,17 +183,18 @@ The 💬 Chat tab shows your Twitch chat live, together with channel-point redem
 follows. It's kept on this PC for `CHAT_LOG_DAYS` days (default 30): pick an earlier day from the date
 list. Messages mods delete show struck through.
 
-- **Filters:** to announce, songs mentioned, commands, mods & VIPs, subscribers, @mentions, first-time
+- **Filters:** songs mentioned, commands, mods & VIPs, subscribers, @mentions, first-time
   chatters, highlighted messages & bits, redemptions, waiting redemptions, and subs, raids & follows.
-  Click a name to see only that viewer. The search box looks in messages and names. Bots are hidden
-  while **Hide bots** is ticked.
-- **To announce:** what to thank or greet on stream — subs, resubs and gifted subs (a gift of several
-  subs as one line), raids, cheers, new followers, watch streaks, highlighted messages, first-time
-  chatters, and each viewer's first message this stream (tagged *first words this stream*; bots and
-  you are left out). **✓** checks one off and **✓ All** checks off everything shown. **Show announced**
-  brings the checked ones back into view; clicking **✓ announced** on one puts it back on the list.
-  The chip shows how many are left. A new session starts when your stream goes live; until then,
-  anything not checked off stays.
+  The search box looks in messages and names. Bots are hidden while **Hide bots** is ticked.
+- **To announce:** what to thank or greet on stream is highlighted in amber, right in the chat — subs,
+  resubs and gifted subs (a gift of several subs as one line), raids, cheers, new followers, watch
+  streaks, channel-point redemptions, highlighted messages, first-time chatters, and each viewer's first message this stream
+  (tagged *first words this stream*; bots and you are left out). **✓** on one removes its highlight
+  (on a redemption it's **✓ Announce**, apart from its **✓ Done**).
+  Changed your mind? Point at the row and click **✓ announced** to highlight it again. In the filter
+  row, **To announce: N ↓** jumps to the oldest one still highlighted (showing all chat if a filter
+  hides it), and **✓ Mark all announced** clears them all. A new session starts when your stream goes
+  live; until then, anything not checked off stays highlighted.
 - **First-time chatters** are the viewers Twitch itself highlights: their first message in your channel ever.
 - **Songs mentioned:** **♪** on a sheet song named in chat adds it to the queue with the viewer as
   requester. It shows when the song was last sung: amber within the random cooldown, 📺 when it was
@@ -204,6 +205,17 @@ list. Messages mods delete show struck through.
   **↪ Reply** (shown when you point at a message) answers that message; ✕ or Esc cancels. When Twitch
   holds a message back (AutoMod, slow mode…), your text stays in the box and the reason is shown.
   **↗ Twitch chat** still opens Twitch's own chat window.
+- **Moderating:** click a name for its menu: **👤 Only this viewer's messages** (click again to show
+  everyone), **📣 Shoutout**, **🚀 Raid**, **Timeout** (1m / 10m / 1h / 1d, or type a length), **✅ Unban /
+  end timeout** and **🚫 Ban** (asks once more). The reason box is optional and goes with a ban or timeout.
+  **🛡 Moderate** at the top opens the same menu for anyone, by channel name — e.g. to unban someone who
+  isn't in the chat. **Shoutout** sends Twitch's own Shoutout (the follow pop-up) and plays one of their
+  clips, like `!so`; Twitch only allows it while you're live, every 2 minutes (once an hour for the same
+  channel), so outside that the clip still plays and you're told why. **Raid** first shows whether that
+  channel is live and how many viewers it has; click again to go. Twitch then counts down 90 seconds
+  (shown above the chat, with **Cancel raid**). **📌** (shown when you point at a message) pins it to the
+  top of your Twitch chat for 1, 5 or 30 minutes or until the stream ends; the pinned message shows above
+  the chat with **Unpin**. Setups from before these buttons need to authorize again once: the menu links to it.
 - **Redemptions:** a waiting redemption of a reward this app made gets **✓ Done** and **↩ Refund**
   (Refund asks once more: Twitch can't undo it). Song requests settle themselves: done when you press
   ✓ Finished (or drag the song to Played), refunded when you remove it from the queue or Pending.
@@ -219,6 +231,44 @@ list. Messages mods delete show struck through.
 **Updating from an earlier version:** new followers (for `!endingtk`) and posting in chat need Twitch
 permissions that older setups didn't ask for. The Chat tab then shows **Authorize again →**, which
 takes you to the wizard's authorization step once; nothing else changes.
+
+---
+
+## Modes (🎛 Modes tab)
+
+Buttons at the top of the dashboard, e.g. **🎤 Singing**, **💬 Talking** and **☕ Break**. One click puts
+Streamlabs Desktop or OBS Studio back the way you saved the mode and does this app's part.
+
+- **Connect once** (🎛 Modes → Streaming app):
+  - **Streamlabs Desktop:** Settings → Remote Control → click the QR code → **Show details**, and copy the
+    token into the dashboard. Never show that QR code on stream.
+  - **OBS Studio 30 or newer:** Tools → WebSocket Server Settings → tick **Enable WebSocket server**. If
+    authentication is on, copy the password from **Show Connect Info**.
+  - Both only work on this PC. The token or password is kept in `.env`.
+- **Making a mode:** set the streaming app up by hand the way it should look, then press **＋ New mode from
+  what's on now** (or one of the 🎤 / 💬 / ☕ starters). The mode saves:
+  - the scene;
+  - which items show in it and in the scenes and groups inside it;
+  - each sound's mute and volume (% in Streamlabs, dB in OBS, as their mixers show them).
+- **Changing a mode:** **✎ Edit** shows its contents. Tick **👁** for what shows, **🔇** for muted, or set a
+  volume. **✕** leaves an item out, so the mode doesn't touch it. **📥 Save what … shows now into this mode**
+  takes it all again from the streaming app.
+- **Dual Output (Streamlabs):** each item is there once per canvas, listed under "horizontal canvas" and
+  "vertical canvas". Each canvas has its own 👁 and 📍.
+- **📍 Position:** ticked items are also put back where they were saved (position, size, rotation, crop).
+  Unticked (the default), they stay where you placed them. A mode never moves anything if the canvas size
+  changed since it was saved; save it again.
+- **This app's part:** a chat message posted when switching to the mode; **⏸ Hold clips**, where clips
+  from `!so`, `!watch` and `!tk` wait (up to 10) until you switch to another mode, and one already
+  playing finishes; and a dashboard tab to open.
+- **When things change in the streaming app:**
+  - Renamed items, scenes and sounds are still found.
+  - An item deleted and made again with the same name is found by its name.
+  - Missing ones are skipped while everything else is applied. The notice names them, and the mode's
+    button and editor show ⚠ with **Pick a replacement…** or **✕**.
+  - Items added later aren't touched. The editor lists them under "Not in this mode" with **＋** to add one.
+- **Studio Mode:** in OBS, a mode changes the program scene. In Streamlabs Desktop it may only change the
+  preview; press Transition.
 
 ---
 
@@ -300,7 +350,7 @@ vtuber-song-queue/
 ├── chat-logs/                ← Chat tab log, one file per day (kept CHAT_LOG_DAYS days)
 ├── ending-credits.json       ← when !endingtk last ran
 ├── reward-takeovers.json     ← rewards handed over to the app (Chat ⚙)
-├── stream-session.json       ← when the stream last went live (Chat tab "To announce")
+├── stream-session.json       ← when the stream last went live (Chat tab, what to announce)
 ├── server/                   ← the server (see CLAUDE.md for every file)
 │   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk, !endingtk)
 ├── shared/                   ← English / 繁體中文 strings shared by the pages

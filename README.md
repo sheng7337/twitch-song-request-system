@@ -13,7 +13,7 @@ Twitch 頻道點數點歌，附 OBS 顯示層與連麥 Shoutout 功能。
 
 **每次直播**：雙擊 `start_zh.bat`，就這樣。
 
-**控制台**：`http://localhost:3000/dashboard` — 點歌佇列、雷虎練唱台，以及聊天室（篩選、要宣讀、直接發言和回覆、完成或退還兌換）。
+**控制台**：`http://localhost:3000/dashboard` — 點歌佇列、雷虎練唱台，以及聊天室（篩選、標示要宣讀的訊息、直接發言和回覆、封鎖／禁言／Shoutout／揪團／置頂、完成或退還兌換），以及模式（一鍵切換 Streamlabs／OBS 的場景、顯示項目、音訊，並暫停 Clip、在聊天室發言）。
 
 > 完整說明請見 [SETUP_zh_TW.md](SETUP_zh_TW.md)
 
@@ -37,7 +37,7 @@ body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow
 
 | 指令 | 說明 |
 |---|---|
-| `!so <帳號>` | 播放指定頻道的隨機 Clip，並記錄至感謝名單 |
+| `!so <帳號>` | 送出 Twitch 的 Shoutout，播放指定頻道的隨機 Clip，並記錄至感謝名單 |
 | `!tk` | 播放感謝名單，列出本場所有 `!so` 的頻道 |
 | `!endingtk` | 片尾感謝名單：揪團、訂閱、小奇點、新追隨、兌換、點歌和最活躍的聊天觀眾 |
 | `!watch <網址>` | 播放 Twitch Clip、YouTube 或影片連結 |
