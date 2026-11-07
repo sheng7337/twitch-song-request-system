@@ -1111,6 +1111,12 @@
       <button class="btn danger" onclick="if(confirm(I18N.t('dash.clearConfirm'))) api('clear')" data-i18n="dash.clearAll">✕ Clear All</button>
     </div>
   </section>
+  <!-- This copy's version (package.json, /api/version) and what each release changed -->
+  <section>
+    <h3 data-i18n="dash.set.versionTitle">Version</h3>
+    <p class="setting-hint"><span id="app-version">…</span> ·
+      <a href="https://github.com/sheng7337/twitch-song-request-system/releases" target="_blank" rel="noopener" data-i18n="dash.set.releases">What's new in each release</a></p>
+  </section>
 </div>
 
 <div class="board">
@@ -1602,6 +1608,15 @@ async function loadHistory() {
     historyData = await res.json();
     // Snapshot the data at load time — never overwrite during session
     render();
+  } catch(_) {}
+}
+
+// This copy's version, in the Song Queue ⚙ and on the title's hover
+async function loadVersion() {
+  try {
+    const { version } = await (await fetch('/api/version')).json();
+    document.getElementById('app-version').textContent = version;
+    document.querySelector('.topbar-title').title = version;
   } catch(_) {}
 }
 
@@ -3824,6 +3839,7 @@ loadSongList();
 loadHistory();
 loadSettings();
 loadNodeStatus();
+loadVersion();
 pollLeihu();
 setInterval(pollLeihu, 5000);
 </script>

@@ -23,7 +23,7 @@ Twitch 頻道點數點歌，附 OBS 顯示層與連麥 Shoutout 功能。
 
 | 來源 | 網址 | 尺寸 |
 |---|---|---|
-| 歌單顯示層 | `http://localhost:3000/overlay/index.html` | 960×1362，縮小至 50% |
+| 歌單顯示層 | `http://localhost:3000/overlay/index.html` | 960×1470，縮小至 50%（480×735） |
 | Clip Player | `http://localhost:3000/clip-player/index.html` | 1920×1080 |
 
 歌單顯示層 Custom CSS：

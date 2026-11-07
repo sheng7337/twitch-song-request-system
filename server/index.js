@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const { version: APP_VERSION } = require('../package.json');   // YYYY.MM-W, see CHANGELOG.md
 const fs = require('fs');
 const { isAllowedRequest } = require('./request-guard');
 
@@ -643,6 +644,7 @@ app.post('/api/pending/add-to-sheet', async (req, res) => {
 
 app.get('/api/history', (req, res) => res.json(getHistory()));
 app.get('/api/node-status', (req, res) => res.json(nodeStatus()));
+app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
 app.get('/api/songs', (req, res) => {
   const { getSongs } = require('./sheets');
   res.json(getSongs());
@@ -901,7 +903,7 @@ async function start() {
   leihu.start();
 
   server.listen(PORT, () => {
-    console.log(`\n✅ Server running at http://localhost:${PORT}`);
+    console.log(`\n✅ Song Queue ${APP_VERSION} running at http://localhost:${PORT}`);
     if (isSetupComplete()) {
       console.log(`   Dashboard:  http://localhost:${PORT}/dashboard`);
       console.log(`   Overlay:    http://localhost:${PORT}/overlay/index.html`);

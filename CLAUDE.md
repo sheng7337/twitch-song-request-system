@@ -526,6 +526,7 @@ register it in index.js.
 | GET | `/api/songs` | Full song list (for dashboard autocomplete) |
 | GET | `/api/history` | Request history snapshot (startup state) |
 | GET | `/api/node-status` | `{version, minimum, outdated}` — is Node.js missing security fixes |
+| GET | `/api/version` | `{version}` — this copy's version (package.json), shown in Song Queue ⚙ |
 | GET/POST | `/api/settings` | Random cooldown days, overlay panel opacity, text brightness, overlay language, Leihu auto-prepare |
 | GET | `/api/hls`, `/api/clip-stream` | Proxies for Twitch clip playback (Twitch hosts only) |
 | GET | `/api/leihu/status` | Leihu state of nowPlaying + queue, keyed by title + artist |
@@ -639,6 +640,18 @@ See `.env.example` for full descriptions.
   starts anyway), the server log and a dashboard banner (`/api/node-status`; closing it lasts until
   the page is opened again). Unlisted older or odd lines count as outdated. When Node.js ships a
   security release, update `secureNode`
+
+---
+
+## Versions and releases
+
+- `YYYY.MM-W` (e.g. `2026.11-1`): year, two-digit month, and which release weekend of the month, counted by
+  its Saturday (a weekend across two months belongs to the Saturday's). A hotfix between weekends adds `.N`
+  (`2026.11-1.1`). Not SemVer: compare versions by these parts, not with a SemVer library
+- The same string in package.json, the git tag (`v2026.11-1`), the GitHub Release title and the dashboard
+  (`/api/version`). package-lock.json is gitignored
+- CHANGELOG.md (English + 中文) per release: **⚠ Action needed** first (Browser Source sizes, authorizing
+  Twitch again, .env changes), then what's new and fixed
 
 ---
 
