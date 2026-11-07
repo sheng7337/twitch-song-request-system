@@ -775,6 +775,13 @@
   .modes-head .col-title { flex: 1; }
   .mode-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; }
   .mode-card.active { border-color: var(--purple); }
+  .mode-card.dragging { opacity: 0.6; border-style: dashed; }
+  .mode-move { display: flex; align-items: center; gap: 2px; }
+  .mode-grip { cursor: grab; touch-action: none; user-select: none; color: var(--text-dim); font-size: 18px; padding: 2px 4px; }
+  .mode-grip:hover { color: var(--purple); }
+  body.mode-dragging, body.mode-dragging .mode-grip { cursor: grabbing; user-select: none; }
+  .mode-arrows { display: flex; flex-direction: column; gap: 2px; }
+  .mode-card .mode-arrows .btn { font-size: 10px; padding: 0 6px; line-height: 1.4; }
   .mode-card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
   .mode-icon { width: 52px; text-align: center; }
   .mode-name { width: 160px; }
@@ -789,6 +796,12 @@
   .mode-table tr.missing td.name { color: var(--amber); }
   .mode-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--purple); vertical-align: middle; }
   .mode-table label { white-space: nowrap; cursor: pointer; }
+  .mode-tog {
+    background: none; border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+    font-size: 15px; line-height: 1.3; color: var(--text); cursor: pointer; filter: grayscale(1); opacity: 0.4;
+  }
+  .mode-tog.on { filter: none; opacity: 1; border-color: var(--purple); }
+  .mode-tog:hover { border-color: var(--purple); }
   .mode-table select { max-width: 220px; }
   .mode-vol { width: 76px; }
   .mode-extra { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--text-dim); }
@@ -3159,7 +3172,7 @@ I18N.onChange(() => {
 // The top bar's buttons switch; the 🎛 Modes tab connects Streamlabs / OBS and edits modes, saved as
 // they're made. view = GET /api/modes: live = what the streaming app shows (read when the tab opens,
 // or ↻), issues = what each mode no longer finds and what's new in its scenes.
-const modes = { view: null, open: new Set(), busy: false };
+const modes = { view: null, open: new Set(), busy: false, dragging: false };
 const MODE_PRESETS = [['🎤', 'sing', { holdClips: true, tab: 'queue' }], ['💬', 'talk', { tab: 'chat' }], ['☕', 'break', {}]];
 const appName = app => ({ streamlabs: 'Streamlabs Desktop', obs: 'OBS Studio' })[app] || app;
 const modeById = id => modes.view && modes.view.modes.find(m => m.id === id);
@@ -3240,6 +3253,7 @@ async function switchMode(id) {
 // ── The 🎛 Modes tab ──
 
 function paintModes() {
+  if (modes.dragging) return;   // painted when the drag ends
   paintModeConnection();
   const v = modes.view;
   const list = document.getElementById('modes-list');
@@ -3318,6 +3332,13 @@ function modeCard(m, i) {
   return `
   <div class="mode-card${v.active === m.id ? ' active' : ''}" data-id="${esc(m.id)}">
     <div class="mode-card-head">
+      ${v.modes.length > 1 ? `<div class="mode-move">
+        <span class="mode-grip" title="${esc(t('dash.modes.drag'))}" aria-hidden="true">⠿</span>
+        <div class="mode-arrows">
+          <button class="btn" data-act="up"${i === 0 ? ' disabled' : ''} title="${esc(t('dash.modes.up'))}" aria-label="${esc(t('dash.modes.up'))}">▲</button>
+          <button class="btn" data-act="down"${i === v.modes.length - 1 ? ' disabled' : ''} title="${esc(t('dash.modes.down'))}" aria-label="${esc(t('dash.modes.down'))}">▼</button>
+        </div>
+      </div>` : ''}
       <input class="modes-input mode-icon" data-f="icon" maxlength="8" value="${esc(m.icon)}" aria-label="${esc(t('dash.modes.iconLabel'))}">
       <input class="modes-input mode-name" data-f="name" maxlength="30" value="${esc(m.name)}" aria-label="${esc(t('dash.modes.nameLabel'))}">
       <span class="mode-sum">${esc(sum)}${issue ? ` <span class="mode-warn">⚠ ${esc(issue)}</span>` : ''}</span>
@@ -3326,8 +3347,6 @@ function modeCard(m, i) {
     </div>
     ${open ? `<div class="mode-body">${modeStreamPart(m, is)}${modeAppPart(m)}
       <div class="mode-foot">
-        <button class="btn" data-act="up"${i === 0 ? ' disabled' : ''} title="${esc(t('dash.modes.up'))}" aria-label="${esc(t('dash.modes.up'))}">↑</button>
-        <button class="btn" data-act="down"${i === v.modes.length - 1 ? ' disabled' : ''} title="${esc(t('dash.modes.down'))}" aria-label="${esc(t('dash.modes.down'))}">↓</button>
         <span class="topbar-spacer"></span>
         <button class="btn danger" data-act="delete">${esc(t('dash.modes.delete'))}</button>
       </div></div>` : ''}
@@ -3384,7 +3403,7 @@ function modeStreamPart(m, is) {
     html += missingItem.has(`${it.scene.id}/${it.item.id}`)
       ? `<tr class="missing" data-i="${n}"><td>⚠</td><td class="name">${notFound(it.item.name)}</td>
           <td>${live ? `<select class="lang-select" data-fix="item">${pick}${liveItemOptions()}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
-      : `<tr data-i="${n}"><td><label title="${esc(t('dash.modes.visible'))}"><input type="checkbox" data-f="visible"${it.visible ? ' checked' : ''}> 👁</label></td>
+      : `<tr data-i="${n}"><td>${modeToggle('show', it.visible)}</td>
           <td class="name">${esc(it.item.name)}</td>
           <td><label title="${esc(t('dash.modes.move'))}"><input type="checkbox" data-f="move"${it.move ? ' checked' : ''}${it.place ? '' : ' disabled'}> 📍</label></td>
           <td>${dropBtn()}</td></tr>`;
@@ -3405,7 +3424,7 @@ function modeStreamPart(m, is) {
       ? `<tr class="missing" data-a="${n}"><td>⚠</td><td class="name">${notFound(a.name)}</td>
           <td colspan="2">${live ? `<select class="lang-select" data-fix="audio">${pick}${live.audio.map(x =>
             `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
-      : `<tr data-a="${n}"><td><label title="${esc(t('dash.modes.muted'))}"><input type="checkbox" data-f="muted"${a.muted ? ' checked' : ''}> 🔇</label></td>
+      : `<tr data-a="${n}"><td>${modeToggle('sound', !a.muted)}</td>
           <td class="name">${esc(a.name)}</td>
           <td><input class="modes-input mode-vol" type="number" data-f="volume" value="${a.volume == null ? '' : a.volume}"
             ${unit === 'dB' ? 'min="-100" max="26" step="0.5"' : 'min="0" max="100" step="1"'} aria-label="${esc(t('dash.modes.volume', { unit }))}"></td>
@@ -3438,6 +3457,13 @@ function modeAppPart(m) {
 }
 
 // Saves a mode; `reread` reads the streaming app again (what's missing or new may have changed)
+// 👁 / 🔊 when on, 🚫 / 🔇 (dimmed) when off, like the streaming app's own buttons; a click flips it
+function modeToggle(kind, on) {
+  const tip = t(`dash.modes.${kind}.${on ? 'on' : 'off'}`);
+  const icon = kind === 'show' ? (on ? '👁' : '🚫') : (on ? '🔊' : '🔇');
+  return `<button type="button" class="mode-tog${on ? ' on' : ''}" data-act="flip" data-kind="${kind}" aria-pressed="${on}" title="${esc(tip)}" aria-label="${esc(tip)}">${icon}</button>`;
+}
+
 async function saveMode(m, reread) {
   try {
     Object.assign(m, await modPost('/api/modes/save', { mode: m }));
@@ -3463,6 +3489,49 @@ async function newMode(preset) {
 }
 
 const modesList = document.getElementById('modes-list');
+
+async function orderModes(ids) {
+  try { await modPost('/api/modes/order', { ids }); } catch (err) { showToast(err.message, true); }
+  loadModes(true);
+}
+
+// Drag a mode by its ⠿ handle, with the mouse or a finger. The card moves as it's dragged;
+// the new order is saved on letting go. Listened for on the document: moving the card in the page
+// would drop a pointer capture on its handle.
+modesList.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('.mode-grip');
+  if (!grip || e.button > 0) return;
+  e.preventDefault();
+  const card = grip.closest('.mode-card');
+  const before = [...modesList.children].map(c => c.dataset.id).join();
+  const page = modesList.closest('.modes-page');
+  grip.setPointerCapture(e.pointerId);
+  modes.dragging = true;
+  card.classList.add('dragging');
+  document.body.classList.add('mode-dragging');
+  const move = (ev) => {
+    // Near the top or bottom edge, scroll the page
+    const box = page.getBoundingClientRect();
+    if (ev.clientY < box.top + 40) page.scrollTop -= 12;
+    else if (ev.clientY > box.bottom - 40) page.scrollTop += 12;
+    // Before the first card whose middle is below the pointer
+    const next = [...modesList.children].find(c => c !== card && ev.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
+    if (next !== card.nextElementSibling) modesList.insertBefore(card, next || null);
+  };
+  const end = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    modes.dragging = false;
+    card.classList.remove('dragging');
+    document.body.classList.remove('mode-dragging');
+    const ids = [...modesList.children].map(c => c.dataset.id);
+    if (ids.join() !== before) orderModes(ids); else paintModes();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+});
 
 modesList.addEventListener('change', (e) => {
   const card = e.target.closest('.mode-card');
@@ -3508,6 +3577,14 @@ modesList.addEventListener('click', async (e) => {
     if (modes.open.has(m.id)) modes.open.delete(m.id); else modes.open.add(m.id);
     return paintModes();
   }
+  if (act === 'flip') {
+    const kind = btn.dataset.kind;
+    let on;
+    if (kind === 'show') { const it = m.items[row.dataset.i]; on = it.visible = !it.visible; }
+    else { const a = m.audio[row.dataset.a]; a.muted = !a.muted; on = !a.muted; }
+    btn.outerHTML = modeToggle(kind, on);
+    return saveMode(m, false);
+  }
   if (act === 'drop') {
     if (row.dataset.i != null) m.items.splice(row.dataset.i, 1); else m.audio.splice(row.dataset.a, 1);
     return saveMode(m, true);
@@ -3536,8 +3613,7 @@ modesList.addEventListener('click', async (e) => {
     const ids = modes.view.modes.map(x => x.id);
     const i = ids.indexOf(m.id), j = i + (act === 'up' ? -1 : 1);
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    try { await modPost('/api/modes/order', { ids }); } catch (err) { showToast(err.message, true); }
-    return loadModes(true);
+    return orderModes(ids);
   }
   if (act === 'delete') {
     if (!modArmed(btn, t('dash.modes.deleteConfirm'))) return;

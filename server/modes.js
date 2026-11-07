@@ -5,7 +5,7 @@
 // open a dashboard tab.
 //
 // A mode is saved from what the streaming app shows (capture): the current scene and the scenes and
-// groups inside it, and every audio source. Things are found again by ID, then by name (a source
+// groups inside it, and the audio heard in them (heard). Things are found again by ID, then by name (a source
 // deleted and made again keeps its name but not its ID); found by name, the mode takes the new ID.
 // Missing ones are skipped and reported; things added later are left alone and listed as `extra`.
 // Saved in stream-modes.json.
@@ -132,8 +132,9 @@ function check(mode, snap) {
 // The streaming app as it is now, as a mode's scene, items and audio
 function capture(snap) {
   const scene = snap.scenes.find(s => s.id === snap.current);
+  const tree = sceneTree(snap, scene);
   const items = [];
-  for (const s of sceneTree(snap, scene)) {
+  for (const s of tree) {
     // The horizontal canvas's items first, then the vertical one's
     for (const i of [...s.items].sort((a, b) => (a.display === 'vertical') - (b.display === 'vertical'))) {
       items.push({
@@ -146,8 +147,17 @@ function capture(snap) {
     app: snap.app, canvas: snap.canvas || null,
     scene: scene ? { id: scene.id, name: scene.name } : null,
     items,
-    audio: snap.audio.map(a => ({ id: a.id, name: a.name, muted: a.muted, volume: a.volume })),
+    audio: heard(snap, tree).map(a => ({ id: a.id, name: a.name, muted: a.muted, volume: a.volume })),
   };
+}
+
+// The sound these scenes can put on stream: their own sources' audio, and the devices that are in
+// no scene (Desktop Audio, Mic/Aux), which are heard in all of them. A sound's mute and volume
+// belong to its source, so the other scenes' sources are left alone.
+function heard(snap, tree) {
+  const inTree = new Set(tree.flatMap(s => s.items.map(i => i.sourceId)));
+  const inAny = new Set(snap.scenes.flatMap(s => s.items.map(i => i.sourceId)));
+  return snap.audio.filter(a => inTree.has(a.id) || !inAny.has(a.id));
 }
 
 const text = (v, max) => String(v == null ? '' : v).slice(0, max);

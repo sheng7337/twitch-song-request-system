@@ -311,3 +311,19 @@ test('Streamlabs Dual Output: each source has an item per canvas, kept and found
   assert.deepStrictEqual(again.items.map(i => i.item.display), ['horizontal', 'vertical']);
   modes.remove(mode.id);
 });
+
+test('a mode keeps only the audio heard in its scenes, and the devices that are in no scene', async (t) => {
+  const sl = fakeStreamlabs('tok');
+  t.after(() => sl.server.close());
+  sl.scenes[2].nodes.push({ sceneNodeType: 'item', sceneItemId: 'i4', sourceId: 'talkmusic', name: 'Talk music', visible: true, transform: place(0, 0), resourceId: 'SceneItem[i4]' });
+  sl.audio.push(
+    { sourceId: 'lyrics', name: 'Lyrics', muted: false, fader: { deflection: 1 }, resourceId: 'AudioSource[lyrics]' },
+    { sourceId: 'talkmusic', name: 'Talk music', muted: false, fader: { deflection: 1 }, resourceId: 'AudioSource[talkmusic]' },
+  );
+  useApp('streamlabs', sl.port(), 'tok');
+  const sing = await modes.create({ name: 'Singing', icon: '🎤' });
+  assert.deepStrictEqual(sing.audio.map(a => a.name), ['Mic', 'BGM', 'Lyrics']);   // Lyrics: in a scene inside Singing
+  sl.current = 'sc_talk';
+  await modes.recapture(sing.id);
+  assert.deepStrictEqual(sing.audio.map(a => a.name), ['Mic', 'BGM', 'Talk music']);   // re-saved: trimmed to Talking's
+});

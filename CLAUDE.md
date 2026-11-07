@@ -237,7 +237,7 @@ vtuber-song-queue/
   - The socket's message handler is attached before it opens: OBS's Hello can arrive in the same tick
 - modes.js: a mode = `{ id, name, icon, app, canvas, scene, items: [{ scene, item: {id, sourceId, name}, visible,
   place, move }], audio: [{ id, name, muted, volume }], chat, holdClips, tab }` in stream-modes.json. `capture` takes
-  the current scene, the scenes / groups inside it (`sceneTree`) and all audio.
+  the current scene, the scenes / groups inside it (`sceneTree`) and the audio heard there (`heard`: their sources' audio + devices in no scene).
   - `resolve`: finds things by ID first, then by name (only when one matches). It writes the found IDs and
     names back into the mode. Missing ones are skipped and listed; `check` also lists `extra` (in the mode's
     scenes but not in the mode).

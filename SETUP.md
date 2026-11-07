@@ -249,10 +249,12 @@ Streamlabs Desktop or OBS Studio back the way you saved the mode and does this a
   what's on now** (or one of the 🎤 / 💬 / ☕ starters). The mode saves:
   - the scene;
   - which items show in it and in the scenes and groups inside it;
-  - each sound's mute and volume (% in Streamlabs, dB in OBS, as their mixers show them).
-- **Changing a mode:** **✎ Edit** shows its contents. Tick **👁** for what shows, **🔇** for muted, or set a
-  volume. **✕** leaves an item out, so the mode doesn't touch it. **📥 Save what … shows now into this mode**
-  takes it all again from the streaming app.
+  - the mute and volume of the sounds heard in those scenes: their sources, plus devices that are in no
+    scene, like Desktop Audio and the mic (% in Streamlabs, dB in OBS, as their mixers show them). Other
+    scenes' sounds are left alone; add one with **＋** if a mode should set it too.
+- **Changing a mode:** **✎ Edit** shows its contents. Click **👁 / 🚫** to show or hide an item and
+  **🔊 / 🔇** to turn a sound on or off (dimmed = off), or set a volume. **✕** leaves an item out, so the mode doesn't touch it.
+  **📥 Save what … shows now into this mode** takes it all again from the streaming app.
 - **Dual Output (Streamlabs):** each item is there once per canvas, listed under "horizontal canvas" and
   "vertical canvas". Each canvas has its own 👁 and 📍.
 - **📍 Position:** ticked items are also put back where they were saved (position, size, rotation, crop).
