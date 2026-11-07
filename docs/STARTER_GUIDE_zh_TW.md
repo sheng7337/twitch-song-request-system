@@ -79,7 +79,7 @@ Node.js 是點歌系統執行時需要的程式，裝一次就好。
 
 ## 5. 下載點歌系統
 
-1. 下載這個檔案：[**點歌系統 ZIP**](https://github.com/sheng7337/twitch-song-request-system/archive/refs/heads/master.zip)
+1. 打開[**最新版本**](https://github.com/sheng7337/twitch-song-request-system/releases/latest)，在最下面的「**Assets**」點「**Source code (zip)**」
 2. 在下載的 ZIP 檔按**右鍵 → 內容**，如果最下面有「**解除封鎖**」，把它勾起來 → 確定
    （這樣之後執行時 Windows 就不會一直跳出安全性警告）
 3. 在 ZIP 檔按右鍵 → **解壓縮全部** → 解壓縮到一個簡單的位置，例如 `C:\SongQueue`（路徑用英文比較保險）
@@ -97,8 +97,7 @@ Node.js 是點歌系統執行時需要的程式，裝一次就好。
 
 ### 6-1. 用範本建立試算表
 
-1. 下載範本：[**song-list-template.xlsx**](https://github.com/sheng7337/twitch-song-request-system/raw/master/docs/song-list-template.xlsx)
-   （解壓縮的資料夾裡也有：`docs\song-list-template.xlsx`）
+1. 範本在[第 5 章](#5-下載點歌系統)解壓縮出來的資料夾裡：`docs\song-list-template.xlsx`
 2. 打開 [sheets.new](https://sheets.new)（會建立一份空白的 Google 試算表）
 3. 選單「**檔案 → 匯入**」→「**上傳**」→ 把範本檔案拖進去
 4. 「匯入位置」選「**取代試算表**」→ 按「**匯入資料**」
@@ -281,8 +280,9 @@ Node.js 是點歌系統執行時需要的程式，裝一次就好。
 ## 12. 更新到新版本
 
 1. 關掉黑色視窗
-2. 用[第 5 章](#5-下載點歌系統)的連結下載新的 ZIP，一樣先「解除封鎖」再解壓縮
-3. 打開解壓縮出來的資料夾（名字是 `twitch-song-request-system-master`），**全選裡面的東西 → 複製**
+2. 到[最新版本](https://github.com/sheng7337/twitch-song-request-system/releases/latest)下載新的 ZIP（「**Source code (zip)**」，跟[第 5 章](#5-下載點歌系統)一樣），先「解除封鎖」再解壓縮。
+   先看一下版本說明：「**⚠ 需要動手**」底下是這個版本要做一次的事
+3. 打開解壓縮出來的資料夾（名字帶有版本號，例如 `twitch-song-request-system-2026.11-1`），**全選裡面的東西 → 複製**
 4. 貼到你原本的點歌系統資料夾 → 選「**取代目的地中的檔案**」
 
 你的設定（`.env`）、Google 金鑰和歌單紀錄不在 ZIP 裡，所以**不會被覆蓋**。之後照常雙擊 `start_zh.bat`。

@@ -13,6 +13,11 @@ the dashboard under 🎵 Song Queue → ⚙ Settings. Read **⚠ Action needed**
 
 The first official release. 第一個正式版本。
 
+### 🚀 First time? / 第一次使用？
+
+- 新手入門（從零開始，不需要會寫程式）：https://github.com/sheng7337/twitch-song-request-system/blob/v2026.11-1/docs/STARTER_GUIDE_zh_TW.md
+- Starter Guide (English): https://github.com/sheng7337/twitch-song-request-system/blob/v2026.11-1/docs/STARTER_GUIDE.md
+
 **Works with:** Node.js LTS · Leihu Singsing 1.6.x (checked with 1.6.8) · for modes, Streamlabs Desktop
 or OBS Studio 30+.
 **搭配**：Node.js LTS · 雷虎練唱台 1.6.x（以 1.6.8 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30 以上。

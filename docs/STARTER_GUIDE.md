@@ -83,7 +83,7 @@ Node.js is what the song queue runs on. You install it once.
 
 ## 5. Download the song queue
 
-1. Download this file: [**the song queue (ZIP)**](https://github.com/sheng7337/twitch-song-request-system/archive/refs/heads/master.zip)
+1. Open [**the latest release**](https://github.com/sheng7337/twitch-song-request-system/releases/latest) and, under **Assets** at the bottom, click **Source code (zip)**
 2. Right-click the ZIP → **Properties**. If there's an **Unblock** box at the bottom, tick it → OK
    (so Windows doesn't warn you every time you start it)
 3. Right-click the ZIP → **Extract All** → pick a simple place, e.g. `C:\SongQueue`
@@ -102,8 +102,8 @@ up without restarting anything.
 
 ### 6-1. Start from the template
 
-1. Download the template: [**song-list-template.xlsx**](https://github.com/sheng7337/twitch-song-request-system/raw/master/docs/song-list-template.xlsx)
-   (it's also in the folder you extracted: `docs\song-list-template.xlsx`)
+1. Find the template in the folder you extracted in [chapter 5](#5-download-the-song-queue):
+   `docs\song-list-template.xlsx`
 2. Open [sheets.new](https://sheets.new) (a new blank Google Sheet)
 3. **File → Import** → **Upload** → drop the template in
 4. Import location: **Replace spreadsheet** → **Import data**
@@ -303,8 +303,11 @@ channel and type a title. It shows up on the dashboard within seconds.
 ## 12. Updating to a new version
 
 1. Close the black window
-2. Download the ZIP again from [chapter 5](#5-download-the-song-queue), **Unblock** it, and extract it
-3. Open the extracted folder (`twitch-song-request-system-master`), **select everything in it → Copy**
+2. Download the new version from [the latest release](https://github.com/sheng7337/twitch-song-request-system/releases/latest) (**Source code (zip)**, as in
+   [chapter 5](#5-download-the-song-queue)), **Unblock** it, and extract it. Read its notes first: anything
+   under **⚠ Action needed** is a one-time step for that version
+3. Open the extracted folder (named after the version, e.g. `twitch-song-request-system-2026.11-1`),
+   **select everything in it → Copy**
 4. Paste into your song queue folder → **Replace the files in the destination**
 
 Your settings (`.env`), Google key and logs aren't in the ZIP, so **nothing of yours is overwritten**.
