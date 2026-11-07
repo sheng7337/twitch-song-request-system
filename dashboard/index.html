@@ -789,22 +789,35 @@
   .mode-warn { color: var(--amber); }
   .mode-body { border-top: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 16px; }
   .mode-section { display: flex; flex-direction: column; gap: 8px; }
-  .mode-table { border-collapse: collapse; font-size: 14px; width: 100%; }
-  .mode-table td { padding: 3px 6px; vertical-align: middle; }
-  .mode-table td.name { width: 100%; overflow-wrap: anywhere; }
+  /* Items and sounds share the columns [toggle][toggle][name][volume][✕], so names line up */
+  .mode-table { border-collapse: collapse; font-size: 14px; width: 100%; max-width: 640px; }
+  .mode-table td { padding: 3px 4px; vertical-align: middle; }
+  .mode-table td.name { width: 100%; overflow-wrap: anywhere; padding-left: 8px; }
+  .mode-table td.vol { white-space: nowrap; color: var(--text-dim); }
+  .mode-table tr[data-i]:hover, .mode-table tr[data-a]:hover { background: rgba(176, 106, 255, 0.08); }
+  .mode-table tr[data-i] td:first-child, .mode-table tr[data-a] td:first-child { border-radius: 4px 0 0 4px; }
+  .mode-table tr[data-i] td:last-child, .mode-table tr[data-a] td:last-child { border-radius: 0 4px 4px 0; }
+  .mode-drop {
+    background: none; border: 1px solid transparent; border-radius: 4px; padding: 1px 7px;
+    font-size: 13px; color: var(--text-dim); cursor: pointer; opacity: 0.6;
+  }
+  .mode-table tr:hover .mode-drop { opacity: 1; }
+  .mode-drop:hover { color: var(--red); border-color: rgba(255, 90, 90, 0.5); }
+  .mode-tog-blank { display: inline-block; width: 32px; }
   .mode-table tr.scene-row td { padding-top: 8px; font-size: 12px; color: var(--text-dim); }
   .mode-table tr.missing td.name { color: var(--amber); }
   .mode-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--purple); vertical-align: middle; }
   .mode-table label { white-space: nowrap; cursor: pointer; }
   .mode-tog {
-    background: none; border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+    width: 32px; background: none; border: 1px solid var(--border); border-radius: 4px; padding: 1px 0;
     font-size: 15px; line-height: 1.3; color: var(--text); cursor: pointer; filter: grayscale(1); opacity: 0.4;
   }
   .mode-tog.on { filter: none; opacity: 1; border-color: var(--purple); }
-  .mode-tog:hover { border-color: var(--purple); }
+  .mode-tog:hover:not(:disabled) { border-color: var(--purple); }
+  .mode-tog:disabled { opacity: 0.15; cursor: default; }
   .mode-table select { max-width: 220px; }
   .mode-vol { width: 76px; }
-  .mode-extra { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--text-dim); }
+  .mode-extra { max-width: 640px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--text-dim); }
   .mode-card .btn { font-size: 13px; padding: 3px 9px; }
   .mode-card .btn:disabled { opacity: 0.35; cursor: default; }
   .mode-card .btn.sure { color: var(--red); border-color: rgba(255,90,90,0.5); }
@@ -3365,7 +3378,7 @@ function liveItemOptions() {
     `<option value="${esc(s.id)}|${esc(i.id)}">${esc(i.name)}${i.display ? ' · ' + esc(canvasTag(i)) : ''}</option>`).join('')}</optgroup>`).join('');
 }
 
-const dropBtn = () => `<button class="btn" data-act="drop" title="${esc(t('dash.modes.drop'))}" aria-label="${esc(t('dash.modes.drop'))}">✕</button>`;
+const dropBtn = () => `<button class="mode-drop" data-act="drop" title="${esc(t('dash.modes.drop'))}" aria-label="${esc(t('dash.modes.drop'))}">✕</button>`;
 
 function modeStreamPart(m, is) {
   const { live, connection: conn } = modes.view;
@@ -3398,15 +3411,13 @@ function modeStreamPart(m, is) {
     const it = m.items[n];
     if (`${it.scene.id}/${it.item.display || ''}` !== lastGroup) {
       lastGroup = `${it.scene.id}/${it.item.display || ''}`;
-      html += `<tr class="scene-row"><td colspan="4">${esc(t('dash.modes.inScene', { scene: it.scene.name }))}${it.item.display ? ` · ${esc(canvasTag(it.item))}` : ''}</td></tr>`;
+      html += `<tr class="scene-row"><td colspan="5">${esc(t('dash.modes.inScene', { scene: it.scene.name }))}${it.item.display ? ` · ${esc(canvasTag(it.item))}` : ''}</td></tr>`;
     }
     html += missingItem.has(`${it.scene.id}/${it.item.id}`)
-      ? `<tr class="missing" data-i="${n}"><td>⚠</td><td class="name">${notFound(it.item.name)}</td>
-          <td>${live ? `<select class="lang-select" data-fix="item">${pick}${liveItemOptions()}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
-      : `<tr data-i="${n}"><td>${modeToggle('show', it.visible)}</td>
-          <td class="name">${esc(it.item.name)}</td>
-          <td><label title="${esc(t('dash.modes.move'))}"><input type="checkbox" data-f="move"${it.move ? ' checked' : ''}${it.place ? '' : ' disabled'}> 📍</label></td>
-          <td>${dropBtn()}</td></tr>`;
+      ? `<tr class="missing" data-i="${n}"><td colspan="2">⚠</td><td class="name">${notFound(it.item.name)}
+          ${live ? `<select class="lang-select" data-fix="item">${pick}${liveItemOptions()}</select>` : ''}</td><td></td><td>${dropBtn()}</td></tr>`
+      : `<tr data-i="${n}"><td>${modeToggle('show', it.visible)}</td><td>${modeToggle('move', it.move, !it.place)}</td>
+          <td class="name">${esc(it.item.name)}</td><td></td><td>${dropBtn()}</td></tr>`;
   });
   html += '</tbody></table>';
   const extraItems = live ? is.extra.filter(x => x.itemId) : [];
@@ -3421,14 +3432,14 @@ function modeStreamPart(m, is) {
   html += `<h4>${esc(t('dash.modes.sounds'))}</h4><table class="mode-table"><tbody>`;
   m.audio.forEach((a, n) => {
     html += missingAudio.has(a.id)
-      ? `<tr class="missing" data-a="${n}"><td>⚠</td><td class="name">${notFound(a.name)}</td>
-          <td colspan="2">${live ? `<select class="lang-select" data-fix="audio">${pick}${live.audio.map(x =>
-            `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select>` : ''}</td><td>${dropBtn()}</td></tr>`
-      : `<tr data-a="${n}"><td>${modeToggle('sound', !a.muted)}</td>
+      ? `<tr class="missing" data-a="${n}"><td colspan="2">⚠</td><td class="name">${notFound(a.name)}
+          ${live ? `<select class="lang-select" data-fix="audio">${pick}${live.audio.map(x =>
+            `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select>` : ''}</td><td></td><td>${dropBtn()}</td></tr>`
+      : `<tr data-a="${n}"><td>${modeToggle('sound', !a.muted)}</td><td><span class="mode-tog-blank"></span></td>
           <td class="name">${esc(a.name)}</td>
-          <td><input class="modes-input mode-vol" type="number" data-f="volume" value="${a.volume == null ? '' : a.volume}"
-            ${unit === 'dB' ? 'min="-100" max="26" step="0.5"' : 'min="0" max="100" step="1"'} aria-label="${esc(t('dash.modes.volume', { unit }))}"></td>
-          <td>${unit}</td><td>${dropBtn()}</td></tr>`;
+          <td class="vol"><input class="modes-input mode-vol" type="number" data-f="volume" value="${a.volume == null ? '' : a.volume}"
+            ${unit === 'dB' ? 'min="-100" max="26" step="0.5"' : 'min="0" max="100" step="1"'} aria-label="${esc(t('dash.modes.volume', { unit }))}"> ${unit}</td>
+          <td>${dropBtn()}</td></tr>`;
   });
   html += '</tbody></table>';
   const extraAudio = live ? is.extra.filter(x => x.audioId) : [];
@@ -3456,14 +3467,15 @@ function modeAppPart(m) {
   </div>`;
 }
 
-// Saves a mode; `reread` reads the streaming app again (what's missing or new may have changed)
-// 👁 / 🔊 when on, 🚫 / 🔇 (dimmed) when off, like the streaming app's own buttons; a click flips it
-function modeToggle(kind, on) {
-  const tip = t(`dash.modes.${kind}.${on ? 'on' : 'off'}`);
-  const icon = kind === 'show' ? (on ? '👁' : '🚫') : (on ? '🔊' : '🔇');
-  return `<button type="button" class="mode-tog${on ? ' on' : ''}" data-act="flip" data-kind="${kind}" aria-pressed="${on}" title="${esc(tip)}" aria-label="${esc(tip)}">${icon}</button>`;
+// 👁 / 🔊 / 📍 when on, 🚫 / 🔇 / 📍 dimmed when off, like the streaming app's own buttons; a click flips it.
+// 📍 can't be on for an item saved without a position.
+function modeToggle(kind, on, disabled) {
+  const tip = t(`dash.modes.${kind}.${disabled ? 'none' : on ? 'on' : 'off'}`);
+  const icon = kind === 'show' ? (on ? '👁' : '🚫') : kind === 'sound' ? (on ? '🔊' : '🔇') : '📍';
+  return `<button type="button" class="mode-tog${on ? ' on' : ''}" data-act="flip" data-kind="${kind}" aria-pressed="${on}" title="${esc(tip)}" aria-label="${esc(tip)}"${disabled ? ' disabled' : ''}>${icon}</button>`;
 }
 
+// Saves a mode; `reread` reads the streaming app again (what's missing or new may have changed)
 async function saveMode(m, reread) {
   try {
     Object.assign(m, await modPost('/api/modes/save', { mode: m }));
@@ -3581,6 +3593,7 @@ modesList.addEventListener('click', async (e) => {
     const kind = btn.dataset.kind;
     let on;
     if (kind === 'show') { const it = m.items[row.dataset.i]; on = it.visible = !it.visible; }
+    else if (kind === 'move') { const it = m.items[row.dataset.i]; on = it.move = !it.move; }
     else { const a = m.audio[row.dataset.a]; a.muted = !a.muted; on = !a.muted; }
     btn.outerHTML = modeToggle(kind, on);
     return saveMode(m, false);

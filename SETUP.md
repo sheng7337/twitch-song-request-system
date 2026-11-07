@@ -257,9 +257,9 @@ Streamlabs Desktop or OBS Studio back the way you saved the mode and does this a
   **📥 Save what … shows now into this mode** takes it all again from the streaming app.
 - **Dual Output (Streamlabs):** each item is there once per canvas, listed under "horizontal canvas" and
   "vertical canvas". Each canvas has its own 👁 and 📍.
-- **📍 Position:** ticked items are also put back where they were saved (position, size, rotation, crop).
-  Unticked (the default), they stay where you placed them. A mode never moves anything if the canvas size
-  changed since it was saved; save it again.
+- **📍 Position** (next to 👁; dimmed = off): items with it on are also put back where they were saved
+  (position, size, rotation, crop). Off (the default), they stay where you placed them. A mode never moves
+  anything if the canvas size changed since it was saved; save it again.
 - **This app's part:** a chat message posted when switching to the mode; **⏸ Hold clips**, where clips
   from `!so`, `!watch` and `!tk` wait (up to 10) until you switch to another mode, and one already
   playing finishes; and a dashboard tab to open.
