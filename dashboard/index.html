@@ -150,6 +150,9 @@
   }
   .tab:hover { color: var(--text); }
   .tab[aria-selected="true"] { color: var(--purple); border-bottom-color: var(--purple); }
+  /* The tabs on the left, the chat beside them on the right (not in the Chat tab itself) */
+  .workspace { flex: 1; min-height: 0; display: flex; }
+  .tab-area { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   .tab-page { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   .tab-page[hidden] { display: none; }
 
@@ -176,6 +179,28 @@
   }
   .tab-count[hidden] { display: none; }
   .chat-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; }
+
+  /* ── The chat beside every other tab: the same .chat-view, moved here (placeChat) ── */
+  .chat-dock { position: relative; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; padding: 14px 16px 14px 0; }
+  .chat-dock[hidden] { display: none; }
+  .chat-dock-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .chat-dock-resize { position: absolute; left: -10px; top: 14px; bottom: 14px; width: 10px; cursor: col-resize; touch-action: none; }
+  .chat-dock-resize::after { content: ''; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: transparent; }
+  .chat-dock-resize:hover::after, body.dock-resizing .chat-dock-resize::after { background: var(--purple); }
+  body.dock-resizing { cursor: col-resize; user-select: none; }
+  body.dock-resizing iframe { pointer-events: none; }   /* Leihu's screen would take the pointer */
+  .chat-dock-filter {
+    display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px; font-size: 13px;
+    background: rgba(255,184,74,0.08); border: 1px solid var(--border-amber); color: var(--amber);
+  }
+  .chat-dock-filter[hidden] { display: none; }
+  .chat-dock-filter span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-dock-filter button { background: none; border: none; color: var(--amber); cursor: pointer; font-family: inherit; font-size: 13px; }
+  .chat-view.docked .chat-tools, .chat-view.docked .chat-filters { display: none; }
+  .chat-view.docked .chat-list { font-size: 13px; padding: 6px 6px; }
+  .tab.dock-btn { margin-left: auto; }
+  .tab.dock-btn[aria-pressed="true"] { color: var(--purple); }
+  .tab.dock-btn[hidden] { display: none; }
   .chat-view { flex: 1; background: var(--bg-panel); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; position: relative; }
   .chat-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .chat-tools input[type="search"] {
@@ -323,6 +348,8 @@
     .pending-panel { max-height: none; }
     .leihu-frame { flex: none; height: 85vh; }
     .chat-list { flex: none; height: 75vh; }
+    .workspace { display: block; }
+    .chat-dock, .tab.dock-btn { display: none !important; }   /* no room: the Chat tab only */
   }
 
   /* ── Column panels ── */
@@ -748,8 +775,19 @@
   .toast.long { white-space: normal; width: max-content; max-width: min(720px, calc(100vw - 32px)); }
 
   /* ── Modes: buttons in the top bar, the 🎛 Modes tab (server/modes.js) ── */
+  /* The modes in a labelled box, so they read as one control; "🎛 Modes" opens the tab */
+  .mode-box {
+    display: flex; align-items: center; gap: 8px; min-width: 0; padding: 3px 4px 3px 12px;
+    border: 1px solid var(--border); border-radius: 18px; background: rgba(176,106,255,0.05);
+  }
+  .mode-box[hidden] { display: none; }
+  .mode-box-label {
+    background: none; border: none; cursor: pointer; padding: 0; white-space: nowrap;
+    font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--purple-dim);
+  }
+  .mode-box-label:hover { color: var(--purple); }
   .mode-bar { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
-  .mode-bar[hidden] { display: none; }
   .mode-bar.busy .mode-chip { opacity: 0.5; pointer-events: none; }
   .mode-chip.on { color: var(--bg); background: var(--purple); border-color: var(--purple); }
   .mode-chip.on:hover { background: var(--purple); }
@@ -767,6 +805,7 @@
     font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--text); outline: none; min-width: 0;
   }
   .modes-input:focus { border-color: var(--purple); }
+  .modes-box.compact { padding: 8px 14px; }
   .modes-status { font-size: 13px; color: var(--text-dim); }
   .modes-status:empty { display: none; }
   .modes-status.ok { color: var(--green); }
@@ -833,7 +872,10 @@
   <span class="topbar-title" data-i18n="dash.title">Song Queue Dashboard</span>
   <span class="topbar-spacer"></span>
   <!-- Modes (🎛 Modes tab): one click switches -->
-  <div class="mode-bar" id="mode-bar" role="group" data-i18n-aria-label="dash.modes.bar" hidden></div>
+  <div class="mode-box" id="mode-box" hidden>
+    <button class="mode-box-label" type="button" onclick="showTab('modes')" data-i18n-title="dash.modes.barEdit" data-i18n="dash.modes.barLabel">🎛 Modes</button>
+    <div class="mode-bar" id="mode-bar" role="group" data-i18n-aria-label="dash.modes.bar"></div>
+  </div>
   <span class="lang-switch" role="group" data-i18n-aria-label="dash.set.language"></span>
   <button class="chip" id="leihu-chip" onclick="showTab('leihu')" data-i18n-title="dash.leihuChipTitle">
     🎤 <span id="leihu-state" data-i18n="dash.leihuOffline">Leihu offline</span>
@@ -846,6 +888,8 @@
   <button class="tab" role="tab" id="tabbtn-leihu" data-tab="leihu" aria-controls="tab-leihu" onclick="showTab('leihu')" data-i18n="dash.tab.leihu">🎤 Leihu Singsing</button>
   <button class="tab" role="tab" id="tabbtn-chat" data-tab="chat" aria-controls="tab-chat" onclick="showTab('chat')"><span data-i18n="dash.tab.chat">💬 Chat</span><span class="tab-count" id="chat-unread" hidden></span></button>
   <button class="tab" role="tab" id="tabbtn-modes" data-tab="modes" aria-controls="tab-modes" onclick="showTab('modes')" data-i18n="dash.tab.modes">🎛 Modes</button>
+  <!-- The chat beside the other tabs: open / close (placeChat) -->
+  <button class="tab dock-btn" id="dock-btn" type="button" onclick="toggleChatDock()" aria-pressed="false">💬<span class="tab-count" id="dock-unread" hidden></span> <span id="dock-arrow">◂</span></button>
 </nav>
 
 <!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
@@ -856,6 +900,8 @@
 
 <span class="toast" id="toast"></span>
 
+<div class="workspace">
+<div class="tab-area">
 <div class="tab-page" id="tab-leihu" role="tabpanel" aria-labelledby="tabbtn-leihu" hidden>
   <div class="leihu-page">
    <!-- Leihu's own screen. Microphone and autoplay are passed on for its practice and recording. -->
@@ -934,7 +980,7 @@
 <!-- Chat: live chat and earlier days' logs (server/chat-log.js), filtered here -->
 <div class="tab-page" id="tab-chat" role="tabpanel" aria-labelledby="tabbtn-chat" hidden>
   <div class="chat-page">
-    <div class="chat-view">
+    <div class="chat-view" id="chat-view">
       <div class="chat-tools">
         <input type="search" id="chat-search" oninput="onChatSearch()" data-i18n-placeholder="dash.chat.search" placeholder="Search messages or names…" />
         <select class="lang-select" id="chat-day" onchange="onChatDay()" data-i18n-aria-label="dash.chat.day"></select>
@@ -1125,6 +1171,18 @@
  </div>
 </div>
 </div>
+</div><!-- .tab-area -->
+
+<!-- The chat beside the other tabs: #chat-view moves in here (placeChat) -->
+<aside class="chat-dock" id="chat-dock" hidden>
+  <div class="chat-dock-resize" id="chat-dock-resize" data-i18n-title="dash.dock.resize"></div>
+  <div class="chat-dock-body" id="chat-dock-body">
+    <div class="chat-dock-filter" id="chat-dock-filter" hidden>
+      <span></span><button type="button" onclick="clearDockFilter()" data-i18n="dash.dock.showAll">Show all ✕</button>
+    </div>
+  </div>
+</aside>
+</div><!-- .workspace -->
 
 <script>
 const t = I18N.t, tHtml = I18N.tHtml;
@@ -1934,7 +1992,8 @@ function showTab(name) {
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
   closeTabConfigs();
   paintLeihuView();
-  if (name === 'chat') onChatShown();
+  placeChat();
+  if (name === 'chat') loadChatDays();
   if (name === 'modes') loadModes(true);
 }
 
@@ -2251,12 +2310,102 @@ function paintChatDays() {
   sel.value = chat.day;
 }
 
-function onChatShown() {
+// ── The chat beside every tab ── The Chat tab's .chat-view (one chat, not a copy) moves into the
+// panel at the right of the other tabs. There it shows the live chat without search, filters and
+// days, which stay in the Chat tab; a strip says when a filter is on. Open / closed and the width
+// are remembered; it starts closed in narrow windows and in the stream window. Under 900px: no panel.
+const DOCK_MIN = 260, DOCK_MAX = 640;
+const dock = { open: !IS_STREAM_WINDOW && innerWidth >= 1100, width: 340 };
+try { Object.assign(dock, JSON.parse(localStorage.getItem('chatDock')) || {}); } catch(_) {}
+const dockRoom = matchMedia('(min-width: 901px)');
+
+const chatDocked = () => currentTab !== 'chat' && dock.open && dockRoom.matches;
+const chatOnScreen = () => currentTab === 'chat' || chatDocked();
+
+function saveChatDock() {
+  try { localStorage.setItem('chatDock', JSON.stringify(dock)); } catch(_) {}
+}
+
+// Puts the chat where it's seen now, and draws it if it is
+function placeChat() {
+  const docked = chatDocked();
+  const view = document.getElementById('chat-view');
+  const host = docked ? document.getElementById('chat-dock-body') : document.querySelector('#tab-chat .chat-page');
+  if (view.parentElement !== host) host.appendChild(view);
+  view.classList.toggle('docked', docked);
+  const panel = document.getElementById('chat-dock');
+  panel.hidden = !docked;
+  panel.style.width = `${dockWidth()}px`;
+  const btn = document.getElementById('dock-btn');
+  btn.hidden = currentTab === 'chat';
+  btn.setAttribute('aria-pressed', String(dock.open));
+  btn.title = t(dock.open ? 'dash.dock.hide' : 'dash.dock.show');
+  btn.setAttribute('aria-label', btn.title);
+  document.getElementById('dock-arrow').textContent = dock.open ? '▸' : '◂';
+  if (!chatOnScreen()) return;
   chat.unread = 0;
   paintChatUnread();
-  loadChatDays();
-  renderChat();
+  // The panel is for the chat going on now: back to live from an earlier day
+  if (docked && chat.day) { document.getElementById('chat-day').value = ''; onChatDay(); }
+  else renderChat();
+  paintDockFilter();
 }
+
+function toggleChatDock() {
+  dock.open = !dock.open;
+  saveChatDock();
+  placeChat();
+}
+
+const dockWidth = () => Math.round(Math.min(Math.max(dock.width, DOCK_MIN), DOCK_MAX, innerWidth * 0.5));
+
+// In the panel, a filter, search or one viewer's messages could pass for a quiet chat: say so
+function paintDockFilter() {
+  const strip = document.getElementById('chat-dock-filter');
+  const what = [chat.filter !== 'all' ? t('dash.chat.f.' + chat.filter) : '', chat.user ? '👤 ' + (chat.userName || chat.user) : '',
+    chat.query ? `🔍 "${chat.query}"` : ''].filter(Boolean).join(' · ');
+  strip.hidden = !chatDocked() || !what;
+  strip.querySelector('span').textContent = t('dash.dock.showing', { what });
+}
+
+function clearDockFilter() {
+  chat.filter = 'all';
+  chat.user = null;
+  chat.query = '';
+  document.getElementById('chat-search').value = '';
+  renderChat();
+  paintDockFilter();
+}
+
+// Drag the panel's left edge to make it wider or narrower
+document.getElementById('chat-dock-resize').addEventListener('pointerdown', (e) => {
+  if (e.button > 0) return;
+  e.preventDefault();
+  const panel = document.getElementById('chat-dock');
+  const startX = e.clientX, startW = panel.offsetWidth;
+  document.body.classList.add('dock-resizing');
+  const move = (ev) => {
+    dock.width = startW + startX - ev.clientX;
+    panel.style.width = `${dockWidth()}px`;
+  };
+  const end = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    document.body.classList.remove('dock-resizing');
+    dock.width = dockWidth();
+    saveChatDock();
+    if (chat.atBottom) chatToBottom();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+});
+
+dockRoom.addEventListener('change', placeChat);
+window.addEventListener('resize', () => {
+  if (chatDocked()) document.getElementById('chat-dock').style.width = `${dockWidth()}px`;
+});
 
 function isBot(rec) {
   return CHAT_BOTS.includes((rec.user.login || '').toLowerCase());
@@ -2381,7 +2530,7 @@ function chatSource() {
 }
 
 function renderChat() {
-  if (currentTab !== 'chat') return;
+  if (!chatOnScreen()) return;
   const list = document.getElementById('chat-list');
   const all = chatSource();
   const shown = all.filter(chatMatches);
@@ -2706,9 +2855,11 @@ function paintChatMore() {
 }
 
 function paintChatUnread() {
-  const el = document.getElementById('chat-unread');
-  el.hidden = !chat.unread;
-  el.textContent = chat.unread > 99 ? '99+' : String(chat.unread);
+  for (const id of ['chat-unread', 'dock-unread']) {
+    const el = document.getElementById(id);
+    el.hidden = !chat.unread;
+    el.textContent = chat.unread > 99 ? '99+' : String(chat.unread);
+  }
 }
 
 // A new message or redemption from the server
@@ -2719,7 +2870,7 @@ function onChatRecord(rec) {
     markGreet(rec, chat.session.seen);
     chat.session.records.push(rec);
   }
-  if (chat.day === '' && currentTab === 'chat' && chatMatches(rec)) {
+  if (chat.day === '' && chatOnScreen() && chatMatches(rec)) {
     const list = document.getElementById('chat-list');
     const empty = list.querySelector('.chat-empty');
     if (empty) empty.remove();
@@ -2731,8 +2882,8 @@ function onChatRecord(rec) {
     const shown = chat.live.filter(chatMatches).length;
     document.getElementById('chat-count').textContent = t('dash.chat.count', { shown, total: chat.live.length });
   }
-  if (currentTab === 'chat' && chat.day === '' && isAnnounce(rec)) paintChatFilters();
-  if (currentTab !== 'chat' && rec.kind === 'chat' && !isBot(rec)) { chat.unread++; paintChatUnread(); }
+  if (chatOnScreen() && chat.day === '' && isAnnounce(rec)) paintChatFilters();
+  if (!chatOnScreen() && rec.kind === 'chat' && !isBot(rec)) { chat.unread++; paintChatUnread(); }
 }
 
 // ── Moderation (server/chat-mod.js): a name's menu, 🛡 for anyone not in the chat, 📌 on a message.
@@ -3119,7 +3270,7 @@ function applyAnnounced(ids, done) {
 
 // Draws the chat again where it was (at the bottom only if it was there)
 function rerenderChat() {
-  if (currentTab !== 'chat') return;
+  if (!chatOnScreen()) return;
   const keep = chat.atBottom;
   const list = document.getElementById('chat-list');
   const top = list.scrollTop;
@@ -3172,7 +3323,7 @@ I18N.onChange(() => {
   paintBulk();
   paintLeihuView();
   paintChatDays();
-  renderChat();
+  placeChat();   // draws the chat, and the panel button's words
   paintChatMore();
   paintRewards();
   if (filteredSongs.length) renderSuggest();
@@ -3220,7 +3371,7 @@ function paintModeBar() {
   const bar = document.getElementById('mode-bar');
   const v = modes.view;
   const list = v ? v.modes : [];
-  bar.hidden = !list.length;
+  document.getElementById('mode-box').hidden = !list.length;
   bar.innerHTML = list.map((m) => {
     const on = v.active === m.id;
     const issue = modeIssue(m);
@@ -3278,13 +3429,34 @@ function paintModes() {
   list.innerHTML = v.modes.map(modeCard).join('');
 }
 
+// Connected (or no app on purpose): one line with Change…. The form shows while changing it, and
+// when the connection fails.
 function paintModeConnection() {
   const box = document.getElementById('modes-connection');
   const c = modes.view ? modes.view.connection : { app: null, hasSecret: false };
+  const editing = box.dataset.edit === '1' || box.dataset.app != null;
+  box.classList.toggle('compact', !editing && !c.error);
+  if (!editing && !c.error) {
+    const secret = !c.hasSecret ? (c.app === 'obs' ? t('dash.modes.conn.noPassword') : '')
+      : t(c.app === 'obs' ? 'dash.modes.conn.passwordSaved' : 'dash.modes.conn.tokenSaved');
+    const state = !c.app ? ['', t('dash.modes.conn.off')]
+      : c.connected ? ['ok', '● ' + t('dash.modes.conn.ok', { app: appName(c.app) })]
+      : ['', t('dash.modes.conn.connecting', { app: appName(c.app) })];
+    box.innerHTML = `
+      <div class="modes-row">
+        <h3>${esc(t('dash.modes.conn.title'))}</h3>
+        <span class="modes-status ${state[0]}">${esc(state[1])}</span>
+        ${c.app ? `<span class="setting-hint">${esc([t('dash.modes.conn.portIs', { port: c.port }), secret].filter(Boolean).join(' · '))}</span>` : ''}
+        <span class="topbar-spacer"></span>
+        <button class="btn" onclick="editModeConnection(true)">${esc(t(c.app ? 'dash.modes.conn.change' : 'dash.modes.conn.connectOne'))}</button>
+      </div>
+      ${c.app ? '' : `<p class="setting-hint">${esc(t('dash.modes.conn.notSet'))}</p>`}`;
+    return;
+  }
   const app = box.dataset.app != null ? box.dataset.app : (c.app || '');
   const same = app === (c.app || '');
   const status = !same ? ['', '']
-    : !c.app ? ['', t('dash.modes.conn.notSet')]
+    : !app ? ['', t('dash.modes.conn.notSet')]
     : c.error ? ['err', I18N.server(c.error, 'dash.toast.requestFailed')]
     : c.connected ? ['ok', t('dash.modes.conn.ok', { app: appName(c.app) })] : ['', ''];
   const secretName = t(app === 'obs' ? 'dash.modes.conn.password' : 'dash.modes.conn.token');
@@ -3302,9 +3474,18 @@ function paintModeConnection() {
       <input class="modes-input" id="mc-secret" type="password" autocomplete="off" style="width:min(280px,100%)" aria-label="${esc(secretName)}"
         placeholder="${esc(same && c.hasSecret ? t('dash.modes.conn.saved') : secretName)}">` : ''}
       <button class="btn" onclick="saveModeConnection()">${esc(t(app ? 'dash.modes.conn.save' : 'dash.modes.conn.saveNone'))}</button>
+      ${c.error ? '' : `<button class="btn" onclick="editModeConnection(false)">${esc(t('dash.modes.conn.cancel'))}</button>`}
     </div>
     ${app ? `<p class="setting-hint">${esc(t(app === 'obs' ? 'dash.modes.conn.helpObs' : 'dash.modes.conn.helpStreamlabs'))}</p>` : ''}
     <p class="modes-status ${status[0]}">${esc(status[1])}</p>`;
+}
+
+// Change… opens the form; Cancel puts back the line as it was
+function editModeConnection(on) {
+  const box = document.getElementById('modes-connection');
+  if (on) box.dataset.edit = '1'; else delete box.dataset.edit;
+  delete box.dataset.app;
+  paintModeConnection();
 }
 
 // Picking another app only changes the form; Connect saves it
@@ -3326,6 +3507,7 @@ async function saveModeConnection() {
   try {
     modes.view = await modPost('/api/modes/connection', body);
     delete box.dataset.app;
+    delete box.dataset.edit;
     paintModeBar();
     paintModes();
   } catch (err) {

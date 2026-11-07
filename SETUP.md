@@ -81,13 +81,13 @@ Add the overlay to your scene — do this once:
 
 1. In OBS/Streamlabs, add a new source → **Browser**
 2. URL: `http://localhost:3000/overlay/index.html`
-3. Width: `960`, Height: `1362` (the overlay renders at 2× for sharpness)
+3. Width: `960`, Height: `1470` (the overlay renders at 2× for sharpness)
 4. Paste this into the **Custom CSS** field:
    ```css
    body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
    ```
 5. Uncheck **"Shutdown source when not visible"**
-6. In your scene, select the source and resize it down to `480 x 681` (50%) —
+6. In your scene, select the source and resize it down to `480 x 735` (50%) —
    this is what makes the 2× render look sharper instead of just bigger
 
 The overlay connects automatically when the server is running and updates live.
@@ -182,6 +182,12 @@ Open `http://localhost:3000/dashboard` during streams.
 The 💬 Chat tab shows your Twitch chat live, together with channel-point redemptions, subs, raids and
 follows. It's kept on this PC for `CHAT_LOG_DAYS` days (default 30): pick an earlier day from the date
 list. Messages mods delete show struck through.
+
+- **Chat on every tab:** on the other tabs the live chat also shows in a panel on the right, so you can
+  follow it while working with songs, Leihu or modes. Drag its left edge to resize it; **💬** at the right
+  of the tabs hides or shows it (both remembered). The panel is the live chat only: search, filters and
+  earlier days are here in the Chat tab, and while a filter is on the panel says so (**Show all ✕**). It starts
+  hidden in narrow windows; under 900px wide there is no panel, only this tab.
 
 - **Filters:** songs mentioned, commands, mods & VIPs, subscribers, @mentions, first-time
   chatters, highlighted messages & bits, redemptions, waiting redemptions, and subs, raids & follows.

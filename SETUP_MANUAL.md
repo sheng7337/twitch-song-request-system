@@ -207,13 +207,13 @@ a WebSocket, so nothing needs to be publicly reachable.
 
 1. Add Source → **Browser**
 2. URL: `http://localhost:3000/overlay/index.html`
-3. Width: `960`, Height: `1362` (the overlay renders at 2× for sharpness)
+3. Width: `960`, Height: `1470` (the overlay renders at 2× for sharpness)
 4. Custom CSS:
    ```css
    body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
    ```
 5. Uncheck **"Shutdown source when not visible"**
-6. In your scene, select the source and resize it down to `480 x 681` (50%) —
+6. In your scene, select the source and resize it down to `480 x 735` (50%) —
    this is what makes the 2× render look sharper instead of just bigger
 
 For the chat commands (`!so`, `!watch`, `!tk`, `!endingtk`), add a second Browser source:

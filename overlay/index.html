@@ -86,8 +86,10 @@
     background: rgba(80,30,120,0.4); border: 1px solid rgba(120,60,200,0.4); color: var(--purple);
   }
 
-  /* ── Now Playing ── */
+  /* ── Now Playing ── One height whether a song plays or not, with or without an artist, in any
+     font: the panel never changes size, so the Browser Source size in the docs is exact. */
   .now-playing {
+    height: 123px; overflow: hidden;
     background: transparent;
     border: 1px solid var(--border);
     border-left: 3px solid var(--purple);
@@ -96,17 +98,17 @@
     margin-bottom: 10px;
     flex-shrink: 0;
   }
-  .np-label     { font-size: 8px; letter-spacing: 3px; color: var(--purple-dim); margin-bottom: 4px; }
+  .np-label     { font-size: 8px; line-height: 12px; letter-spacing: 3px; color: var(--purple-dim); margin-bottom: 4px; }
   .np-title     {
     font-family: 'Orbitron', sans-serif; font-size: 32px; font-weight: 500; color: #ddc8ff;
-    line-height: 1.2; white-space: nowrap; overflow: hidden;
+    height: 40px; line-height: 40px; white-space: nowrap; overflow: hidden;
   }
   .np-title-inner {
     display: inline-block;
     white-space: nowrap;
   }
-  .np-artist    { font-size: 15px; color: var(--text-dim); margin-top: 2px; }
-  .np-requester { font-size: 13px; color: var(--blue); margin-top: 5px; }
+  .np-artist    { font-size: 15px; height: 20px; line-height: 20px; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np-requester { font-size: 13px; height: 18px; line-height: 18px; color: var(--blue); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .np-empty     { font-size: 12px; color: var(--text-muted); line-height: 44px; }
   @keyframes scroll-title {
     0%      { transform: translateX(0); }

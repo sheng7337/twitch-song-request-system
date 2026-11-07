@@ -224,17 +224,17 @@ const STRINGS = {
       obsSteps: [
         'In OBS, click <strong>+</strong> under Sources → <strong>Browser</strong> → name it e.g. <em>Song list</em>',
         'URL: {url}',
-        'Width: <code>960</code> — Height: <code>1362</code> (twice the size it shows at, for sharp text)',
+        'Width: <code>960</code> — Height: <code>1470</code> (twice the size it shows at, for sharp text)',
         'Paste this into <strong>Custom CSS</strong>: {css}',
         'Uncheck <strong>"Shutdown source when not visible"</strong> → OK',
-        'In your scene, shrink it to half: right-click it → <strong>Transform → Edit Transform</strong> → Size <code>480</code> × <code>681</code>',
+        'In your scene, shrink it to half: right-click it → <strong>Transform → Edit Transform</strong> → Size <code>480</code> × <code>735</code>',
       ],
       streamlabsSteps: [
         'In Streamlabs, add a new source → <strong>Browser Source</strong> → name it e.g. <em>Song list</em>',
         'URL: {url}',
-        'Width: <code>960</code> — Height: <code>1362</code> (twice the size it shows at, for sharp text)',
+        'Width: <code>960</code> — Height: <code>1470</code> (twice the size it shows at, for sharp text)',
         'Paste this into <strong>Custom CSS</strong>: {css}',
-        'In your scene, drag a corner to shrink it to half: <code>480</code> × <code>681</code>',
+        'In your scene, drag a corner to shrink it to half: <code>480</code> × <code>735</code>',
       ],
       clipTitle: 'Clip player (for !so, !watch, !tk and !endingtk)',
       clipSteps: [
@@ -490,17 +490,17 @@ const STRINGS = {
       obsSteps: [
         '在 OBS 中，點擊來源底下的 <strong>+</strong> → <strong>瀏覽器</strong> → 取個名字，例如「<em>歌單</em>」',
         '網址：{url}',
-        '寬度：<code>960</code> — 高度：<code>1362</code>（顯示大小的兩倍，文字比較清晰）',
+        '寬度：<code>960</code> — 高度：<code>1470</code>（顯示大小的兩倍，文字比較清晰）',
         '把這段貼到<strong>自訂 CSS</strong>欄位：{css}',
         '取消勾選<strong>「來源不可見時關閉來源」</strong>→ 確定',
-        '在場景中把它縮小一半：右鍵 →<strong>「變形 → 編輯變形」</strong>→ 大小 <code>480</code> × <code>681</code>',
+        '在場景中把它縮小一半：右鍵 →<strong>「變形 → 編輯變形」</strong>→ 大小 <code>480</code> × <code>735</code>',
       ],
       streamlabsSteps: [
         '在 Streamlabs 中，新增來源 → <strong>瀏覽器來源</strong> → 取個名字，例如「<em>歌單</em>」',
         '網址：{url}',
-        '寬度：<code>960</code> — 高度：<code>1362</code>（顯示大小的兩倍，文字比較清晰）',
+        '寬度：<code>960</code> — 高度：<code>1470</code>（顯示大小的兩倍，文字比較清晰）',
         '把這段貼到<strong>自訂 CSS</strong>欄位：{css}',
-        '在場景中拖曳角落，把它縮小一半：<code>480</code> × <code>681</code>',
+        '在場景中拖曳角落，把它縮小一半：<code>480</code> × <code>735</code>',
       ],
       clipTitle: 'Clip Player（!so、!watch、!tk 和 !endingtk 用）',
       clipSteps: [

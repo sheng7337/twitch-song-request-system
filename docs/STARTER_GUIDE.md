@@ -225,13 +225,13 @@ You add **two** Browser sources:
 
 1. In OBS, click **+** under Sources → **Browser** → name it "Song list"
 2. URL: `http://localhost:3000/overlay/index.html`
-3. Width `960`, Height `1362`
+3. Width `960`, Height `1470`
 4. Replace the whole **Custom CSS** with:
    ```css
    body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
    ```
 5. Untick **Shutdown source when not visible** → OK
-6. Shrink it to half in your scene: right-click → **Transform → Edit Transform** → Size `480 × 681`, then move it where you like
+6. Shrink it to half in your scene: right-click → **Transform → Edit Transform** → Size `480 × 735`, then move it where you like
 
 **② Clip player** (for `!so` clips, the `!tk` sponsor roll and other commands)
 

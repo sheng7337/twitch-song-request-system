@@ -315,6 +315,10 @@ vtuber-song-queue/
   the everyday browser. That window's title is fixed (`STREAM_WINDOW_TITLE`, not translated) for OBS's
   "Window title must match". In it, /setup and twitch.tv links go to the usual browser (`POST /api/open-in-browser`,
   only those URLs; it has no Twitch login). The header's 🔊 hint shows until it's opened once (localStorage `streamWindowOpened`)
+- Chat beside every tab (dashboard): the Chat tab's #chat-view is one element that placeChat() moves into
+  #chat-dock (right of .tab-area in .workspace) on the other tabs. Use chatOnScreen() (not currentTab === 'chat')
+  for "is the chat visible". Docked: live only (a past day switches back), tools / filters hidden, a strip names an
+  active filter. localStorage chatDock {open, width}; none under 900px; starts closed under 1100px and in the stream window
 - Dashboard Chat tab (chat-log.js): every `channel.chat.message`, redemption, chat notification (sub,
   raid…) and follow becomes a record (user,
   badges, text split into text / emote / mention / cheer parts, message_type, bits, reply, `songs` = sheet
@@ -614,7 +618,8 @@ See `.env.example` for full descriptions.
 ## Overlay settings (overlay/index.html)
 
 - `SCROLL_PX_PER_SEC` (script) — list auto-scroll speed (16)
-- `--list-height` — height of Up Next and Played scroll areas
+- `--list-height` — height of Up Next and Played scroll areas. Now Playing has a fixed height too, so the panel is
+  always 960 × 1465 at 2× (Browser Source 960 × 1470 in the docs and setup wizard): change those if the layout changes
 - `--panel-bg-alpha` — background opacity (set via dashboard WebSocket message)
 - Font sizes: `.np-title` (32px), `.q-title` / `.p-title` (21px), artists (15px), requesters (13px)
 
