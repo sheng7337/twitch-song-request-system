@@ -15,18 +15,18 @@ The first official release. 第一個正式版本。
 
 **Works with:** Node.js LTS · Leihu Singsing 1.6.x (checked with 1.6.8) · for modes, Streamlabs Desktop
 or OBS Studio 30+.
-**搭配：**Node.js LTS · 雷虎練唱台 1.6.x（以 1.6.8 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30 以上。
+**搭配**：Node.js LTS · 雷虎練唱台 1.6.x（以 1.6.8 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30 以上。
 
 ### ⚠ Action needed (only if you ran an earlier copy) / 需要動手（只有之前用過舊版的人）
 
 - **Song list Browser Source:** set Height to **1470** (was 1362) and size it **480 × 735** in your
   scene. The overlay is now always the same height; at 1362 its bottom was cut off.
-  **歌單瀏覽器來源：**高度改成 **1470**（原本 1362），在場景裡大小設為 **480 × 735**。顯示層現在高度固定；
+  **歌單瀏覽器來源**：高度改成 **1470**（原本 1362），在場景裡大小設為 **480 × 735**。顯示層現在高度固定；
   用 1362 時最下面會被切掉。
 - **Twitch permissions:** if the 💬 Chat tab shows **Authorize again →**, do it once. Sending messages,
   moderation (ban / timeout / Shoutout / raid / pin) and redemptions need permissions older setups
   didn't ask for.
-  **Twitch 權限：**如果 💬 聊天室分頁顯示「**重新授權 →**」，請做一次。發言、管理（封鎖／禁言／Shoutout／
+  **Twitch 權限**：如果 💬 聊天室分頁顯示「**重新授權 →**」，請做一次。發言、管理（封鎖／禁言／Shoutout／
   揪團／置頂）和兌換需要舊版沒有要求的權限。
 - **Restart** the app (close it, run `start.bat` / `start_zh.bat` again) and refresh the dashboard.
   **重新啟動**程式（關掉後再執行 `start.bat`／`start_zh.bat`），並重新整理控制台。
@@ -53,7 +53,7 @@ or OBS Studio 30+.
   分頁：🎵 點歌佇列、🎤 雷虎練唱台、💬 聊天室、🎛 模式 —— 英文與繁體中文。
 - **Chat beside every tab:** live chat in a resizable panel on the right; search, filters and earlier
   days in the Chat tab.
-  **每個分頁都看得到聊天室：**右邊可調寬度的即時聊天；搜尋、篩選和之前的日期在聊天室分頁。
+  **每個分頁都看得到聊天室**：右邊可調寬度的即時聊天；搜尋、篩選和之前的日期在聊天室分頁。
 - Chat tools: what to thank or greet on stream highlighted, sending and replying, ban / timeout /
   Shoutout / raid / pin, completing or refunding redemptions, song notes on the overlay.
   聊天室工具：標示要感謝或打招呼的事件、發言和回覆、封鎖／禁言／Shoutout／揪團／置頂、完成或退還兌換、
