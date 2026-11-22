@@ -9,6 +9,65 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 ---
 
+## 2026.11-4 — unreleased
+
+### 繁體中文
+
+**搭配**：Node.js LTS · 雷虎練唱台 1.6.x–2.0.x（以 2.0.0 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30
+以上 · 換裝需要 veadotube mini 2.1 以上。
+
+#### ⚠ 需要動手
+
+- **重新啟動**程式（關掉後再執行 `start.bat`／`start_zh.bat`），並重新整理控制台。
+- 兌換項目的設定搬到新的「**🎟️ 兌換**」分頁；原本的設定都會保留，不用重設。
+
+#### 新功能
+
+- **🎟️ 兌換分頁**：頻道上每個兌換項目在這裡設定用途 ——「🎤 點歌」、「🎲 隨機點歌」（和要抽的歌單分頁）、「👕 換裝」或無 ——
+  另外可以勾選「🎟️ 特效」，單獨使用或加在主要用途上（例如換裝時加一個音效）。完成和退還由主要用途決定。原本分散在「💬 聊天室 ⚙」
+  （交給點歌系統管理）、「👕 換裝」（勾選會換裝的獎勵）和「🔔 通知」（加入兌換項目）的設定都搬到這裡。
+  點歌、隨機點歌或換裝的項目如果沒辦法退還點數（還沒交給點歌系統管理，或在 Twitch 開了「略過獎勵請求佇列」），會顯示 ⚠ 和解決方法。
+- **🎬 `!so` 播較新的 Clip**：以前只會從對方觀看次數最高的 20 個 Clip 裡挑，所以老是那幾個舊的；現在預設從最新的 50 個裡隨機挑。
+  想用原本的方式，到聊天分頁 ⚙ →「**Shoutout 的 Clip**」選「觀看次數最高的 20 個」。
+
+#### 修正
+
+- 一個兌換項目同時有特效和其他功能時，兩邊都可能標成完成或退還，互相蓋掉。現在只有主要用途會處理。
+- 交給點歌系統管理的項目，換裝和特效的設定現在也會跟著換到複本（之前只有點歌和隨機點歌會）。
+- 手機上的分頁列改成可以左右滑動，不會把分頁名稱擠成直的。
+
+### English
+
+**Works with:** Node.js LTS · Leihu Singsing 1.6.x–2.0.x (checked with 2.0.0) · for modes, Streamlabs
+Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
+
+#### ⚠ Action needed
+
+- **Restart** the app (close it, run `start.bat` / `start_zh.bat` again) and refresh the dashboard.
+- Reward settings moved to the new **🎟️ Rewards** tab; what you had set up is kept, nothing to redo.
+
+#### What's new
+
+- **🎟️ Rewards tab**: every reward on your channel gets its use here — 🎤 song request, 🎲 random song (and the
+  sheet tabs it draws from), 👕 outfit or none — and a 🎟️ Effect tick, on its own or on top of the main use (e.g.
+  an outfit change with a sound). The main use decides done and refund. What was spread over 💬 Chat ⚙ (handing
+  rewards over), 👕 Outfits (ticking outfit rewards) and 🔔 Alerts (adding a reward) is all here now. A song,
+  random-song or outfit reward that can't give points back (not handed over yet, or “Skip Reward Requests Queue”
+  on at Twitch) shows a ⚠ with how to fix it.
+- **🎬 `!so` plays newer clips**: it used to pick from the broadcaster's 20 most-viewed clips only, so the same old
+  ones kept coming up; now it picks at random from their newest 50 by default. For the old way, Chat tab ⚙ →
+  **Shoutout clips** → **The 20 most viewed**.
+
+#### Fixes
+
+- A reward with an effect and another use could be marked done by one and refunded by the other. Now only the
+  main use does.
+- A reward handed over to the app now keeps its outfit and effect settings on the copy too (before, only song
+  request and random song did).
+- On a phone the tab bar scrolls sideways instead of squeezing the tab names into a column.
+
+---
+
 ## 2026.11-3 — 2026-11-23
 
 ### 繁體中文

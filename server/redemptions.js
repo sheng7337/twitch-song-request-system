@@ -128,12 +128,8 @@ function copyOf(r) {
   return body;
 }
 
-function roleOf(id) {
-  if (id && id === process.env.TWITCH_REWARD_ID) return 'song';
-  try { if (JSON.parse(process.env.TWITCH_RANDOM_REWARDS || '[]').some(r => r.id === id)) return 'random'; } catch {}
-  if (id && (process.env.OUTFIT_REWARDS || '').split(',').includes(id)) return 'outfit';
-  return '';
-}
+// The reward's main use (reward-uses.js): 'song' | 'random' | 'outfit' | ''
+const roleOf = (id) => require('./reward-uses').useOf(id);
 
 // Undefined when Twitch has no such reward (deleted)
 async function getReward(id) {
@@ -171,6 +167,8 @@ async function listRewards() {
     channel: await channelLogin(),
     rewards: rewards.filter(r => !copies.has(r.id)).map(r => ({
       id: r.id, title: r.title, cost: r.cost, enabled: r.is_enabled, role: roleOf(r.id),
+      tabs: require('./reward-uses').tabsOf(r.id),   // a 🎲 reward's sheet tabs
+      needsText: !!r.is_user_input_required,          // a 🎤 reward needs the viewer's text
       manageable: manageable.ids.has(r.id),
       skipsQueue: !!r.should_redemptions_skip_request_queue,
       takeover: takeovers[r.id] && !takeovers[r.id].done ? { startedAt: takeovers[r.id].startedAt } : null,
@@ -194,7 +192,7 @@ async function startTakeover(id) {
 }
 
 // Step 2, once the original is deleted on Twitch: the copy takes its name and state, and the
-// song request system uses the copy
+// song request system uses the copy: its main use (reward-uses.js) and its effect move over
 async function finishTakeover(id) {
   const takeovers = loadTakeovers();
   const t = takeovers[id];
@@ -211,11 +209,9 @@ async function finishTakeover(id) {
     }
     throw err;
   }
-  const { writeEnvValues } = require('./setup-routes');   // here, so tests of this module don't load setup
-  if (process.env.TWITCH_REWARD_ID === id) writeEnvValues({ TWITCH_REWARD_ID: t.copyId });
-  let random = [];
-  try { random = JSON.parse(process.env.TWITCH_RANDOM_REWARDS || '[]'); } catch {}
-  if (random.some(r => r.id === id)) writeEnvValues({ TWITCH_RANDOM_REWARDS: JSON.stringify(random.map(r => r.id === id ? { ...r, id: t.copyId } : r)) });
+  const values = require('./reward-uses').moved(id, t.copyId);
+  if (Object.keys(values).length) require('./setup-routes').writeEnvValues(values);   // here, so tests of this module don't load setup
+  require('./reward-effects').moveReward(id, t.copyId);
   takeovers[id] = { ...t, done: true, doneAt: Date.now() };
   saveTakeovers(takeovers);
   manageable.at = 0;

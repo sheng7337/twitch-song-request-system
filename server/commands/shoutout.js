@@ -1,7 +1,8 @@
 // server/commands/shoutout.js
 // Handles the !so <username> chat command, and the Chat tab's Shoutout button (same function).
 // Sends Twitch's own Shoutout (the follow pop-up; chat-mod.js — only while live, so a refusal is
-// passed on and the clip still plays). Looks up the user's Twitch ID, fetches a random clip, gets a signed HLS
+// passed on and the clip still plays). Looks up the user's Twitch ID, picks a random one of their newest 50 clips
+// or of their 20 most viewed (SHOUTOUT_CLIPS; newest-clips.js), gets a signed HLS
 // playlist URL via GQL, and broadcasts it to all WebSocket clients.
 //
 // Playback path:
@@ -21,6 +22,7 @@ const { addShoutout } = require('../shoutout-history');
 const { broadcastRaw } = require('../queue');
 const chatMod = require('../chat-mod');
 const { UserError, errorBody } = require('../messages');
+const { newestClips, clipPool } = require('../newest-clips');
 
 const TWITCH_API = 'https://api.twitch.tv/helix';
 
@@ -39,12 +41,12 @@ async function lookupUser(login) {
   return res.data.data[0] ?? null;
 }
 
-async function fetchClips(broadcasterId) {
-  const res = await axios.get(`${TWITCH_API}/clips`, {
-    params: { broadcaster_id: broadcasterId, first: 20 },
-    headers: twitchHeaders(),
-  });
-  return res.data.data ?? [];
+// 'newest': the newest 50 (Twitch's own order is most-viewed first, so its first page is always the same old
+// clips). 'top': that first page, the 20 most viewed
+async function fetchClips(broadcasterId, pool) {
+  const get = async params => (await axios.get(`${TWITCH_API}/clips`, { params, headers: twitchHeaders() })).data;
+  if (pool === 'top') return (await get({ broadcaster_id: broadcasterId, first: 20 })).data ?? [];
+  return newestClips(get, broadcasterId, 50);
 }
 
 // → { name, twitch: null when Twitch's Shoutout went out, else why not ({ error, code, params }),
@@ -74,14 +76,15 @@ async function shoutout(login) {
   }
 
   const result = { name: user.display_name || user.login, twitch, clip: false };
-  const clips = await fetchClips(user.id);
+  const pool = clipPool();
+  const clips = await fetchClips(user.id, pool);
   if (!clips.length) {
     console.log(`[shoutout] No clips found for ${username}`);
     return result;
   }
 
   const clip = clips[Math.floor(Math.random() * clips.length)];
-  console.log(`[shoutout] Selected clip "${clip.title}" by ${clip.broadcaster_name}`);
+  console.log(`[shoutout] Selected clip "${clip.title}" by ${clip.broadcaster_name} (${clip.created_at.slice(0, 10)}; one of the ${pool === 'top' ? `${clips.length} most viewed` : `newest ${clips.length}`})`);
 
   let videoUrl;
   try {

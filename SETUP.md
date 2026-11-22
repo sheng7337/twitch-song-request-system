@@ -162,7 +162,7 @@ Mods and the broadcaster only — viewers can't trigger them.
 
 | Command | Description |
 |---|---|
-| `!so <user>` | Sends Twitch's Shoutout (while you're live), plays a random clip of that channel and adds it to the sponsor roll |
+| `!so <user>` | Sends Twitch's Shoutout (while you're live), plays a random clip of that channel (one of its newest 50, or of its 20 most viewed: Chat tab ⚙ → **Shoutout clips**) and adds it to the sponsor roll |
 | `!tk` | Japanese-TV-style sponsor roll of every channel `!so`'d this stream, then clears the list |
 | `!endingtk` | The same roll for everyone who supported this stream, one heading each: raiders, subscribers (gifters and gifted viewers), cheers, new followers, channel-point redeemers, song requesters and the 8 most active chatters — since the last `!endingtk`. Who it would thank now: Chat tab ⚙ |
 | `!watch <url>` | Plays a Twitch clip, a YouTube video or a video file link (mp4/webm) |
@@ -185,7 +185,7 @@ Open `http://localhost:3000/dashboard` during streams.
 | Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Settings** at the right end of its top row opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — which sheet tabs can be requested, random cooldown and pick, clear the queue; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now, channel-point rewards. Each saves on its own |
+| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — which sheet tabs can be requested, random cooldown and pick, clear the queue; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now. Each saves on its own |
 | 🎨 Look & overlays | The button at the top, beside EN / 中文 — one place for what isn't a single tab's: five themes — **Neon** (the original), **Daylight**, **High contrast**, **Ocean**, **Cream & coffee** — chosen apart for the dashboard and for the overlays, and text sizes: the dashboard's (85–140%, the same on every browser and phone that opens it), the song list's and the break card's. Overlays change at once on stream and keep their size in OBS (bigger text, fewer songs in the same space). One overlay in another theme: add `?theme=daylight` (`neon`, `daylight`, `contrast`, `ocean`, `coffee`) to its URL. The chat's text size stays under 💬 Chat → ⚙. Also here: the overlays' panel opacity, brightness and language, each overlay's Browser Source address and size with **Copy**, and the version |
 | EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlays follow **🎨 Look & overlays → Overlay language** |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
@@ -254,10 +254,7 @@ list. Messages mods delete show struck through.
   app change only the redemptions of rewards it made, so a reward made on Twitch gets **↗ Twitch queue**
   instead, which opens Twitch's own reward queue.
 - **Chat ⚙:** song notes on the overlay; who `!endingtk` would thank right now, and whether new
-  followers are included; **Channel-point rewards**, which hands a reward made on Twitch over to the
-  app. Click **Let the app manage it**: the app makes a hidden copy with the same settings. Delete the original on
-  Twitch (clear its queue first), and the copy takes its name and place, also as the song request or
-  a random reward. Only a custom icon has to be uploaded again.
+  followers are included. Channel-point rewards are in their own tab (below).
 
 **Updating from an earlier version:** new followers (for `!endingtk`) and posting in chat need Twitch
 permissions that older setups didn't ask for. The Chat tab then shows **Authorize again →**, which
@@ -332,6 +329,23 @@ and follows the source's own volume and mute, so a mode that mutes the source (�
 Without it, the sound goes straight to your speakers: it isn't in the mixer, and reaches the stream only through a
 desktop-audio capture. Moving from Streamlabs: run both for one stream with the Alert Box muted, then remove the Alert Box.
 
+### 🎟️ Rewards tab: what each reward is for
+
+Every channel-point reward on your channel, one row each:
+
+- **Use** — its main use: **🎤 Song request**, **🎲 Random song** or **👕 Outfit**, or none. There's always
+  one song-request reward: to move it, choose 🎤 on another reward. A 🎲 reward also ticks the sheet tabs it
+  draws from (none ticked = every tab). A 🎤 reward has to ask viewers to type the song: if it doesn't, the row
+  warns you — turn on **Require Viewer to Enter Text** for it on Twitch.
+- **🎟️ Effect** — a sound or picture (below), on its own or on top of the main use, e.g. an outfit change
+  with a sound. **→ Effect settings** opens it in 🔔 Alerts.
+- **Done / refund** — the main use decides (a song when it's sung or removed, an outfit when you pick one);
+  a reward with only an effect leaves it to the effect.
+- **Let the app manage it** — Twitch lets the app mark done or refund only the rewards it made, so a reward
+  made on Twitch can be handed over: the app makes a hidden copy with the same settings. Delete the original
+  on Twitch (clear its queue first), and the copy takes its name and place, with its use and effect. Only a
+  custom icon has to be uploaded again.
+
 ### 🎟️ Reward effects (instead of TriggerFyre)
 
 A channel-point reward plays a sound, a picture / GIF / video, or both. In 🔔 Alerts → **🎟️ Reward effects**:
@@ -339,16 +353,17 @@ A channel-point reward plays a sound, a picture / GIF / video, or both. In 🔔 
 1. Add a new source → **Browser**: `http://localhost:3000/overlay/reward-effects.html`, Width `1920`, Height `1080`,
    over your whole scene (on top). It's transparent while nothing plays. Tick **Control audio via OBS** and set
    Audio Monitoring to **Monitor and Output**, as for alerts above: then it has its own volume and mute in the mixer.
-2. **＋ Add a reward…**, then pick its sounds (several = one at random each time), a picture, GIF or video,
-   where it shows and how big, how long (or as long as the sound), and **Show who redeemed it**. **▶ Test** plays
-   it on stream only. Song, random-song and outfit rewards aren't in the list: they have their own.
+2. In the **🎟️ Rewards** tab, tick **🎟️ Effect** on the reward. Back here, pick its sounds (several = one at
+   random each time), a picture, GIF or video, where it shows and how big, how long (or as long as the sound),
+   and **Show who redeemed it**. **▶ Test** plays it on stream only.
 3. **Two at once**: one after the other, play together (up to 3), or skip the new one.
 
 When an effect has played, its redemption is marked done. One that doesn't play — **🔇 Off**, skipped, more than
-20 waiting, or **🗑 Clear the queue** — is refunded. **⏸ Pause** (or a mode with **🎟️ Pause reward effects**, e.g.
+20 waiting, or **🗑 Clear the queue** — is refunded. A reward that's also a song request, random song or outfit is
+left to that: the effect only plays. **⏸ Pause** (or a mode with **🎟️ Pause reward effects**, e.g.
 🎤 singing) keeps them waiting; they play when it ends. With no reward-effects source open in OBS they wait too,
 and the tab says so. Twitch lets the app mark done or refund only the rewards it manages: a reward made on Twitch
-still plays, and can be handed over in 💬 Chat → ⚙ → Channel-point rewards. Waiting ones aren't kept over a
+still plays, and can be handed over in the 🎟️ Rewards tab. Waiting ones aren't kept over a
 restart: they stay in Twitch's own reward queue.
 
 Moving from TriggerFyre: save your sounds and pictures into `alert-media`, set the rewards up here, then turn
@@ -364,10 +379,10 @@ Viewers redeem a reward, you pick the outfit: your avatar's state in veadotube m
 2. Dashboard → **👕 Outfits**: your veadotube windows show with a picture of each state. Click one to wear it.
 3. Press **☆** on your usual outfit: it becomes the default, and its window the one redemptions change.
    With the same avatar in two windows, press ☆ in the right one, once after opening veadotube.
-4. Under **Redemptions**, tick the rewards that change the outfit, and set **Back to the default outfit
-   after** N minutes (0 = it stays until the next redemption)
+4. In the **🎟️ Rewards** tab, set the rewards that change the outfit to **👕 Outfit**. Back here, under
+   **Redemptions**, set **Back to the default outfit after** N minutes (0 = it stays until the next redemption)
 5. When one is redeemed, a card with your outfits pops up on any tab: click the one to wear. Rewards made
-   by the app (or taken over in 💬 Chat ⚙) are then marked done, or **↩ Refund**; others stay in Twitch's queue.
+   by the app (or taken over in the 🎟️ Rewards tab) are then marked done, or **↩ Refund**; others stay in Twitch's queue.
 
 ---
 
@@ -461,7 +476,7 @@ vtuber-song-queue/
 ├── chat-logs/                ← Chat tab log, one file per day (kept CHAT_LOG_DAYS days)
 ├── logs/                     ← one folder per start: app.log (the console) and leihu.log (kept 30 runs / 14 days)
 ├── ending-credits.json       ← when !endingtk last ran
-├── reward-takeovers.json     ← rewards handed over to the app (Chat ⚙)
+├── reward-takeovers.json     ← rewards handed over to the app (🎟️ Rewards tab)
 ├── stream-session.json       ← when the stream last went live (Chat tab, what to announce)
 ├── server/                   ← the server (see CLAUDE.md for every file)
 │   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk, !endingtk)

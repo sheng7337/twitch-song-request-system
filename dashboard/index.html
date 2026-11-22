@@ -277,6 +277,29 @@
   .reward-row .reward-state.ok { color: var(--good); }
   .reward-row .reward-steps { flex-basis: 100%; color: var(--warn); line-height: 1.5; }
   .reward-row .btn { font-size: calc(12px * var(--ts)); padding: 3px 9px; text-decoration: none; }
+  a.btn { text-decoration: none; }   /* a link that looks like a button */
+  /* 🎟️ Rewards tab: the same columns in every row, under a header; extra lines span the row */
+  #tab-rewards .reward-rows { --rw-cols: minmax(7em, 1.2fr) 4.5em 13em 13em minmax(11em, 1.6fr); }
+  #tab-rewards .reward-row, .reward-head { display: grid; grid-template-columns: var(--rw-cols); align-items: center; gap: 6px 12px; }
+  .reward-head { padding: 0 9px; color: var(--text-dim); font-size: calc(12px * var(--ts)); }
+  .reward-head > :nth-child(2), .reward-row .reward-cost { text-align: right; }
+  .reward-row .reward-cost { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .reward-row .reward-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+  .reward-row .reward-cell.one-line { flex-wrap: nowrap; }
+  .reward-row .reward-cell select { flex: 1 1 auto; min-width: 0; }
+  .reward-row .reward-go { padding: 3px 7px; }
+  .reward-row .reward-name { overflow-wrap: anywhere; }
+  .reward-row .reward-fx { display: inline-flex; align-items: center; gap: 4px; }
+  .reward-row .reward-more { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--text-dim); }
+  .reward-row .reward-more label { display: inline-flex; align-items: center; gap: 3px; }
+  .reward-row .reward-warn { grid-column: 1 / -1; color: var(--warn); line-height: 1.5; }
+  #tab-rewards .reward-row .reward-steps { grid-column: 1 / -1; }
+  #tab-rewards .reward-row .reward-state { flex: 1 1 auto; }
+  @media (max-width: 900px) {
+    .reward-head { display: none; }
+    #tab-rewards .reward-row { grid-template-columns: minmax(0, 1fr) auto; }
+    #tab-rewards .reward-row .reward-cell:not(:first-child) { grid-column: 1 / -1; }
+  }
   .chat-more {
     position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
     background: var(--accent); color: var(--bg); border: none; border-radius: 14px; padding: 5px 14px;
@@ -357,6 +380,8 @@
     .chat-list { flex: none; height: 75vh; }
     .workspace { display: block; }
     .chat-dock, .tab.dock-btn { display: none !important; }   /* no room: the Chat tab only */
+    .tabs { overflow-x: auto; padding: 0 8px; }   /* the tabs scroll sideways instead of squeezing */
+    .tab { flex: none; white-space: nowrap; padding: 9px 10px; }
   }
 
   /* ── Column panels ── */
@@ -1062,6 +1087,7 @@
   <button class="tab" role="tab" id="tabbtn-modes" data-tab="modes" aria-controls="tab-modes" onclick="showTab('modes')" data-i18n="dash.tab.modes">🎛 Modes</button>
   <button class="tab" role="tab" id="tabbtn-outfits" data-tab="outfits" aria-controls="tab-outfits" onclick="showTab('outfits')"><span data-i18n="dash.tab.outfits">👕 Outfits</span><span class="tab-count" id="outfit-count" hidden></span></button>
   <button class="tab" role="tab" id="tabbtn-alerts" data-tab="alerts" aria-controls="tab-alerts" onclick="showTab('alerts')" data-i18n="dash.tab.alerts">🔔 Alerts</button>
+  <button class="tab" role="tab" id="tabbtn-rewards" data-tab="rewards" aria-controls="tab-rewards" onclick="showTab('rewards')" data-i18n="dash.tab.rewards">🎟️ Rewards</button>
   <!-- The chat beside the other tabs: open / close (placeChat) -->
   <button class="tab dock-btn" id="dock-btn" type="button" onclick="toggleChatDock()" aria-pressed="false">💬<span class="tab-count" id="dock-unread" hidden></span> <span id="dock-arrow">◂</span></button>
 </nav>
@@ -1222,18 +1248,24 @@
       </label>
       <p class="setting-hint" data-i18n="dash.chat.songNotesHint">When chat names a song from the sheet, the song overlay briefly shows when it was last sung.</p>
     </section>
+    <!-- Which clips !so picks from (server/newest-clips.js) -->
+    <section>
+      <h3 data-i18n="dash.chat.soClipsTitle">Shoutout clips (!so)</h3>
+      <label class="setting">
+        <span class="setting-name" data-i18n="dash.chat.soClips">Pick from</span>
+        <select class="lang-select" id="so-clips" onchange="saveShoutoutClips()">
+          <option value="newest" data-i18n="dash.chat.soNewest">The newest 50</option>
+          <option value="top" data-i18n="dash.chat.soTop">The 20 most viewed</option>
+        </select>
+      </label>
+      <p class="setting-hint" data-i18n="dash.chat.soClipsHint"></p>
+    </section>
     <!-- !endingtk (server/ending-credits.js) -->
     <section>
       <h3 data-i18n="dash.chat.creditsTitle">Ending roll (!endingtk)</h3>
       <p class="setting-hint" data-i18n="dash.chat.creditsHint"></p>
       <p class="setting-hint" id="credits-now"></p>
       <p class="setting-hint" id="credits-follows"></p>
-    </section>
-    <!-- Channel-point rewards: which the app manages (✓ / ↩ in the chat), taking over ones made on Twitch (server/redemptions.js) -->
-    <section>
-      <h3 data-i18n="dash.chat.rewardsTitle">Channel-point rewards</h3>
-      <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
-      <div class="reward-rows" id="reward-rows"></div>
     </section>
   </div>
 </div>
@@ -1277,7 +1309,7 @@
       <div class="al-row" id="fx-controls"></div>
       <p class="fx-status" id="fx-status"></p>
       <div class="al-kinds" id="fx-list"></div>
-      <div class="al-row"><select class="modes-input" id="fx-add"></select></div>
+      <p class="setting-hint"><span data-i18n="dash.fx.addHere"></span> <a class="btn" href="#rewards" data-i18n="dash.rewards.go">→ 🎟️ Rewards</a></p>
     </section>
     <section class="modes-box">
       <h3 data-i18n="dash.alerts.recentTitle">Latest alerts</h3>
@@ -1298,12 +1330,26 @@
       <h3 data-i18n="dash.outfits.settingsTitle">Redemptions</h3>
       <p class="setting-hint" data-i18n="dash.outfits.rewardsHint"></p>
       <div class="outfit-rewards" id="outfit-rewards"></div>
+      <p class="setting-hint"><span data-i18n="dash.outfits.rewardsWhere"></span> <a class="btn" href="#rewards" data-i18n="dash.rewards.go">→ 🎟️ Rewards</a></p>
       <label class="modes-row">
         <span data-i18n="dash.outfits.minutes">Back to the default outfit after</span>
         <input type="number" class="cooldown-input" id="outfit-minutes" min="0" max="1440" step="1" onchange="saveOutfits({ minutes: Number(this.value) || 0 })" />
         <span id="outfit-minutes-unit"></span>
       </label>
       <p class="setting-hint" data-i18n="dash.outfits.minutesHint"></p>
+    </section>
+  </div>
+</div>
+
+<!-- 🎟️ Rewards: what each channel-point reward is for (server/reward-uses.js), its effect, and taking over
+     ones made on Twitch (server/redemptions.js) -->
+<div class="tab-page" id="tab-rewards" role="tabpanel" aria-labelledby="tabbtn-rewards" hidden>
+  <div class="modes-page">
+    <section class="modes-box">
+      <h3 data-i18n="dash.rewards.title">🎟️ Channel-point rewards</h3>
+      <p class="setting-hint" data-i18n="dash.rewards.intro"></p>
+      <div class="reward-rows" id="reward-rows"></div>
+      <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
     </section>
   </div>
 </div>
@@ -1462,6 +1508,7 @@ function connect() {
       else if (m.type === 'outfits') { outfits.status = m; paintOutfits(); }
       else if (m.type === 'alert') onAlertMessage(m.alert);
       else if (m.type === 'reward-effects') onEffectsMessage(m.status);
+      else if (m.type === 'rewards-changed') onRewardsChanged();
       else if (m.type === 'ending-raid') onEndingRaid(m);
       else if (m.type === 'settings') applyLook(m);
     } catch(_){}
@@ -1888,8 +1935,10 @@ async function loadSettings() {
     document.getElementById('cooldown-input').value = settings.randomCooldownDays;
     cooldownDays = settings.randomCooldownDays;
     document.getElementById('pick-mode').value = settings.randomPickMode || 'weighted';
+    document.getElementById('so-clips').value = settings.shoutoutClips || 'newest';
     sheetTabs = { all: settings.sheetTabs || [], excluded: settings.excludedTabs || [] };
     paintSheetTabs();
+    paintRewards();   // 🎲 rewards' tab ticks
     document.getElementById('chat-song-notes').checked = settings.songNotes !== false;
     if (settings.chatOverlay) paintChatOverlay(settings.chatOverlay);
     document.getElementById('opacity-input').value = settings.panelBgAlpha;
@@ -1985,7 +2034,7 @@ function toggleTabConfig(tab, open) {
   const panel = document.getElementById('config-' + tab);
   if (!panel) return;   // a tab without settings
   panel.hidden = open === undefined ? !panel.hidden : !open;
-  if (tab === 'chat' && !panel.hidden) { loadCredits(); loadRewards(); }
+  if (tab === 'chat' && !panel.hidden) loadCredits();
   const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
   if (!btn) return;
   btn.setAttribute('aria-expanded', String(!panel.hidden));
@@ -2033,6 +2082,20 @@ async function savePickMode() {
     showToast(t('dash.toast.pickModeSet', { name: sel.options[sel.selectedIndex].text }));
   } catch(_) {
     showToast(t('dash.toast.pickModeFailed'), true);
+  }
+}
+
+async function saveShoutoutClips() {
+  const sel = document.getElementById('so-clips');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shoutoutClips: sel.value }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(t('dash.toast.soClipsSet', { name: sel.options[sel.selectedIndex].text }));
+  } catch(_) {
+    showToast(t('dash.toast.soClipsFailed'), true);
   }
 }
 
@@ -2365,8 +2428,8 @@ async function pollLeihu() {
 }
 
 // ── Tabs ── Each tab is a button in .tabs and a .tab-page; #leihu in the address keeps the tab
-// on reload. Planned: chat room, rewards, OBS / Streamlabs control — add them here and in the markup.
-const TABS = ['queue', 'leihu', 'chat', 'modes', 'outfits', 'alerts'];
+// on reload. Planned: OBS / Streamlabs control — add them here and in the markup.
+const TABS = ['queue', 'leihu', 'chat', 'modes', 'outfits', 'alerts', 'rewards'];
 let currentTab = 'queue';
 
 function showTab(name) {
@@ -2387,6 +2450,7 @@ function showTab(name) {
   if (name === 'modes') loadModes(true);
   if (name === 'outfits') { loadOutfits(); loadOutfitRewards(); }
   if (name === 'alerts') loadAlerts();
+  if (name === 'rewards') loadRewards();
   paintOutfitPick();
 }
 
@@ -3136,9 +3200,10 @@ async function loadCredits() {
   }
 }
 
-// Chat ⚙ → Channel-point rewards. Taking over one made on Twitch (server/redemptions.js): the app makes
-// a hidden copy, the streamer deletes the original on Twitch, the copy takes its place (by itself when
-// Twitch reports the delete; "I've deleted it" checks at once).
+// 🎟️ Rewards tab: every reward, what it's for (one main use: 🎤 / 🎲 / 👕, server/reward-uses.js) and its
+// 🎟️ effect (on top of any use; set up in the Alerts tab). Taking over one made on Twitch
+// (server/redemptions.js): the app makes a hidden copy, the streamer deletes the original on Twitch, the
+// copy takes its place (by itself when Twitch reports the delete; "I've deleted it" checks at once).
 let rewardsView = null;
 async function loadRewards() {
   const box = document.getElementById('reward-rows');
@@ -3166,26 +3231,85 @@ function paintRewards() {
   if (!rewardsView) return;
   const ch = rewardsView.channel;
   const page = `https://dashboard.twitch.tv/${ch ? `u/${encodeURIComponent(ch)}/` : ''}viewer-rewards/channel-points/rewards`;
-  document.getElementById('reward-rows').innerHTML = rewardsView.rewards.map(r => {
-    const tags = (r.role ? `<span class="chat-tag">${esc(t('dash.chat.rewardRole.' + r.role))}</span>` : '')
-      + (r.enabled ? '' : `<span class="chat-tag">${esc(t('dash.chat.rewardOff'))}</span>`);
+  const rows = rewardsView.rewards.map(r => {
+    const song = r.role === 'song';
+    const uses = ['', 'song', 'random', 'outfit'].map(u =>
+      `<option value="${u}"${r.role === u ? ' selected' : ''}>${esc(t('dash.rewards.use.' + (u || 'none')))}</option>`).join('');
+    const go = (tab, label) => `<a class="btn reward-go" href="#${tab}" data-rw-go="${tab}" title="${esc(t(label))}" aria-label="${esc(t(label))}">⚙</a>`;
+    // name · cost · use · effect · manage, then the lines under the row
+    const cells = `<span class="reward-cell"><span class="reward-name">${esc(r.title)}</span>`
+        + (r.enabled ? '' : `<span class="chat-tag">${esc(t('dash.chat.rewardOff'))}</span>`) + '</span>'
+      + `<span class="reward-cost">${r.cost}</span>`
+      + `<span class="reward-cell one-line"><select class="modes-input" data-rw-use aria-label="${esc(t('dash.rewards.col.use'))}"${song ? ` disabled title="${esc(t('dash.rewards.songFixed'))}"` : ''}>${uses}</select>`
+        + (r.role === 'outfit' ? go('outfits', 'dash.rewards.goOutfits') : '') + '</span>'
+      + `<span class="reward-cell one-line"><label class="reward-fx"><input type="checkbox" data-rw-fx${r.effect ? ' checked' : ''}> ${esc(t('dash.rewards.effect'))}</label>`
+        + (r.effect ? go('alerts', 'dash.rewards.goEffect') : '') + '</span>';
+    const under = (r.role === 'random' ? `<div class="reward-more">${esc(t('dash.rewards.tabs'))} ${(sheetTabs.all || []).filter(n => !sheetTabs.excluded.includes(n)).map(n =>
+          `<label><input type="checkbox" data-rw-tab="${esc(n)}"${(r.tabs || []).includes(n) ? ' checked' : ''}> ${esc(n)}</label>`).join('')}</div>` : '')
+      + (song && !r.needsText ? `<div class="reward-warn">${esc(t('dash.rewards.needsText'))}</div>` : '')
+      + (song ? `<div class="reward-more">${esc(t('dash.rewards.songFixed'))}</div>` : '')
+      // 🎤 / 🎲 / 👕 give points back (song removed, nothing to draw, outfit dropped): only on a managed, queued reward
+      + (r.role && r.skipsQueue ? `<div class="reward-warn">${esc(t('dash.rewards.skipWarn', { why: t('dash.rewards.why.' + r.role) }))}</div>`
+        : r.role && !r.manageable ? `<div class="reward-warn">${esc(t('dash.rewards.manageWarn', { why: t('dash.rewards.why.' + r.role) }))}</div>` : '');
     const btn = (act, label) => `<button class="btn" data-takeover="${act}" data-id="${esc(r.id)}">${esc(t(label))}</button>`;
-    let rest;
-    if (r.manageable) rest = `<span class="reward-state ok">${esc(t('dash.chat.rewardManaged'))}</span>`;
-    else if (r.skipsQueue) rest = `<span class="reward-state">${esc(t('dash.chat.rewardSkipsQueue'))}</span>`;
+    let manage, steps = '';
+    if (r.manageable && !r.skipsQueue) manage = `<span class="reward-state ok">${esc(t('dash.chat.rewardManaged'))}</span>`;
+    else if (r.skipsQueue) manage = `<span class="reward-state">${esc(t(r.role ? 'dash.rewards.skipsQueue' : 'dash.chat.rewardSkipsQueue'))}</span>`;
     else if (r.takeover) {
-      rest = `<span class="reward-state">${esc(t('dash.chat.rewardCopyReady'))}</span>`
-        + `<div class="reward-steps">${esc(t('dash.chat.rewardDeleteStep', { title: r.title }))}</div>`
+      manage = `<span class="reward-state">${esc(t('dash.chat.rewardCopyReady'))}</span>`;
+      steps = `<div class="reward-more reward-steps">${esc(t('dash.chat.rewardDeleteStep', { title: r.title }))}`
         + `<a class="btn" href="${esc(page)}" target="_blank" rel="noopener">${esc(t('dash.chat.rewardOpenTwitch'))}</a>`
-        + btn('finish', 'dash.chat.rewardFinish') + btn('cancel', 'dash.chat.rewardCancel');
+        + btn('finish', 'dash.chat.rewardFinish') + btn('cancel', 'dash.chat.rewardCancel') + '</div>';
     } else {
-      rest = `<span class="reward-state">${esc(t('dash.chat.rewardOnTwitch'))}</span>` + btn('start', 'dash.chat.rewardTakeOver');
+      manage = `<span class="reward-state">${esc(t('dash.chat.rewardOnTwitch'))}</span>` + btn('start', 'dash.chat.rewardTakeOver');
     }
-    return `<div class="reward-row"><span class="reward-name">${esc(r.title)}</span>${tags}${rest}</div>`;
-  }).join('') || esc(t('dash.chat.rewardsNone'));
+    return `<div class="reward-row" data-rw="${esc(r.id)}">${cells}<span class="reward-cell">${manage}</span>${under}${steps}</div>`;
+  }).join('');
+  document.getElementById('reward-rows').innerHTML = rows
+    ? `<div class="reward-head" aria-hidden="true">${['name', 'cost', 'use', 'effect', 'manage'].map(c => `<span>${esc(t('dash.rewards.col.' + c))}</span>`).join('')}</div>` + rows
+    : esc(t('dash.chat.rewardsNone'));
+}
+
+// A row's main use, its 🎲 tabs, its 🎟️ effect
+document.getElementById('reward-rows').addEventListener('change', async (e) => {
+  const row = e.target.closest('[data-rw]');
+  const r = row && rewardsView && rewardsView.rewards.find(x => x.id === row.dataset.rw);
+  if (!r) return;
+  let url, body;
+  if (e.target.matches('[data-rw-use]')) {
+    url = '/api/rewards/use'; body = { id: r.id, title: r.title, use: e.target.value };
+  } else if (e.target.matches('[data-rw-tab]')) {
+    const tabs = [...row.querySelectorAll('[data-rw-tab]')].filter(x => x.checked).map(x => x.dataset.rwTab);
+    url = '/api/rewards/use'; body = { id: r.id, title: r.title, use: 'random', tabs };
+  } else if (e.target.matches('[data-rw-fx]')) {
+    url = '/api/rewards/effect'; body = { id: r.id, title: r.title, on: e.target.checked };
+  } else return;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = await res.json();
+    if (!res.ok) throw new Error(I18N.server(out, 'dash.toast.requestFailed'));
+    showToast(t('dash.rewards.saved', { name: r.title }));
+  } catch (err) {
+    showToast(err.message, true);
+  }
+  await loadRewards();
+});
+
+// Another dashboard changed what a reward is for: the lists here follow
+function onRewardsChanged() {
+  if (currentTab === 'rewards') loadRewards();
+  if (outfits.rewards) loadOutfitRewards();
+  if (fx.rewards) loadEffectRewards();
 }
 
 document.getElementById('reward-rows').addEventListener('click', async (e) => {
+  const go = e.target.closest('[data-rw-go]');
+  if (go) {   // → the effect's settings: the Alerts tab, scrolled to them
+    e.preventDefault();
+    showTab(go.dataset.rwGo);
+    if (go.dataset.rwGo === 'alerts') document.getElementById('fx-box').scrollIntoView({ block: 'start' });
+    return;
+  }
   const b = e.target.closest('[data-takeover]');
   if (!b) return;
   b.disabled = true;
@@ -4001,10 +4125,6 @@ function paintEffects() {
       + `<label title="${esc(t('dash.alerts.volume'))}">🔊 <input type="range" class="opacity-slider" min="0" max="100" step="5" data-f="volume" value="${e.volume}"></label>`
       + `<label><input type="checkbox" data-f="showName"${e.showName ? ' checked' : ''}> ${esc(t('dash.fx.showName'))}</label></div></div>`;
   }).join('') : `<p class="setting-hint">${esc(t('dash.fx.none'))}</p>`;
-  const used = new Set(st.effects.map(e => e.rewardId));
-  const can = (fx.rewards || []).filter(r => !r.role && !used.has(r.id));   // song, random and outfit rewards have their own
-  document.getElementById('fx-add').innerHTML = `<option value="">${esc(t(!fx.rewards ? 'dash.chat.rewardsLoading' : can.length ? 'dash.fx.add' : 'dash.fx.addNone'))}</option>`
-    + can.map(r => `<option value="${esc(r.id)}">${esc(r.title)} (${r.cost})</option>`).join('');
   paintEffectStatus();
 }
 
@@ -4037,11 +4157,6 @@ const saveEffectList = list => saveEffects({ effects: list.map(e => ({ ...e, tit
 
 document.getElementById('fx-box').addEventListener('change', (e) => {
   const el = e.target;
-  if (el.id === 'fx-add') {
-    const r = fxReward(el.value);
-    if (r) saveEffectList([...fx.status.effects, { rewardId: r.id, title: r.title }]);
-    return;
-  }
   if (el.dataset.fx) { saveEffects({ [el.dataset.fx]: el.type === 'range' ? Number(el.value) : el.value }); return; }
   const row = el.closest('[data-fx-i]');
   const f = el.dataset.f;
@@ -4170,17 +4285,11 @@ function paintOutfitRewards() {
   const st = outfits.status;
   const box = document.getElementById('outfit-rewards');
   if (!st || !outfits.rewards) return;
-  box.innerHTML = outfits.rewards.filter(r => r.role !== 'song' && r.role !== 'random').map(r =>
-    `<label><input type="checkbox" data-outfit-reward="${esc(r.id)}"${st.rewards.includes(r.id) ? ' checked' : ''}> ${esc(r.title)}`
-    + (r.manageable || !st.rewards.includes(r.id) ? '' : ` <span class="setting-hint">· ${esc(t('dash.outfits.notManaged'))}</span>`) + '</label>'
-  ).join('') || esc(t('dash.chat.rewardsNone'));
+  // Which rewards change the outfit is chosen in the 🎟️ Rewards tab
+  box.innerHTML = outfits.rewards.filter(r => st.rewards.includes(r.id)).map(r =>
+    `<span>👕 ${esc(r.title)}` + (r.manageable ? '' : ` <span class="setting-hint">· ${esc(t('dash.outfits.notManaged'))}</span>`) + '</span>'
+  ).join('') || esc(t('dash.outfits.noRewards'));
 }
-
-document.getElementById('outfit-rewards').addEventListener('change', (e) => {
-  if (!e.target.dataset.outfitReward) return;
-  const ids = [...document.querySelectorAll('[data-outfit-reward]')].filter(x => x.checked).map(x => x.dataset.outfitReward);
-  saveOutfits({ rewards: ids });
-});
 
 // The first waiting redemption, with the outfits to pick from. Not over the Leihu tab (singing): it
 // waits, counted on the 👕 tab, and pops up on leaving Leihu.

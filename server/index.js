@@ -737,6 +737,7 @@ app.get('/api/settings', (req, res) => {
     overlayLanguage: overlayLanguage(),
     chatOverlay: chatOverlaySettings(),
     randomPickMode: songTabs.pickMode(),
+    shoutoutClips: require('./newest-clips').clipPool(),
     excludedTabs: config.EXCLUDED_TABS,
     sheetTabs: require('./sheets').getTabs(),
     ...look.read(),   // themes and text sizes (look.js)
@@ -758,6 +759,14 @@ app.post('/api/settings', async (req, res) => {
   if (req.body.randomPickMode !== undefined) {
     try { updates.randomPickMode = songTabs.parsePickMode(req.body.randomPickMode); } catch (err) { return res.status(400).json(errorBody(err)); }
     setupRouter.writeEnvValues({ RANDOM_PICK_MODE: updates.randomPickMode });
+  }
+
+  // Which clips !so picks from (newest-clips.js)
+  if (req.body.shoutoutClips !== undefined) {
+    const { CLIP_POOLS } = require('./newest-clips');
+    if (!CLIP_POOLS.includes(req.body.shoutoutClips)) return res.status(400).json({ error: `shoutoutClips must be one of ${CLIP_POOLS.join(', ')}` });
+    updates.shoutoutClips = req.body.shoutoutClips;
+    setupRouter.writeEnvValues({ SHOUTOUT_CLIPS: updates.shoutoutClips });
   }
 
   // Sheet tabs left out of requests, random picks and the link finder; the song list is read again
@@ -1021,12 +1030,35 @@ app.post('/api/reward-effects/test', (req, res) => {
 app.post('/api/reward-effects/skip', (req, res) => { rewardEffects.skip(); res.json(rewardEffects.status()); });
 app.post('/api/reward-effects/clear', (req, res) => { rewardEffects.clear(); res.json(rewardEffects.status()); });
 
-// Chat ⚙: every reward, and taking over one made on Twitch ({ id, action: 'start' | 'finish' | 'cancel' })
+// 🎟️ Rewards tab: every reward (with its main use and whether it has an effect), what each is for
+// (reward-uses.js), its effect, and taking over one made on Twitch ({ id, action: 'start' | 'finish' | 'cancel' })
 app.get('/api/rewards', async (req, res) => {
   try {
-    res.json(await redemptions.listRewards());
+    const list = await redemptions.listRewards();
+    res.json({ ...list, rewards: list.rewards.map(r => ({ ...r, effect: rewardEffects.hasEffect(r.id) })) });
   } catch (err) {
     res.status(500).json(errorBody(err));
+  }
+});
+// { id, title, use: '' | 'song' | 'random' | 'outfit', tabs?: [sheet tab] (🎲) }
+app.post('/api/rewards/use', (req, res) => {
+  try {
+    const { id, title, use, tabs } = req.body || {};
+    const values = require('./reward-uses').change(String(id || ''), title, String(use ?? ''), tabs);
+    if (Object.keys(values).length) setupRouter.writeEnvValues(values);
+    sendChat({ type: 'rewards-changed' });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json(errorBody(err));
+  }
+});
+// { id, title, on }: the reward gets a 🎟️ effect (set up in the Alerts tab) or loses it
+app.post('/api/rewards/effect', (req, res) => {
+  try {
+    const { id, title, on } = req.body || {};
+    res.json(on ? rewardEffects.attach(String(id || ''), title) : rewardEffects.detach(String(id || '')));
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json(errorBody(err));
   }
 });
 app.post('/api/rewards/takeover', async (req, res) => {

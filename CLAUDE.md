@@ -74,6 +74,7 @@ vtuber-song-queue/
 │                          waiting() while held → dashboard top bar "⏸ N waiting" (media-waiting, /api/media/waiting/play|drop)
 │   ├── media-history.js   Last played media, for !replay
 │   ├── shoutout-history.js  Broadcasters shouted out since the last !tk (restore(): a dropped roll's go back)
+│   ├── newest-clips.js    A broadcaster's newest N clips for !so (Twitch sorts by views: walks back by date windows); clipPool() = SHOUTOUT_CLIPS newest|top
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
 │   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
@@ -88,6 +89,7 @@ vtuber-song-queue/
 │   ├── outfits.js         👕 Outfit rewards: redemptions wait for the streamer's pick; time limit back to the default
 │   ├── alerts.js          🔔 Alerts from chat-log records (follow / sub / gift / cheer / raid); alerts.json
 │   ├── reward-effects.js  🎟️ Reward effects: a reward plays sounds / a picture (queue, pause, done / refund); reward-effects.json
+│   ├── reward-uses.js     🎟️ Rewards tab: each reward's main use (song / random + tabs / outfit, in .env); moved() for takeovers
 │   ├── modes.js           Modes (🎛 tab, top-bar buttons): save / apply the streaming app's state + this app's part
 │   ├── stream-app.js      Streamlabs Desktop (Remote Control JSON-RPC) / OBS (obs-websocket 5) on this PC
 │   ├── stream-session.js  When the stream went live (stream.online / Helix /streams), for "to announce";
@@ -173,12 +175,16 @@ vtuber-song-queue/
   file (at = the redemption's time), applied on load, pushed as `{type: 'chat-redeem'}`. Sources:
   `channel.channel_points_custom_reward_redemption.update` (any reward, done here or on Twitch)
   and the app's own PATCH response
-- Takeover of a reward made on Twitch (Chat ⚙ → Channel-point rewards): `startTakeover` creates a
+- Each reward's main use is reward-uses.js (`useOf` = `roleOf`): one of TWITCH_REWARD_ID (always one: `change`
+  refuses to take it away, choosing 🎤 elsewhere moves it), TWITCH_RANDOM_REWARDS, OUTFIT_REWARDS. A 🎟️ effect
+  (reward-effects.json) can sit on any reward; with a main use, reward-effects.js only plays (`settleIfOurs`):
+  done / refund is the main use's
+- Takeover of a reward made on Twitch (🎟️ Rewards tab): `startTakeover` creates a
   disabled copy (`copyOf`: cost, prompt, color, text input, skip-queue, limits, cooldown — the icon
   can't be set by apps) named `<title> (new)` (titles must be unique). The streamer deletes the
   original on Twitch; `channel.channel_points_custom_reward.remove` (or "I've deleted it", or
   `listRewards` noticing it's gone) runs `finishTakeover`: the copy gets the original's title and
-  enabled / paused state, and `TWITCH_REWARD_ID` / the `TWITCH_RANDOM_REWARDS` entry switch to it.
+  enabled / paused state, and its use (`reward-uses.moved`) and effect (`reward-effects.moveReward`) switch to it.
   reward-takeovers.json keeps finished ones so ending-credits.js still counts the old ID as song
   requests. `cancelTakeover` deletes the copy
 
@@ -313,8 +319,8 @@ vtuber-song-queue/
   download, so Leihu retries the same song instead of adding a new one
 - Dashboard tabs: `TABS` in dashboard/index.html, each a `.tabs` button + `.tab-page` with its own settings
   (`.tab-config-btn` ⚙ at the right end of the tab's top row → `#config-<tab>` panel, `toggleTabConfig`; no
-  global settings popover: Song Queue holds the random cooldown + overlay look, Chat the song-notes switch, the
-  `!endingtk` preview (`/api/credits`) and channel-point rewards); `#leihu` / `#chat` in the URL selects
+  global settings popover: Song Queue holds the random cooldown + overlay look, Chat the song-notes switch and the
+  `!endingtk` preview (`/api/credits`)); the 🎟️ Rewards tab (`#rewards`) is every reward's use, effect and takeover; `#leihu` / `#chat` in the URL selects
   the tab. Planned tab: OBS / Streamlabs control. The Leihu tab shows Leihu's own UI
   with Leihu's settings (auto-prepare, auto-start, the two steps below) in its ⚙ panel (bulk progress
   also shows in the header), the UI in an iframe from `url` in `/api/leihu/status`
@@ -376,7 +382,8 @@ vtuber-song-queue/
   missing ones turn their buttons off with a re-authorize link. The pinned message (GET on load, the pin
   result after 📌) and a raid's 90-second countdown (from the click) show in `#chat-banners`; neither
   is pushed between dashboards. Shoutout = commands/shoutout.js `shoutout()` (also `!so`): Twitch's
-  Shoutout, then the clip even when Twitch refused (`twitch` = the refusal as an error body)
+  Shoutout, then the clip even when Twitch refused (`twitch` = the refusal as an error body). The clip is a
+  random one of the broadcaster's newest 50, or of the 20 most viewed (SHOUTOUT_CLIPS, Chat tab ⚙; newest-clips.js)
 - Message box (chat-send.js): posts as the authorized account (sender = broadcaster), `↪ Reply` on a
   row sets `reply_parent_message_id`. The message comes back through EventSub chat, so nothing is added
   locally. `canSend()` checks the token's scopes via `/oauth2/validate` (true cached 5 min; missing
@@ -602,7 +609,9 @@ register it in index.js.
 | POST | `/api/modes/connection` | `{app, port?, secret?}` → writes .env, reconnects, answers like GET |
 | GET | `/api/redemptions/manageable` | `{ids, channel, songRewards}` — rewards whose redemptions the Chat tab can change; the song ones (not to announce) |
 | POST | `/api/redemptions/status` | `{id, rewardId, action: 'done' \| 'refund'}` |
-| GET | `/api/rewards` | Chat ⚙: every reward with `role`, `manageable`, `skipsQueue`, `takeover` |
+| GET | `/api/rewards` | 🎟️ tab: every reward with `role`, `tabs`, `needsText`, `effect`, `manageable`, `skipsQueue`, `takeover` |
+| POST | `/api/rewards/use` | `{id, title, use: '' \| 'song' \| 'random' \| 'outfit', tabs?}` (reward-uses.js); pushes `rewards-changed` |
+| POST | `/api/rewards/effect` | `{id, title, on}` — the reward gets an empty 🎟️ effect, or loses it |
 | POST | `/api/rewards/takeover` | `{id, action: 'start' \| 'finish' \| 'cancel'}` |
 | POST | `/api/stream-window` | Open the dashboard in its own browser window `{tab?: 'queue', lang?}` (409 until setup is done) |
 | POST | `/api/open-in-browser` | From the stream window: open a /setup or twitch.tv link in the usual browser `{url}` |

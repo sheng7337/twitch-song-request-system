@@ -120,3 +120,33 @@ test('settings are checked: files in the folder, sounds as sounds, ranges, one e
   assert.deepStrictEqual(out.pictures, ['cat.gif']);   // notes.txt isn't media
   assert.strictEqual(JSON.parse(fs.readFileSync(process.env.REWARD_EFFECTS_FILE, 'utf8')).volume, 50);
 });
+
+test('a reward with a main use too (song, random, outfit): the effect plays but leaves done / refund to it', () => {
+  const main = new Set(['r2']);
+  fx.init({ hasMainUse: id => main.has(id) });
+  try {
+    fx.update({ effects: [horn(), horn({ rewardId: 'r2', title: 'Song' })], together: 'skip' });
+    fx.setOverlays(1);
+    fx.fromRecord(redeem(1, 'r2'));
+    fx.fromRecord(redeem(2, 'r2'));   // skipped: not refunded here
+    fx.ended(plays()[0].id);          // played: not marked done here
+    assert.deepStrictEqual(settled, []);
+    fx.fromRecord(redeem(3, 'r1'));   // effect only: as before
+    fx.ended(plays()[1].id);
+    assert.deepStrictEqual(settled, [['red3', 'done']]);
+  } finally {
+    fx.init({ hasMainUse: () => false });
+  }
+});
+
+test('attach / detach from the Rewards tab; a taken-over reward\'s copy keeps the effect', () => {
+  fx.attach('r9', 'Jingle');
+  fx.attach('r9', 'Jingle');   // once
+  assert.deepStrictEqual(fx.status().effects.map(e => [e.rewardId, e.title, e.sounds.length]), [['r9', 'Jingle', 0]]);
+  assert.ok(fx.hasEffect('r9'));
+  fx.moveReward('r9', 'copy9');
+  assert.ok(!fx.hasEffect('r9') && fx.hasEffect('copy9'));
+  fx.detach('copy9');
+  assert.deepStrictEqual(fx.status().effects, []);
+  assert.throws(() => fx.attach('bad id!', 'x'), { messageCode: 'effectBadSetting' });
+});

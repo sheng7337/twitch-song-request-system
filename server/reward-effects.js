@@ -6,7 +6,9 @@
 //
 // An effect that played marks its redemption done; one that doesn't play is refunded — the new one when
 // another is playing and "skip" is set, all while turned off, past the queue's limit, and the waiting
-// ones on Clear. Twitch lets the app do that only for the rewards it manages (redemptions.js).
+// ones on Clear. Twitch lets the app do that only for the rewards it manages (redemptions.js). A reward
+// with a main use too (🎤 / 🎲 / 👕, reward-uses.js) is left to it: the effect only plays.
+// Effects are added and removed in the 🎟️ Rewards tab (attach / detach), and set up in the 🔔 Alerts tab.
 // Nothing plays while paused (here or by a mode, modes.js) or while no reward-effects overlay is open:
 // redemptions wait. The overlay says when an effect ended; the queue is in memory only — after a restart,
 // waiting redemptions stay in Twitch's queue. Settings are kept in reward-effects.json.
@@ -34,6 +36,7 @@ let data = load();
 let toOverlays = () => {};
 let toDashboards = () => {};
 let settle = (redemption, action) => require('./redemptions').settle(redemption, action);
+let hasMainUse = (rewardId) => !!require('./reward-uses').useOf(rewardId);
 let modePaused = false;
 let overlays = 0;
 let queue = [];               // [{ id, effect, redemption }] waiting
@@ -52,11 +55,19 @@ function save() {
   try { fs.writeFileSync(FILE, JSON.stringify(data, null, 1)); } catch (err) { console.error('[reward-effects] Could not save reward-effects.json:', err.message); }
 }
 
-// { toOverlays, toDashboards, settle? } — settle is redemptions.settle (tests pass their own)
+// { toOverlays, toDashboards, settle?, hasMainUse? } — redemptions.settle and reward-uses (tests pass their own)
 function init(opts) {
   toOverlays = opts.toOverlays || toOverlays;
   toDashboards = opts.toDashboards || toDashboards;
   if (opts.settle) settle = opts.settle;
+  if (opts.hasMainUse) hasMainUse = opts.hasMainUse;
+}
+
+// Done / refunded here only when the reward has no main use (that one decides)
+function settleIfOurs(redemption, action) {
+  if (hasMainUse(redemption.rewardId)) return false;
+  settle(redemption, action);
+  return true;
 }
 
 const paused = () => data.state === 'paused' || modePaused;
@@ -172,15 +183,15 @@ function ended(id) {
   if (!p) return;
   clearTimeout(p.timer);
   playing.delete(id);
-  if (p.item.redemption) settle(p.item.redemption, 'done');
+  if (p.item.redemption) settleIfOurs(p.item.redemption, 'done');
   advance();
   changed();
 }
 
 function refund(item, why) {
   if (!item.redemption) return;
-  console.log(`[reward-effects] Refunded (${why}): ${item.effect.title} for ${item.redemption.name}`);
-  settle(item.redemption, 'refund');
+  if (settleIfOurs(item.redemption, 'refund')) console.log(`[reward-effects] Refunded (${why}): ${item.effect.title} for ${item.redemption.name}`);
+  else console.log(`[reward-effects] Not played (${why}): ${item.effect.title} for ${item.redemption.name}`);
 }
 
 // From the chat log: a redemption of a reward with an effect
@@ -225,6 +236,31 @@ function clear() {
   changed();
 }
 
+// 🎟️ Rewards tab: this reward gets an effect (nothing to play yet: set up in the Alerts tab), or loses it
+function attach(rewardId, title) {
+  if (!/^[\w-]{1,100}$/.test(String(rewardId || ''))) throw bad('rewardId is missing');
+  if (!data.effects.some(e => e.rewardId === rewardId)) data.effects.push({ ...EFFECT, rewardId: String(rewardId), title: String(title || '').slice(0, 60) });
+  save();
+  changed();
+  return status();
+}
+
+function detach(rewardId) {
+  data.effects = data.effects.filter(e => e.rewardId !== rewardId);
+  save();
+  changed();
+  return status();
+}
+
+const hasEffect = (rewardId) => data.effects.some(e => e.rewardId === rewardId);
+
+// A taken-over reward's copy (redemptions.js) keeps the effect
+function moveReward(oldId, newId) {
+  let moved = false;
+  for (const e of data.effects) if (e.rewardId === oldId) { e.rewardId = newId; moved = true; }
+  if (moved) { save(); changed(); }
+}
+
 // A mode's ⏸ (modes.js); the waiting ones play when it's off
 function setModePause(on) {
   modePaused = !!on;
@@ -244,4 +280,4 @@ function _reset() {
   data = load(); queue = []; playing = new Map(); modePaused = false; overlays = 0;
 }
 
-module.exports = { init, status, update, fromRecord, test, ended, skip, clear, setModePause, setOverlays, PLACES, _reset };
+module.exports = { init, status, update, fromRecord, test, ended, skip, clear, setModePause, setOverlays, attach, detach, hasEffect, moveReward, PLACES, _reset };
