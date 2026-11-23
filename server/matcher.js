@@ -4,6 +4,7 @@
 const Fuse = require('fuse.js');
 const config = require('./config');
 const { getSongs } = require('./sheets');
+const { canRequest } = require('./song-tabs');
 
 // Options loaded from config.js
 const AUTO_ACCEPT_THRESHOLD = config.AUTO_ACCEPT_THRESHOLD;
@@ -24,7 +25,7 @@ function getFuseOptions() {
 const MAX_CANDIDATES = 5;
 
 function matchSong(requestText) {
-  const songs = getSongs();
+  const songs = getSongs().filter(s => canRequest(s.tab));   // a song in another tab is off the list
 
   if (songs.length === 0) {
     return { matched: false, confident: false, reason: 'Song list is empty' };

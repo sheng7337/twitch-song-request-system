@@ -34,6 +34,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getSongs } = require('./sheets');
+const { canRequest } = require('./song-tabs');
 const history = require('./history');
 
 const LOG_DIR = process.env.CHAT_LOG_DIR || path.join(__dirname, '..', 'chat-logs');   // tests use a temp folder
@@ -72,6 +73,7 @@ function songsIn(text) {
   if (!hay) return [];
   const hits = [];
   for (const s of getSongs()) {
+    if (!canRequest(s.tab)) continue;
     const t = plain(s.title);
     if (t.length < 2 || (/^[a-z0-9]+$/.test(t) && t.length < 4) || !hay.includes(t)) continue;
     hits.push({ t, title: s.title, artist: s.artist || '' });

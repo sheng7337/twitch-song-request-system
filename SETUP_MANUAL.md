@@ -76,10 +76,12 @@ Your existing sheet with songs. The server reads it at startup and every 5 minut
 | ロキ | みきとP | -2 |
 | Ghost Rule | DECO*27 | 3 |
 
-**Tabs:** All tabs are included except the ones unticked in the dashboard (🎵 Song Queue → ⚙ → Sheet tabs),
-saved as `EXCLUDED_TABS` in `.env`, comma-separated (`EXCLUDED_TABS=待練勿點,草稿`). When the line isn't there,
-the tab `待練勿點` is excluded; `EXCLUDED_TABS=` with nothing after it uses every tab. The first one listed is
-where Pending's "＋ Add to" puts songs.
+**Tabs:** Every tab is read. The **practice tab** (🎵 Song Queue → ⚙ → Sheet tabs, saved as `PRACTICE_TAB` in
+`.env`; `待練勿點` when the line isn't there, none when it's empty) is where Pending's "＋ Add to" puts songs:
+its songs can't be requested or drawn, but Leihu prepares them and the link finder searches them. Which tabs song
+requests take is set on the 🎤 reward in the 🎟️ Rewards tab (`TWITCH_REWARD_TABS`, a JSON list such as
+`["國語","日語"]`), and each 🎲 reward has its own; none = every tab but the practice tab. `EXCLUDED_TABS`
+from before 2026.11-4 is turned into these on the first start.
 
 ### History sheet
 

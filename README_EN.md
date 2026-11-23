@@ -17,7 +17,7 @@ stream, and one dashboard runs the requests, the chat and your stream's scenes. 
 - A **random song** reward, optionally from one tab only (e.g. "Random Japanese song"); songs sung recently cool
   down for a few days, and songs nobody has asked for in a while come up more often.
 - Each song shows when it was last requested and by whom; the queue survives a restart mid-stream.
-- Tick which sheet tabs can be requested (songs you're still practising stay out).
+- Tick which sheet tabs can be requested or drawn (songs you're still practising stay out, but Leihu still prepares them).
 
 <img src="docs/images/overlay-en.png" width="320" alt="The song list on stream">
 

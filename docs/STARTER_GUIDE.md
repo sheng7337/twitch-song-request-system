@@ -130,7 +130,7 @@ of each tab holds the column names:
 - **Tabs**: sort songs however you like; rename tabs or add new ones. A random reward can draw from one
   tab only (e.g. "Random Japanese song")
 - **The 待練勿點 tab** (Chinese for "still practising — don't request"): songs here **can't be requested**.
-  It's the one tab left out by default; choose others under 🎵 Song Queue → ⚙ → Sheet tabs
+  Leihu still prepares them for practice. To use another tab for this: 🎵 Song Queue → ⚙ → Sheet tabs
 
 The songs in the template are examples: **replace them with yours** before going on.
 

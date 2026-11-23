@@ -893,6 +893,11 @@
   .mode-bar.busy .mode-chip { opacity: 0.5; pointer-events: none; }
   .mode-chip.on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
   .mode-chip.on:hover { background: var(--accent); }
+  /* Leihu playing outside a 🎤 mode (server/sing-check.js): a banner under the top bar */
+  .sing-warn { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 16px;
+    background: color-mix(in srgb, var(--warn) 18%, var(--bg-panel)); border-bottom: 2px solid var(--warn); color: var(--text); }
+  .sing-warn[hidden] { display: none; }
+  .sing-warn .sing-warn-text { flex: 1 1 18em; font-weight: 600; }
   /* What a mode holds (top bar): "⏸ N waiting", the list under it */
   .held-box { position: relative; }
   .held-box[hidden] { display: none; }
@@ -1009,6 +1014,9 @@
     🎤 <span id="leihu-state">Leihu offline</span>   <!-- paintBadges() writes it, in the language shown -->
   </button>
 </div>
+
+<!-- Leihu plays while the mode on isn't for singing (server/sing-check.js): switch with one click -->
+<div class="sing-warn" id="sing-warn" role="alert" hidden></div>
 
 <!-- 🎨 Look & overlays (top bar): what isn't one tab's — the dashboard's and the overlays' themes and text
      sizes (shared/themes.css, server/look.js), the overlays' opacity / brightness / language, every overlay's
@@ -1374,7 +1382,7 @@
   <section>
     <h3 data-i18n="dash.set.tabsTitle">Sheet tabs</h3>
     <div class="tab-picks" id="tab-picks"></div>
-    <p class="setting-hint" data-i18n="dash.set.tabsHint">Ticked tabs can be requested, picked by the random reward and searched by the 🔗 link finder.</p>
+    <p class="setting-hint" data-i18n="dash.set.tabsHint">Songs you're still practising: Pending's "＋ Add to" adds songs here.</p>
   </section>
   <section>
     <h3 data-i18n="dash.set.randomTitle">Random song reward</h3>
@@ -1488,6 +1496,7 @@ function connect() {
     document.getElementById('dot').classList.remove('off'); clearTimeout(reconnectTimer);
     ws.send(JSON.stringify({ type: 'chat-subscribe' }));
     loadWaiting();
+    loadSingCheck();
     loadChat();   // fills in chat missed while disconnected
     loadModes(currentTab === 'modes');
     loadOutfits();
@@ -1504,6 +1513,7 @@ function connect() {
       else if (m.type === 'chat-announced') applyAnnounced(m.ids, m.done);
       else if (m.type === 'chat-session') loadChatSession().then(() => { linkSession(); rerenderChat(); });
       else if (m.type === 'modes') onModesMessage(m);
+      else if (m.type === 'sing-check') onSingCheck(m);
       else if (m.type === 'media-waiting') onWaiting(m.waiting, true);
       else if (m.type === 'outfits') { outfits.status = m; paintOutfits(); }
       else if (m.type === 'alert') onAlertMessage(m.alert);
@@ -1936,9 +1946,9 @@ async function loadSettings() {
     cooldownDays = settings.randomCooldownDays;
     document.getElementById('pick-mode').value = settings.randomPickMode || 'weighted';
     document.getElementById('so-clips').value = settings.shoutoutClips || 'newest';
-    sheetTabs = { all: settings.sheetTabs || [], excluded: settings.excludedTabs || [] };
+    sheetTabs = { all: settings.sheetTabs || [], practice: settings.practiceTab || '' };
     paintSheetTabs();
-    paintRewards();   // 🎲 rewards' tab ticks
+    paintRewards();   // 🎤 / 🎲 rewards' tab ticks
     document.getElementById('chat-song-notes').checked = settings.songNotes !== false;
     if (settings.chatOverlay) paintChatOverlay(settings.chatOverlay);
     document.getElementById('opacity-input').value = settings.panelBgAlpha;
@@ -2099,38 +2109,36 @@ async function saveShoutoutClips() {
   }
 }
 
-// Song Queue ⚙ → Sheet tabs (server/song-tabs.js): a tick per tab; unticked ones are left out of requests,
-// random picks and the link finder. The first one left out is where Pending's "＋ Add to" puts songs.
-let sheetTabs = { all: [], excluded: [] };
+// Song Queue ⚙ → Practice tab (server/song-tabs.js): where Pending's "＋ Add to" puts songs; never requested
+// or drawn. Which tabs 🎤 and each 🎲 take is in the 🎟️ Rewards tab.
+let sheetTabs = { all: [], practice: '' };
+const offeredTabs = () => (sheetTabs.all || []).filter(n => n !== sheetTabs.practice);   // for the rewards' ticks
 
 function paintSheetTabs() {
   const box = document.getElementById('tab-picks');
-  const all = [...sheetTabs.all, ...sheetTabs.excluded.filter(n => !sheetTabs.all.includes(n))];
+  const all = sheetTabs.all.includes(sheetTabs.practice) || !sheetTabs.practice ? sheetTabs.all : [...sheetTabs.all, sheetTabs.practice];
   if (!all.length) { box.innerHTML = `<p class="setting-hint">${esc(t('dash.set.tabsNone'))}</p>`; return; }
-  box.innerHTML = all.map(name => {
-    const note = name === sheetTabs.excluded[0] ? ` <span class="tab-pick-note">${esc(t('dash.set.tabsPractice'))}</span>` : '';
-    return `<label class="setting"><input type="checkbox" data-sheet-tab="${esc(name)}"${sheetTabs.excluded.includes(name) ? '' : ' checked'} onchange="saveSheetTabs()" /> <span>${esc(name)}</span>${note}</label>`;
-  }).join('');
+  box.innerHTML = `<label class="setting"><span class="setting-name">${esc(t('dash.set.practiceTab'))}</span>
+    <select class="modes-input" id="practice-tab" onchange="savePracticeTab(this)">${['', ...all].map(n =>
+      `<option value="${esc(n)}"${n === sheetTabs.practice ? ' selected' : ''}>${esc(n || t('dash.set.practiceNone'))}</option>`).join('')}</select></label>`;
 }
 
-async function saveSheetTabs() {
-  const boxes = [...document.querySelectorAll('#tab-picks [data-sheet-tab]')];
-  if (!boxes.some(b => b.checked)) { showToast(t('dash.toast.tabsAllOff'), true); paintSheetTabs(); return; }
-  boxes.forEach(b => { b.disabled = true; });
+async function savePracticeTab(sel) {
+  sel.disabled = true;
   try {
     const res = await fetch('/api/settings', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ excludedTabs: boxes.filter(b => !b.checked).map(b => b.dataset.sheetTab) }),
+      body: JSON.stringify({ practiceTab: sel.value }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(I18N.server(data, 'dash.toast.tabsFailed'));
-    sheetTabs.excluded = data.excludedTabs;
-    loadSongList();
-    showToast(t('dash.toast.tabsSet', { count: data.songCount }));
+    sheetTabs.practice = data.practiceTab;
+    showToast(t('dash.toast.practiceSet', { tab: data.practiceTab || t('dash.set.practiceNone') }));
   } catch (err) {
     showToast(err.message || t('dash.toast.tabsFailed'), true);
   }
   paintSheetTabs();
+  paintRewards();
 }
 
 async function saveCooldown() {
@@ -3244,7 +3252,7 @@ function paintRewards() {
         + (r.role === 'outfit' ? go('outfits', 'dash.rewards.goOutfits') : '') + '</span>'
       + `<span class="reward-cell one-line"><label class="reward-fx"><input type="checkbox" data-rw-fx${r.effect ? ' checked' : ''}> ${esc(t('dash.rewards.effect'))}</label>`
         + (r.effect ? go('alerts', 'dash.rewards.goEffect') : '') + '</span>';
-    const under = (r.role === 'random' ? `<div class="reward-more">${esc(t('dash.rewards.tabs'))} ${(sheetTabs.all || []).filter(n => !sheetTabs.excluded.includes(n)).map(n =>
+    const under = (r.role === 'random' || song ? `<div class="reward-more">${esc(t(song ? 'dash.rewards.songTabs' : 'dash.rewards.tabs'))} ${offeredTabs().map(n =>
           `<label><input type="checkbox" data-rw-tab="${esc(n)}"${(r.tabs || []).includes(n) ? ' checked' : ''}> ${esc(n)}</label>`).join('')}</div>` : '')
       + (song && !r.needsText ? `<div class="reward-warn">${esc(t('dash.rewards.needsText'))}</div>` : '')
       + (song ? `<div class="reward-more">${esc(t('dash.rewards.songFixed'))}</div>` : '')
@@ -3280,7 +3288,7 @@ document.getElementById('reward-rows').addEventListener('change', async (e) => {
     url = '/api/rewards/use'; body = { id: r.id, title: r.title, use: e.target.value };
   } else if (e.target.matches('[data-rw-tab]')) {
     const tabs = [...row.querySelectorAll('[data-rw-tab]')].filter(x => x.checked).map(x => x.dataset.rwTab);
-    url = '/api/rewards/use'; body = { id: r.id, title: r.title, use: 'random', tabs };
+    url = '/api/rewards/use'; body = { id: r.id, title: r.title, use: r.role, tabs };
   } else if (e.target.matches('[data-rw-fx]')) {
     url = '/api/rewards/effect'; body = { id: r.id, title: r.title, on: e.target.checked };
   } else return;
@@ -4350,7 +4358,7 @@ for (const id of ['outfit-windows', 'outfit-pick']) {
 // they're made. view = GET /api/modes: live = what the streaming app shows (read when the tab opens,
 // or ↻), issues = what each mode no longer finds and what's new in its scenes.
 const modes = { view: null, open: new Set(), busy: false, dragging: false };
-const MODE_PRESETS = [['🎤', 'sing', { holdClips: true, pauseEffects: true, tab: 'queue' }], ['💬', 'talk', { tab: 'chat' }], ['☕', 'break', {}]];
+const MODE_PRESETS = [['🎤', 'sing', { holdClips: true, pauseEffects: true, sing: true, tab: 'queue' }], ['💬', 'talk', { tab: 'chat', sing: false }], ['☕', 'break', { sing: false }]];
 const appName = app => ({ streamlabs: 'Streamlabs Desktop', obs: 'OBS Studio' })[app] || app;
 const modeById = id => modes.view && modes.view.modes.find(m => m.id === id);
 const modeUnit = m => m.app === 'obs' ? 'dB' : '%';
@@ -4367,6 +4375,28 @@ async function loadModes(live) {
 }
 
 // Another dashboard (or this one) switched or edited a mode
+// ── Leihu playing outside a 🎤 mode (server/sing-check.js) ──
+// A banner with a button for each singing mode; ✕ hides it until the next song.
+const singWarn = { last: { wrong: false }, dismissed: null };
+async function loadSingCheck() {
+  try { onSingCheck(await (await fetch('/api/sing-check')).json()); } catch {}
+}
+function onSingCheck(m) { singWarn.last = m; paintSingWarn(); }
+function paintSingWarn() {
+  const m = singWarn.last, box = document.getElementById('sing-warn');
+  if (!m.wrong || singWarn.dismissed === (m.sid || m.title)) { box.hidden = true; return; }
+  const mode = m.active ? `${m.active.icon ? m.active.icon + ' ' : ''}${m.active.name}` : '';
+  box.innerHTML = `<span class="sing-warn-text">⚠ ${esc(t(mode ? 'dash.singWarn.text' : 'dash.singWarn.noMode', { title: m.title || '?', mode }))}</span>`
+    + m.sing.map(s => `<button class="btn" type="button" data-sing-to="${esc(s.id)}">${esc(t('dash.singWarn.switch', { name: `${s.icon ? s.icon + ' ' : ''}${s.name}` }))}</button>`).join('')
+    + `<button class="btn" type="button" data-sing-dismiss title="${esc(t('dash.singWarn.dismiss'))}" aria-label="${esc(t('dash.singWarn.dismiss'))}">✕</button>`;
+  box.hidden = false;
+}
+document.getElementById('sing-warn').addEventListener('click', (e) => {
+  const to = e.target.closest('[data-sing-to]');
+  if (to) return switchMode(to.dataset.singTo);
+  if (e.target.closest('[data-sing-dismiss]')) { singWarn.dismissed = singWarn.last.sid || singWarn.last.title; paintSingWarn(); }
+});
+
 function onModesMessage(m) {
   if (m.switched && m.switched.tab && TABS.includes(m.switched.tab)) showTab(m.switched.tab);
   loadModes(false);
@@ -4713,6 +4743,8 @@ function modeAppPart(m) {
     <label class="setting"><input type="checkbox" data-f="holdClips"${m.holdClips ? ' checked' : ''}> <span>${esc(t('dash.modes.hold'))}</span></label>
     <label class="setting"><input type="checkbox" data-f="pauseEffects"${m.pauseEffects ? ' checked' : ''}> <span>${esc(t('dash.modes.pauseEffects'))}</span></label>
     <p class="setting-hint">${esc(t('dash.modes.holdHint'))}</p>
+    <label class="setting"><input type="checkbox" data-f="sing"${(m.sing == null ? m.holdClips : m.sing) ? ' checked' : ''}> <span>${esc(t('dash.modes.sing'))}</span></label>
+    <p class="setting-hint">${esc(t('dash.modes.singHint'))}</p>
     <div class="modes-row"><span>${esc(t('dash.modes.tab'))}</span>
       <select class="lang-select" data-f="tab">${['', 'queue', 'leihu', 'chat'].map(tab =>
         `<option value="${tab}"${m.tab === tab ? ' selected' : ''}>${esc(tab ? t('dash.tab.' + tab) : t('dash.modes.tabNone'))}</option>`).join('')}</select></div>

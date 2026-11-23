@@ -16,6 +16,7 @@ const streamApp = require('./stream-app');
 const mediaQueue = require('./media-queue');
 const rewardEffects = require('./reward-effects');
 const chatSend = require('./chat-send');
+const singCheck = require('./sing-check');
 const { UserError, errorBody } = require('./messages');
 
 const FILE = process.env.STREAM_MODES_FILE || path.join(__dirname, '..', 'stream-modes.json');   // tests use a temp file
@@ -41,6 +42,7 @@ function init(send) {
   const active = data.modes.find(m => m.id === data.active);
   mediaQueue.setHold(!!(active && active.holdClips));
   rewardEffects.setModePause(!!(active && active.pauseEffects));
+  singCheck.setModes(data.active, data.modes);
 }
 
 const byId = id => data.modes.find(m => m.id === id);
@@ -186,6 +188,7 @@ function clean(m) {
     chat: text(m.chat, 500).trim(),
     holdClips: !!m.holdClips,
     pauseEffects: !!m.pauseEffects,
+    sing: m.sing == null ? !!m.holdClips : !!m.sing,   // 🎤 for singing: Leihu playing in another mode shows a reminder (sing-check.js)
     tab: TABS.includes(m.tab) ? m.tab : '',
   };
 }
@@ -238,6 +241,7 @@ function reorder(ids) {
 }
 
 function changed(extra) {
+  singCheck.setModes(data.active, data.modes);
   broadcast({ type: 'modes', active: data.active, held: mediaQueue.isHeld(), ...extra });
 }
 

@@ -34,6 +34,7 @@ const firstChat = require('./first-chat');
 const chatSend = require('./chat-send');
 const chatMod = require('./chat-mod');
 const modes = require('./modes');
+const singCheck = require('./sing-check');
 const outfits = require('./outfits');
 const alerts = require('./alerts');
 const rewardEffects = require('./reward-effects');
@@ -122,6 +123,12 @@ async function activateServiceIfReady() {
     coreServicesStarted = true;
     console.log('\n[setup] Configuration complete — starting song queue services...\n');
     await startAutoRefresh();
+    // EXCLUDED_TABS (before 2026.11-4) → the practice tab and each reward's tabs, once
+    const moved = songTabs.migrate(process.env, require('./sheets').getTabs());
+    if (Object.keys(moved).length) {
+      setupRouter.writeEnvValues(moved);
+      console.log(`[tabs] EXCLUDED_TABS moved: the practice tab is now "${moved.PRACTICE_TAB || '(none)'}"`);
+    }
     // Live or not, checked now and then too: a go-live / end event can be missed while reconnecting
     setInterval(() => streamSession.refresh(), 10 * 60 * 1000);
   }
@@ -183,6 +190,7 @@ setReconnectHandler(async ({ since }) => {
   if (handed.length) console.log(`[event] ${handed.length} redemption(s) made while disconnected, handled now`);
 });
 streamSession.init(session => sendChat({ type: 'chat-session', ...session }));
+singCheck.init(msg => sendChat(msg));   // before modes.init: it tells sing-check the modes
 modes.init(msg => sendChat(msg));   // after mediaQueue.init: a mode may hold clips
 endingRaid.init(msg => sendChat(msg));
 outfits.init({ send: msg => sendChat(msg), saveEnv: values => setupRouter.writeEnvValues(values) });
@@ -480,6 +488,7 @@ app.get('/api/clip-stream', async (req, res) => {
 // ── Leihu Singsing (backing tracks + lyrics, optional) ───────────────────────
 app.get('/api/leihu/status', (req, res) => res.json(leihu.getStatus()));
 app.get('/api/leihu/library', (req, res) => res.json(leihu.getLibrary()));
+app.get('/api/sing-check', (req, res) => res.json(singCheck.state()));   // Leihu playing outside a 🎤 mode
 
 // Manual link for a song imported into Leihu as an audio file. id: null unlinks.
 app.post('/api/leihu/link', async (req, res) => {
@@ -643,7 +652,7 @@ app.post('/api/pending/queue-found', async (req, res) => {
   }
 });
 
-// Add the request to the practice tab (first of EXCLUDED_TABS) with its YouTube link.
+// Add the request to the practice tab (song-tabs.js) with its YouTube link.
 // The request stays pending, marked addedTo, so it can still be queued or dismissed.
 app.post('/api/pending/add-to-sheet', async (req, res) => {
   const { index, addedAt, videoId } = req.body;
@@ -738,7 +747,7 @@ app.get('/api/settings', (req, res) => {
     chatOverlay: chatOverlaySettings(),
     randomPickMode: songTabs.pickMode(),
     shoutoutClips: require('./newest-clips').clipPool(),
-    excludedTabs: config.EXCLUDED_TABS,
+    practiceTab: songTabs.practiceTab(),
     sheetTabs: require('./sheets').getTabs(),
     ...look.read(),   // themes and text sizes (look.js)
   });
@@ -769,11 +778,11 @@ app.post('/api/settings', async (req, res) => {
     setupRouter.writeEnvValues({ SHOUTOUT_CLIPS: updates.shoutoutClips });
   }
 
-  // Sheet tabs left out of requests, random picks and the link finder; the song list is read again
-  if (req.body.excludedTabs !== undefined) {
-    try { updates.excludedTabs = songTabs.excludedList(req.body.excludedTabs); } catch (err) { return res.status(400).json(errorBody(err)); }
-    setupRouter.writeEnvValues({ EXCLUDED_TABS: updates.excludedTabs.join(',') });
-    updates.songCount = (await require('./sheets').fetchSongs()).length;
+  // The practice tab (song-tabs.js): where Pending's "＋ Add to" puts songs; never requested or drawn
+  if (req.body.practiceTab !== undefined) {
+    try { updates.practiceTab = songTabs.parsePracticeTab(req.body.practiceTab, require('./sheets').getTabs()); } catch (err) { return res.status(400).json(errorBody(err)); }
+    setupRouter.writeEnvValues({ PRACTICE_TAB: updates.practiceTab });
+    sendChat({ type: 'rewards-changed' });   // the 🎟️ tab's tab ticks leave it out
   }
 
   if (req.body.panelBgAlpha !== undefined) {

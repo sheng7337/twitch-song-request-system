@@ -296,14 +296,14 @@ test('an off-list song is added to the practice tab with its link, once', async 
 });
 
 test('adding to the sheet explains a missing practice tab and needs Editor access', async () => {
-  const saved = process.env.EXCLUDED_TABS;
+  const saved = process.env.PRACTICE_TAB;
   try {
-    process.env.EXCLUDED_TABS = '草稿';
+    process.env.PRACTICE_TAB = '草稿';
     await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'practiceTabMissing');
-    process.env.EXCLUDED_TABS = '';
+    process.env.PRACTICE_TAB = '';
     await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'noPracticeTab');
   } finally {
-    if (saved == null) delete process.env.EXCLUDED_TABS; else process.env.EXCLUDED_TABS = saved;
+    if (saved == null) delete process.env.PRACTICE_TAB; else process.env.PRACTICE_TAB = saved;
   }
   canWrite = false;
   await assert.rejects(F.addToSheet({ title: 't', artist: '' }), e => e.messageCode === 'noEditor');

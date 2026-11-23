@@ -90,12 +90,12 @@ function findColumns(headerRow) {
   };
 }
 
-// Every tab's values, A:Z like sheets.js, excluding config.EXCLUDED_TABS, plus
+// Every tab's values, A:Z like sheets.js (the practice tab too), plus
 // what's needed to add a column (sheetId, columnCount).
 async function readTabs(api) {
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   const meta = await api.spreadsheets.get({ spreadsheetId });
-  const tabs = meta.data.sheets.map(s => s.properties).filter(p => !config.EXCLUDED_TABS.includes(p.title));
+  const tabs = meta.data.sheets.map(s => s.properties);
   const res = await api.spreadsheets.values.batchGet({ spreadsheetId, ranges: tabs.map(p => `${quoteTab(p.title)}!A:Z`) });
   return tabs.map((p, i) => ({
     tab: p.title, sheetId: p.sheetId, columnCount: p.gridProperties?.columnCount ?? 26,
@@ -517,10 +517,10 @@ async function identify(text) {
   };
 }
 
-// The tab new songs go to: the first excluded tab (待練勿點 by default), so they can't be
+// The tab new songs go to: the practice tab (song-tabs.js, 待練勿點 by default), so they can't be
 // requested until the streamer moves them to another tab.
 function practiceTab() {
-  return config.EXCLUDED_TABS[0] || null;
+  return require('./song-tabs').practiceTab() || null;
 }
 
 // Appends a song to practiceTab() with its YouTube link (the YTLink column is created
@@ -530,7 +530,7 @@ async function addToSheet({ title, artist, videoId }) {
   title = String(title || '').trim();
   artist = String(artist || '').trim();
   const tab = practiceTab();
-  if (!tab) throw new UserError('noPracticeTab', {}, 'No tab to add songs to — list one in EXCLUDED_TABS in .env');
+  if (!tab) throw new UserError('noPracticeTab', {}, 'No tab to add songs to — choose a practice tab under Song Queue ⚙');
   const api = await sheetsApi(true);
   if (!(await checkAccess(api)).canEdit) {
     throw new UserError('noEditor', { email: serviceEmail() || 'the service account' }, noPermissionMessage());

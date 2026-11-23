@@ -6,6 +6,7 @@
 //   "weighted" — songs not played recently are more likely to be picked
 
 const { getSongs } = require('./sheets');
+const { takes } = require('./song-tabs');
 const config = require('./config');
 const { getHistory, getLastRequestedAt } = require('./history');
 const { sameSong, findKey } = require('../shared/song-key');
@@ -26,13 +27,12 @@ function getCooldownMs() {
 // exclude: the songs in the queue ({ title, artist })
 function getEligibleSongs(exclude = [], allowedTabs = []) {
   const songs = getSongs();
-  const tabSet = allowedTabs.length > 0 ? new Set(allowedTabs) : null;
   const cooldownMs = getCooldownMs();
   const now = Date.now();
 
   return songs.filter(s => {
     if (exclude.some(e => sameSong(e, s))) return false;
-    if (tabSet && !tabSet.has(s.tab)) return false;
+    if (!takes(s.tab, allowedTabs)) return false;   // [] = every tab but the practice tab
 
     if (cooldownMs > 0) {
       const lastRequestedAt = getLastRequestedAt(s.title, s.artist);

@@ -46,9 +46,7 @@ async function fetchSongs() {
     // Step 1: get all sheet/tab names
     const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
     sheetTabs = meta.data.sheets.map(s => s.properties.title);
-    const tabs = meta.data.sheets
-      .map(s => s.properties.title)
-      .filter(name => !config.EXCLUDED_TABS.includes(name));
+    const tabs = sheetTabs;   // every tab: which ones requests and random picks take is song-tabs.js
 
     // Step 2: fetch all tabs in one batchGet call
     const batchRes = await sheets.spreadsheets.values.batchGet({

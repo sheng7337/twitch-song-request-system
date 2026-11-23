@@ -42,6 +42,16 @@ test('🎲 tabs change in place and are kept when not given', () => {
   assert.deepStrictEqual(tabsOf('rand2', e), ['日語', 'English']);
 });
 
+test('🎤 tabs are for song requests, whichever reward has 🎤', () => {
+  let e = env();
+  assert.deepStrictEqual(tabsOf('song1', e), []);
+  e = apply(e, change('song1', 'Song', 'song', ['國語', '國語'], e));
+  assert.deepStrictEqual(tabsOf('song1', e), ['國語']);
+  assert.strictEqual(e.TWITCH_REWARD_ID, 'song1');
+  e = apply(e, change('out1', 'Hat', 'song', undefined, e));   // moved: the tabs go with 🎤
+  assert.deepStrictEqual(tabsOf('out1', e), ['國語']);
+});
+
 test('🎤 moves to another reward, but the song reward can\'t be set to something else', () => {
   let e = env();
   assert.throws(() => change('song1', 'Song', '', undefined, e), { messageCode: 'rewardSongNeeded' });

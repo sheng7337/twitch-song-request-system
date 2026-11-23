@@ -126,7 +126,7 @@ mark it ⚠ — pick the new chat with **Pick a replacement…**, or press 📥 
 ## Google Sheets setup
 
 ### Song list sheet
-Your existing sheet with songs. All tabs are included except the ones you untick under 🎵 Song Queue → ⚙ → **Sheet tabs** (`待練勿點` until you choose).
+Your existing sheet with songs. Every tab is read. Songs in the **practice tab** (🎵 Song Queue → ⚙ → **Sheet tabs**; `待練勿點` until you choose) can't be requested or drawn, but Leihu prepares them. Which tabs song requests and each random reward take: 🎟️ Rewards tab.
 Share it with the service account email → **Viewer** is enough. The YouTube link finder needs
 **Editor** to save links (see [YouTube link finder](#youtube-link-finder)).
 
@@ -185,7 +185,7 @@ Open `http://localhost:3000/dashboard` during streams.
 | Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Settings** at the right end of its top row opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
 | 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
 | Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — which sheet tabs can be requested, random cooldown and pick, clear the queue; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now. Each saves on its own |
+| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — the practice tab, random cooldown and pick, clear the queue; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now. Each saves on its own |
 | 🎨 Look & overlays | The button at the top, beside EN / 中文 — one place for what isn't a single tab's: five themes — **Neon** (the original), **Daylight**, **High contrast**, **Ocean**, **Cream & coffee** — chosen apart for the dashboard and for the overlays, and text sizes: the dashboard's (85–140%, the same on every browser and phone that opens it), the song list's and the break card's. Overlays change at once on stream and keep their size in OBS (bigger text, fewer songs in the same space). One overlay in another theme: add `?theme=daylight` (`neon`, `daylight`, `contrast`, `ocean`, `coffee`) to its URL. The chat's text size stays under 💬 Chat → ⚙. Also here: the overlays' panel opacity, brightness and language, each overlay's Browser Source address and size with **Copy**, and the version |
 | EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlays follow **🎨 Look & overlays → Overlay language** |
 | ✓ Finished | Moves Now Playing → Played, pulls next song |
@@ -334,8 +334,8 @@ desktop-audio capture. Moving from Streamlabs: run both for one stream with the 
 Every channel-point reward on your channel, one row each:
 
 - **Use** — its main use: **🎤 Song request**, **🎲 Random song** or **👕 Outfit**, or none. There's always
-  one song-request reward: to move it, choose 🎤 on another reward. A 🎲 reward also ticks the sheet tabs it
-  draws from (none ticked = every tab). A 🎤 reward has to ask viewers to type the song: if it doesn't, the row
+  one song-request reward: to move it, choose 🎤 on another reward. 🎤 and 🎲 rewards also tick the sheet tabs they take
+  (none ticked = every tab but the practice tab). A 🎤 reward has to ask viewers to type the song: if it doesn't, the row
   warns you — turn on **Require Viewer to Enter Text** for it on Twitch.
 - **🎟️ Effect** — a sound or picture (below), on its own or on top of the main use, e.g. an outfit change
   with a sound. **→ Effect settings** opens it in 🔔 Alerts.

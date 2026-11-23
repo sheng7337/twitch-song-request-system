@@ -9,6 +9,7 @@
 // can't be set to none: choosing 🎤 for another reward moves it.
 
 const { UserError } = require('./messages');
+const songTabs = require('./song-tabs');
 
 const USES = ['', 'song', 'random', 'outfit'];
 
@@ -24,8 +25,9 @@ function useOf(id, env = process.env) {
   return '';
 }
 
-// The sheet tabs a 🎲 reward draws from ([] = all)
+// The sheet tabs a 🎤 reward takes requests from or a 🎲 reward draws from ([] = all but the practice tab)
 function tabsOf(id, env = process.env) {
+  if (id && id === env.TWITCH_REWARD_ID) return songTabs.requestTabs(env);
   const r = randomList(env).find(x => x.id === id);
   return r ? (r.tabs || []) : [];
 }
@@ -39,11 +41,12 @@ function change(id, title, use, tabs, env = process.env) {
   if (was === 'song' && use !== 'song') throw new UserError('rewardSongNeeded', {}, 'There must be a song-request reward: choose 🎤 for another reward instead');
   const values = {};
   if (use === 'song' && was !== 'song') values.TWITCH_REWARD_ID = id;
+  if (use === 'song' && Array.isArray(tabs)) values.TWITCH_REWARD_TABS = JSON.stringify(songTabs.cleanTabs(tabs));
 
   let random = randomList(env);
   const hadRandom = random.some(r => r.id === id);
   if (use === 'random') {
-    const clean = Array.isArray(tabs) ? [...new Set(tabs.map(String).filter(Boolean))] : tabsOf(id, env);
+    const clean = Array.isArray(tabs) ? songTabs.cleanTabs(tabs) : tabsOf(id, env);
     const entry = { id, name: String(title || '').slice(0, 60), tabs: clean };
     random = hadRandom ? random.map(r => r.id === id ? { ...r, ...entry, name: entry.name || r.name } : r) : [...random, entry];
     values.TWITCH_RANDOM_REWARDS = JSON.stringify(random);

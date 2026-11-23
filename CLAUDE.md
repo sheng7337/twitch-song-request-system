@@ -68,7 +68,7 @@ vtuber-song-queue/
 │   ├── app-log.js         logs/<start time>/: app.log (the console, secrets blanked) + leihu.log; 30 runs / 14 days
 │   ├── chat-log.js        Chat + redemption log for the dashboard Chat tab, chat-logs/YYYY-MM-DD.jsonl
 │   ├── song-notes.js      Song overlay note "last sung N days ago" when chat names a sheet song
-│   ├── song-tabs.js       Song Queue ⚙: sheet tabs left out (EXCLUDED_TABS, kept in order) and the random pick mode
+│   ├── song-tabs.js       Which tabs each use takes: practice tab (PRACTICE_TAB), 🎤 (TWITCH_REWARD_TABS), 🎲; pick mode
 │   ├── look.js            🎨 Look & overlays: dashboard / overlay themes and text sizes (.env), checked
 │   ├── media-queue.js     Clip player queue (max 3; 10 while a mode holds it), mediaId matching, watchdog;
 │                          waiting() while held → dashboard top bar "⏸ N waiting" (media-waiting, /api/media/waiting/play|drop)
@@ -91,6 +91,7 @@ vtuber-song-queue/
 │   ├── reward-effects.js  🎟️ Reward effects: a reward plays sounds / a picture (queue, pause, done / refund); reward-effects.json
 │   ├── reward-uses.js     🎟️ Rewards tab: each reward's main use (song / random + tabs / outfit, in .env); moved() for takeovers
 │   ├── modes.js           Modes (🎛 tab, top-bar buttons): save / apply the streaming app's state + this app's part
+│   ├── sing-check.js      Leihu playing outside a 🎤 mode → dashboard banner
 │   ├── stream-app.js      Streamlabs Desktop (Remote Control JSON-RPC) / OBS (obs-websocket 5) on this PC
 │   ├── stream-session.js  When the stream went live (stream.online / Helix /streams), for "to announce";
 │                          a go-live within 15 min of the end (a dropped stream) keeps the session
@@ -202,7 +203,8 @@ vtuber-song-queue/
 - Cooldown uses live history; weighting uses the startup snapshot
 
 ### Google Sheets
-- Song list: read-only, all tabs loaded except `EXCLUDED_TABS` (.env). Range strings
+- Song list: read-only, every tab loaded (songs carry `tab`); song-tabs.js decides which tabs requests
+  (`canRequest`: matcher, chat-log) and random picks (`takes`) use. Leihu and the link finder use all. Range strings
   quote the tab name (`'Rock ''n'' Roll'!A:Z`)
 - Column headers configurable in `.env`: `SHEET_SONG_COLUMN`, `SHEET_ARTIST_COLUMN`,
   `SHEET_KEY_COLUMN` (default `key`). Matching is case-insensitive
@@ -262,13 +264,16 @@ vtuber-song-queue/
     Transforms sent back without read-only sizes, and bounds only when used (0 is refused).
   - The socket's message handler is attached before it opens: OBS's Hello can arrive in the same tick
 - modes.js: a mode = `{ id, name, icon, app, canvas, scene, items: [{ scene, item: {id, sourceId, name}, visible,
-  place, move }], audio: [{ id, name, muted, volume }], chat, holdClips, tab }` in stream-modes.json. `capture` takes
+  place, move }], audio: [{ id, name, muted, volume }], chat, holdClips, pauseEffects, sing, tab }` in stream-modes.json. `capture` takes
   the current scene, the scenes / groups inside it (`sceneTree`) and the audio heard there (`heard`: their sources' audio + devices in no scene).
   - `resolve`: finds things by ID first, then by name (only when one matches). It writes the found IDs and
     names back into the mode. Missing ones are skipped and listed; `check` also lists `extra` (in the mode's
     scenes but not in the mode).
   - `apply`: only what differs is sent (items, 📍 places unless the canvas changed, then the scene, then
     audio); then hold / chat / active. The `modes` broadcast to dashboards carries `switched.tab`.
+  - sing-check.js: leihu.js reads Leihu's `GET /api/overlay` (`playing`, `sid`, `title`; its live-lyrics state)
+    each poll; with a 🎤 mode (`sing`, or `holdClips` when unset) existing and another (or none) on, the dashboard
+    gets `{type:'sing-check', wrong:true, …}` and shows a banner (`GET /api/sing-check` on connect). Remind only.
   - A mode saved from the other app gets `modeOtherApp`. Without a streaming app, modes are this app's part only
 
 ### Leihu Singsing integration (leihu.js) — optional
@@ -479,8 +484,8 @@ vtuber-song-queue/
   has it) and saves a manual link (song-links.json) under title + artist. Language: kana → 日語
   (`guessTab`); Chinese characters stay automatic (can't tell 國語 from 台語). Nothing is imported
   before the streamer accepts
-- "Add to <tab>": `linkFinder.addToSheet` appends title, artist and YTLink to the first
-  `EXCLUDED_TABS` tab (creating YTLink there if missing); skips a song already in that tab; needs
+- "Add to <tab>": `linkFinder.addToSheet` appends title, artist and YTLink to the
+  practice tab (`song-tabs.practiceTab`) (creating YTLink there if missing); skips a song already in that tab; needs
   Editor access. The request stays pending, marked `addedTo`
 
 ### Languages: English + 繁體中文 (shared/i18n.js)
@@ -643,11 +648,12 @@ See `.env.example` for full descriptions.
 - `GOOGLE_SHEET_ID` — song list sheet
 - `SHEET_SONG_COLUMN` / `SHEET_ARTIST_COLUMN` / `SHEET_KEY_COLUMN` — column headers (e.g. `曲名`, `歌手名`, `key`)
 - `HISTORY_SHEET_ID` — request history sheet (needs Editor access)
-- `EXCLUDED_TABS` — tabs left out of requests, random picks and the link finder, comma-separated.
-  Unset = `待練勿點`; empty = none. Read through `config.EXCLUDED_TABS` (a getter, so it follows .env)
+- `PRACTICE_TAB` — where "＋ Add to" puts songs; never requested or drawn. Unset = `待練勿點`; empty = none.
+  Song Queue ⚙ sets it (one of sheets.getTabs()). `TWITCH_REWARD_TABS` — JSON list of tabs 🎤 requests take
+  (🎟️ Rewards tab; [] = all but the practice tab). The old `EXCLUDED_TABS` is turned into these once at
+  startup (`song-tabs.migrate`, after the first sheet read); until then its first tab is the practice tab.
 - `PORT` — default 3000
-- `RANDOM_PICK_MODE` — `weighted` or `pure`. Song Queue ⚙ sets it and `EXCLUDED_TABS` (Sheet tabs: a tick per
-  tab from sheets.getTabs(); server/song-tabs.js keeps the left-out tabs in order, the first being the practice tab)
+- `RANDOM_PICK_MODE` — `weighted` or `pure`. Song Queue ⚙ sets it and `PRACTICE_TAB`
 - `RANDOM_COOLDOWN_DAYS`, `OVERLAY_PANEL_BG_ALPHA`, `OVERLAY_TEXT_BRIGHTNESS`, `OVERLAY_LANGUAGE` (`en` / `zh-TW`) — also adjustable from the dashboard
 - `DASHBOARD_THEME`, `OVERLAY_THEME` (`neon` / `daylight` / `contrast` / `ocean` / `coffee`), `DASHBOARD_TEXT_SCALE` (0.85–1.4), `OVERLAY_SONG_TEXT_SCALE` (0.8–1.25), `OVERLAY_BREAK_TEXT_SCALE` (0.8–1.1) — 🎨 Look & overlays (top bar; the app-wide panel #config-app: themes, overlay opacity / brightness / language, Browser Source addresses, version)
 - Themes: pages use only the tokens in `shared/themes.css` (test/themes.test.js fails on a typed colour; black / white / greys and lines marked `any theme` are allowed). A new page links themes.css + theme.js; an overlay sets `<html data-surface="overlay">`; text that should follow a size setting uses `calc(Npx * var(--ts))`

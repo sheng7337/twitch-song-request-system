@@ -19,6 +19,7 @@ const { getState } = require('./queue');
 const config = require('./config');
 const { UserError } = require('./messages');
 const launcher = require('./leihu-launcher');
+const singCheck = require('./sing-check');
 
 const LINKS_PATH = process.env.LEIHU_LINKS_FILE || path.join(__dirname, '..', 'song-links.json');   // tests use a temp file
 const POLL_MS = 5000;
@@ -33,6 +34,7 @@ let ytJobs = 0;              // Leihu's queued/running YouTube imports, from any
 let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
 let canOpen = false;         // Leihu supports remote open, 1.5.2+ (/api/status reports `remote`)
 let ytPause = null;          // Leihu 1.6+: { on, reason } while it has paused YouTube downloads
+let overlayVer = '';         // Leihu's lyrics version last seen, so /api/overlay leaves the lyrics out
 const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
 const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
 let links = loadLinks();
@@ -133,6 +135,7 @@ async function refresh() {
       .filter(j => j.status === 'error' && j.error)
       .map(j => [j.song, j.error]));
     if (!wasOnline) console.log(`[leihu] Connected — ${library.length} songs in Leihu Singsing`);
+    await readPlayback();
   } catch (err) {
     library = null;
     activeJobs = new Set();
@@ -141,7 +144,20 @@ async function refresh() {
     jobErrors = new Map();
     canOpen = false;
     ytPause = null;
+    singCheck.setPlayback(null);
     if (wasOnline) console.log(`[leihu] Leihu Singsing not reachable (${err.message})`);
+  }
+}
+
+// Whether Leihu's practice window is playing, and what: its live-lyrics state (Leihu 1.4.3+), which the
+// window sends many times a second. For the singing-mode reminder (sing-check.js).
+async function readPlayback() {
+  try {
+    const { data } = await axios.get(`${baseUrl()}/api/overlay`, { timeout: 3000, params: { ver: overlayVer } });
+    overlayVer = String(data.ver ?? '');
+    singCheck.setPlayback({ playing: data.playing, sid: data.sid, title: data.title });
+  } catch {
+    singCheck.setPlayback(null);   // an older Leihu: no reminder
   }
 }
 

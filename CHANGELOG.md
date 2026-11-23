@@ -29,6 +29,12 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
   點歌、隨機點歌或換裝的項目如果沒辦法退還點數（還沒交給點歌系統管理，或在 Twitch 開了「略過獎勵請求佇列」），會顯示 ⚠ 和解決方法。
 - **🎬 `!so` 播較新的 Clip**：以前只會從對方觀看次數最高的 20 個 Clip 裡挑，所以老是那幾個舊的；現在預設從最新的 50 個裡隨機挑。
   想用原本的方式，到聊天分頁 ⚙ →「**Shoutout 的 Clip**」選「觀看次數最高的 20 個」。
+- **📋 練習分頁和每個兌換項目的分頁**：「🎵 點歌佇列 → ⚙ → 歌單分頁」改成選一個「**練習分頁**」（原本取消勾選的那個，
+  會自動帶過來）：待審核的「＋ 加入」加到這裡，這裡的歌不會被點或抽到，但**雷虎練唱台的「全部準備」和 🔗 連結搜尋現在也會處理它們**，
+  練歌時伴奏已經準備好。🎤 點歌可以用哪些分頁，現在和 🎲 一樣在「🎟️ 兌換」分頁勾選（都不勾 = 練習分頁以外全部）。
+- **🎤 忘了切唱歌模式的提醒**：雷虎練唱台在不是唱歌的模式下播放歌曲時（例如聊天模式的 BGM 還開著），控制台最上面會出現提醒和
+  「**切到 🎤 唱歌**」按鈕；按了才會切換，直播畫面不會自己改變。哪些模式算唱歌，在「🎛 模式」→ 編輯 →「**🎤 唱歌用**」設定；
+  原本會暫停 Clip 的模式預設勾選。需要雷虎練唱台 1.4.3 以上。
 
 #### 修正
 
@@ -57,6 +63,14 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 - **🎬 `!so` plays newer clips**: it used to pick from the broadcaster's 20 most-viewed clips only, so the same old
   ones kept coming up; now it picks at random from their newest 50 by default. For the old way, Chat tab ⚙ →
   **Shoutout clips** → **The 20 most viewed**.
+- **📋 A practice tab, and tabs per reward**: 🎵 Song Queue → ⚙ → Sheet tabs now picks one **practice tab** (the tab
+  you had unticked carries over): Pending's "＋ Add to" adds there, and its songs can't be requested or drawn, but
+  **Leihu's "Prepare all" and the 🔗 link finder now take them too**, so the backing track is ready when you practise.
+  Which tabs 🎤 song requests take is now ticked in the 🎟️ Rewards tab, like 🎲 (none = every tab but the practice tab).
+- **🎤 A reminder when you forget the singing mode**: when Leihu plays a song while the mode on isn't a singing one
+  (e.g. a talking mode's BGM still on), a banner at the top of the dashboard says so, with **Switch to 🎤 Sing**;
+  nothing on stream changes until you click. Which modes are for singing: 🎛 Modes → Edit → **🎤 For singing**,
+  ticked by default on modes that hold clips. Needs Leihu 1.4.3+.
 
 #### Fixes
 
