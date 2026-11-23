@@ -102,7 +102,7 @@ vtuber-song-queue/
 │                          themes as role tokens: --accent, --good, --warn…, *-rgb for tints) and theme.js
 │                          (Theme.apply / scale / nameColor; ?theme= on an overlay URL), loudness.js
 │                          (the overlays even out every sound file to −16 LUFS as it plays; maths tested in Node)
-├── dashboard/i18n-dashboard.js, dashboard/i18n-links.js   Page strings, EN + zh-TW
+├── dashboard/i18n-dashboard.js, i18n-links.js, i18n-prompter.js   Page strings, EN + zh-TW
 ├── setup/                 Web setup wizard (index.html, setup.css, setup.js, i18n.js — EN + zh-TW)
 ├── overlay/index.html     OBS Browser Source — song queue, in the overlay theme (Neon: cyberpunk dark/neon)
 ├── overlay/chat.html      OBS Browser Source — the chat on stream (?style=panel | bubble | list | row)
@@ -111,6 +111,7 @@ vtuber-song-queue/
 ├── overlay/break.html     OBS Browser Source — "休息中 / ON BREAK" card; ?card=opening "準備中 / STARTING SOON" (?min=N / ?at=HH:MM count down)
 ├── dashboard/index.html   Streamer control panel — tabs (Song Queue: 2×2 panels, drag/drop, history, manual add; Leihu; Chat), ⚙ per tab
 ├── dashboard/links.html   YouTube link finder review page
+├── dashboard/prompter.html   📱 Lyrics + progress + chat for a tablet behind the mic shield (/prompter)
 ├── clip-player/
 │   ├── index.html         OBS Browser Source — clips, YouTube, sponsor roll (!tk)
 │   ├── hls.min.js
@@ -274,6 +275,12 @@ vtuber-song-queue/
   - sing-check.js: leihu.js reads Leihu's `GET /api/overlay` (`playing`, `sid`, `title`; its live-lyrics state)
     each poll; with a 🎤 mode (`sing`, or `holdClips` when unset) existing and another (or none) on, the dashboard
     gets `{type:'sing-check', wrong:true, …}` and shows a banner (`GET /api/sing-check` on connect). Remind only.
+  - Prompter (dashboard/prompter.html, `/prompter`, strings in dashboard/i18n-prompter.js): for a tablet behind the
+    mic shield. `GET /api/prompter?ver=` = leihu.playback(): Leihu's `/api/overlay` passed through (lines only for a
+    new `ver`) + `duration` from the library; it polls 4×/s and runs its own clock between reads, like Leihu's
+    overlay. Chat: `/api/chat/recent` + `chat-subscribe` (bots and !commands left out). Display only — Leihu has no
+    seek / play API (only `/api/remote/open` and global hotkeys), so the progress bar can't jump yet.
+    `GET /api/prompter/addresses`: this PC's LAN URLs for the 🎤 Leihu ⚙ section.
   - A mode saved from the other app gets `modeOtherApp`. Without a streaming app, modes are this app's part only
 
 ### Leihu Singsing integration (leihu.js) — optional
@@ -421,6 +428,12 @@ vtuber-song-queue/
   Stops as `paused` when Leihu reports `yt_pause.on`; Leihu's `redownload` lifts that pause, so a
   bulk retry re-reads `/api/status` first. Starting again calls Leihu's `POST /api/youtube/resume`;
   the songs Leihu queues again join the run as already sent.
+- Leihu 1.6.3+ lists only the first 30 queued `process` jobs in `/api/status` (`queued_total` has all): when
+  more wait than are listed, an unfinished song with no listed job and no error counts as processing.
+- Leihu 2.3.1+ gates `POST /api/youtube` (and batch / sheet imports) behind `yt_enabled`, shown as
+  `/api/status` `yt` and turned on by the streamer clicking Leihu's title five times (with a YouTube-terms
+  notice). Never call its `/api/yt-unlock`. While `yt === false`: no imports (prepare skips, bulk pauses,
+  import throws `leihuYoutubeOff`), `youtubeOff` in `/api/leihu/status` for the dashboard notice.
 - Leihu 1.6.1 runs a `fine` clean-up pass (label `fine`) after songs with heavy backing vocals,
   and key renders after processing: a song whose steps are all done counts as ready/nolyrics even
   while such a job runs. Progress is

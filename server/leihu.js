@@ -34,6 +34,8 @@ let ytJobs = 0;              // Leihu's queued/running YouTube imports, from any
 let jobErrors = new Map();   // Leihu song ID → error of its last failed job (Leihu keeps them ~10 min)
 let canOpen = false;         // Leihu supports remote open, 1.5.2+ (/api/status reports `remote`)
 let ytPause = null;          // Leihu 1.6+: { on, reason } while it has paused YouTube downloads
+let ytOff = false;           // Leihu 2.3.1+: YouTube downloads not turned on yet (its title clicked five times)
+let hiddenQueued = false;    // Leihu 1.6.3+ lists only the first 30 waiting jobs: more wait than it shows
 let overlayVer = '';         // Leihu's lyrics version last seen, so /api/overlay leaves the lyrics out
 const requested = new Map(); // import/key-render/lyrics tag → 'sent' | 'failed', for this run
 const imported = new Map();  // video ID → sheet { title, artist }, for songs we imported this run
@@ -121,8 +123,10 @@ async function refresh() {
       lyricsPending: !!m.lyrics_pending,   // Leihu's "online lyrics available" chip
       // Leihu 1.6+: YouTube download not finished — queued | paused | failed | cancelled
       dlState: (m.steps && m.steps.import) ? null : (m.dl_state || null),
+      duration: Number(m.duration) || null,   // seconds, for the prompter's progress bar
     }));
     ytPause = statusRes.data.yt_pause || null;
+    ytOff = statusRes.data.yt === false;   // older Leihu: no `yt`, downloads always on
     canOpen = 'remote' in statusRes.data;
     launcher.remember(statusRes.data.root);   // so the dashboard can start Leihu next time
     activeJobs = new Set((statusRes.data.jobs || [])
@@ -134,6 +138,8 @@ async function refresh() {
     jobErrors = new Map((statusRes.data.jobs || [])
       .filter(j => j.status === 'error' && j.error)
       .map(j => [j.song, j.error]));
+    const shown = (statusRes.data.jobs || []).filter(j => j.status === 'queued' && j.kind === 'process').length;
+    hiddenQueued = Number(statusRes.data.queued_total || 0) > shown;
     if (!wasOnline) console.log(`[leihu] Connected — ${library.length} songs in Leihu Singsing`);
     await readPlayback();
   } catch (err) {
@@ -144,6 +150,8 @@ async function refresh() {
     jobErrors = new Map();
     canOpen = false;
     ytPause = null;
+    ytOff = false;
+    hiddenQueued = false;
     singCheck.setPlayback(null);
     if (wasOnline) console.log(`[leihu] Leihu Singsing not reachable (${err.message})`);
   }
@@ -158,6 +166,26 @@ async function readPlayback() {
     singCheck.setPlayback({ playing: data.playing, sid: data.sid, title: data.title });
   } catch {
     singCheck.setPlayback(null);   // an older Leihu: no reminder
+  }
+}
+
+// What Leihu's practice window plays, for the prompter page (dashboard/prompter.html): Leihu's live-lyrics
+// state passed through — read only, Leihu answers this PC alone — plus the song's length. `ver` is the
+// lyrics version the page already has (Leihu then leaves the lines out). { online: false } when unreachable.
+async function playback(ver) {
+  try {
+    const params = ver != null && ver !== '' ? { ver: String(ver) } : {};
+    const { data } = await axios.get(`${baseUrl()}/api/overlay`, { timeout: 3000, params });
+    const song = data.sid && (library || []).find(s => s.id === data.sid);
+    const out = {
+      online: true, sid: data.sid || null, title: String(data.title || ''), artist: String(data.artist || ''),
+      key: Number(data.key) || 0, t: Number(data.t) || 0, playing: !!data.playing, rate: Number(data.rate) || 1,
+      color: data.color !== false, ver: data.ver ?? null, duration: (song && song.duration) || null,
+    };
+    if (Array.isArray(data.lines)) out.lines = data.lines;
+    return out;
+  } catch {
+    return { online: false };
   }
 }
 
@@ -194,7 +222,10 @@ function songState(song) {
   // A finished song can be sung while Leihu still works on it: a key render, or Leihu 1.6.1's
   // clean-up pass for songs with heavy backing vocals (lyrics stay as they are)
   if (song.complete) return song.hasLyrics ? 'ready' : 'nolyrics';
-  return activeJobs.has(song.id) || song.dlState === 'queued' ? 'processing' : 'failed';
+  if (activeJobs.has(song.id) || song.dlState === 'queued') return 'processing';
+  // Not in the jobs Leihu shows, but more wait than it shows: waiting unless Leihu reported an error
+  if (hiddenQueued && !song.dlState && !jobErrors.has(song.id)) return 'processing';
+  return 'failed';
 }
 
 // Leihu's recognition language for a sheet tab (config.LEIHU_TAB_LANGUAGES), or null = automatic.
@@ -208,6 +239,7 @@ function tabLanguage(tab) {
 // leaves them blank. Imports for the stream move ahead of the sheet songs "Prepare all" queued;
 // `bulk` (from bulkStep) leaves the song at the back.
 async function importVideo(vid, tab, song = null, { bulk: fromBulk = false } = {}) {
+  if (ytOff) throw new UserError('leihuYoutubeOff', {}, 'YouTube downloads are not turned on in Leihu Singsing');
   const res = await axios.post(`${baseUrl()}/api/youtube`, { url: `https://www.youtube.com/watch?v=${vid}` }, { timeout: 10000 });
   const id = res.data && res.data.id;
   if (song) imported.set(vid, { title: song.title, artist: song.artist });
@@ -359,6 +391,7 @@ async function prepare(entry, { retry = false } = {}) {
       console.error(`[leihu] Download retry of "${entry.title}" failed:`, err.response?.data?.error || err.message);
     }
   } else if (status.state === 'missing') {
+    if (ytOff) return;   // imported once Leihu's YouTube downloads are on
     const tag = `import:${vid}`;
     if (requested.has(tag)) return;
     requested.set(tag, 'sent');
@@ -425,6 +458,7 @@ function sheetCounts() {
 async function startBulk() {
   await refresh();
   if (!library) throw new UserError('leihuOffline', {}, 'Leihu Singsing is not running');
+  if (ytOff) throw new UserError('leihuYoutubeOff', {}, 'YouTube downloads are not turned on in Leihu Singsing');
   if (bulk.state === 'running') return bulkStatus();
   // Starting again after a YouTube pause is the streamer saying the limit has cleared
   if (ytPause && ytPause.on) {
@@ -475,6 +509,12 @@ async function bulkStep() {
     } else {
       bulk.done++;
     }
+  }
+  if (ytOff) {
+    bulk.state = 'paused';
+    bulk.reason = '';
+    console.log('[leihu] YouTube downloads are off in Leihu — stopped preparing the sheet');
+    return;
   }
   if (ytPause && ytPause.on) {
     bulk.state = 'paused';
@@ -544,7 +584,7 @@ function getStatus() {
   }
   // `url`: Leihu's own screen, shown in the dashboard's Leihu tab; `launched`/`starting`: the
   // song queue started Leihu without its window (leihu-launcher.js)
-  return { online: !!library, url: baseUrl(), ...launcher.status(), autoStart: autoStartEnabled(), canOpen,
+  return { online: !!library, url: baseUrl(), ...launcher.status(), autoStart: autoStartEnabled(), canOpen, youtubeOff: ytOff,
     autoPrepare: autoPrepareEnabled(), songs, bulk: bulkStatus(), sheet: sheetCounts() };
 }
 
@@ -599,7 +639,7 @@ async function open(entry) {
 }
 
 module.exports = {
-  start, getStatus, getLibrary, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
+  start, getStatus, getLibrary, playback, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
   fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
   startBulk, stopBulk, bulkStatus, bulkStep, sheetCounts, launch, closeLeihu,
 };

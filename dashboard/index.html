@@ -1163,6 +1163,15 @@
           <button class="btn" id="obs-sound-open" onclick="openStreamWindow()" data-i18n="dash.set.obsSoundOpen">🔊 Open the stream window</button>
         </div>
       </section>
+      <!-- The prompter (dashboard/prompter.html): lyrics, progress and chat on a tablet behind the mic shield -->
+      <section id="settings-prompter">
+        <h3 data-i18n="dash.set.prompterTitle">📱 Lyrics and chat on a tablet</h3>
+        <p class="setting-hint" data-i18n="dash.set.prompterHint">For a tablet or phone behind the mic shield: Leihu's lyrics as they play, the song's progress and the chat. It only shows — nothing on it changes Leihu or the stream. Open the address on the device (same Wi-Fi as this PC); on an iPad, Share → Add to Home Screen opens it full screen.</p>
+        <ul class="setting-hint" id="prompter-addresses"></ul>
+        <div class="step-buttons">
+          <a class="btn" style="text-decoration:none" href="/prompter" target="_blank" rel="noopener" data-i18n="dash.set.prompterOpen">📱 Open the prompter here</a>
+        </div>
+      </section>
       <section id="settings-ready">
         <h3 data-i18n="dash.set.readyTitle">Get your song list ready in Leihu</h3>
         <p class="setting-hint" data-i18n="dash.set.readyIntro">Leihu Singsing makes a backing track and timed lyrics from each song's YouTube video. Do these two steps once (and again after adding songs to the sheet), so requested songs are ready to sing right away.</p>
@@ -2045,11 +2054,22 @@ function toggleTabConfig(tab, open) {
   if (!panel) return;   // a tab without settings
   panel.hidden = open === undefined ? !panel.hidden : !open;
   if (tab === 'chat' && !panel.hidden) loadCredits();
+  if (tab === 'leihu' && !panel.hidden) loadPrompterAddresses();
   const btn = document.querySelector(`.tab-config-btn[aria-controls="config-${tab}"]`);
   if (!btn) return;
   btn.setAttribute('aria-expanded', String(!panel.hidden));
   // Opens just under the tab's top row, so its ⚙ stays in view
   if (!panel.hidden) panel.style.top = `${Math.max(0, btn.getBoundingClientRect().bottom - panel.parentElement.getBoundingClientRect().top + 8)}px`;
+}
+
+// The prompter's addresses another device on this network can open
+async function loadPrompterAddresses() {
+  const list = document.getElementById('prompter-addresses');
+  try {
+    const urls = await (await fetch('/api/prompter/addresses')).json();
+    list.innerHTML = urls.length ? urls.map(u => `<li><code>${esc(u)}</code></li>`).join('')
+      : `<li>${esc(t('dash.set.prompterNoNetwork'))}</li>`;
+  } catch (_) { list.innerHTML = ''; }
 }
 
 function closeTabConfigs() {
@@ -2613,12 +2633,13 @@ function paintBulk() {
   else if (c.linked < c.songs) step('step1-status', 'dash.set.step1.some', { linked: c.linked, songs: c.songs, missing: c.songs - c.linked });
   else step('step1-status', 'dash.set.step1.all', { songs: c.songs }, true);
   if (!leihuStatus.online) step('step2-status', 'dash.set.step2.offline', {});
+  else if (leihuStatus.youtubeOff) step('step2-status', 'dash.leihuYtOff', {});
   else if (!c || c.todo == null) step('step2-status', null, {});
   else if (!c.linked) step('step2-status', 'dash.set.step2.noLinks', {});
   else if (c.todo) step('step2-status', 'dash.set.step2.todo', { todo: c.todo, ready: c.linked - c.todo, linked: c.linked });
   else step('step2-status', 'dash.set.step2.all', { linked: c.linked }, true);
   document.getElementById('bulk-start').hidden = running;
-  document.getElementById('bulk-start').disabled = !leihuStatus.online || !(c && c.todo);
+  document.getElementById('bulk-start').disabled = !leihuStatus.online || leihuStatus.youtubeOff || !(c && c.todo);
   document.getElementById('bulk-stop').hidden = !running;
   const el = document.getElementById('bulk-progress');
   const p = { done: b.done, failed: b.failed, total: b.total, current: b.current, reason: b.reason };
@@ -2627,10 +2648,11 @@ function paintBulk() {
     : b.state === 'paused' || b.state === 'stopped' ? b.state : null;
   el.hidden = !key;
   el.textContent = key ? t('dash.set.bulk.' + key, p) : '';
-  // While preparing runs (or stopped for YouTube), its progress also shows in the Leihu tab's header
+  // While preparing runs (or stopped for YouTube), its progress also shows in the Leihu tab's header;
+  // so does Leihu 2.3.1+'s YouTube downloads being off
   const mini = document.getElementById('leihu-bulk-mini');
-  mini.hidden = !(running || b.state === 'paused');
-  mini.textContent = mini.hidden ? '' : el.textContent;
+  mini.hidden = !(running || b.state === 'paused' || leihuStatus.youtubeOff);
+  mini.textContent = mini.hidden ? '' : leihuStatus.youtubeOff ? t('dash.leihuYtOff') : el.textContent;
   mini.title = mini.textContent;
 }
 
@@ -2651,6 +2673,7 @@ async function bulkAction(action) {
 }
 
 async function onBadgeClick(entry, st) {
+  if (st.state === 'missing' && leihuStatus.youtubeOff) { showToast(t('dash.leihuYtOff'), true, 8000); return; }
   if (st.state === 'missing' || (st.state === 'failed' && !st.manual)) {
     await fetch('/api/leihu/prepare', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

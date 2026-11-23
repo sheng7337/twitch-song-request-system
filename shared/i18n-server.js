@@ -12,6 +12,7 @@
       redrawFailed: 'redraw failed',
       // Leihu Singsing
       noRemoteOpen: 'this Leihu Singsing version cannot open songs from here (needs 1.5.2 or newer)',
+      leihuYoutubeOff: 'Leihu\'s YouTube downloads are off: in Leihu, click its title (top left) five times within 3 seconds to turn them on (mind YouTube\'s terms). No new songs are imported until then.',
       notReady: 'the song is not ready in Leihu yet',
       // link finder
       leihuNotRunning: 'Leihu Singsing is not running — start it first, the search uses its lyric sites and YouTube tools.',
@@ -114,6 +115,7 @@
       noRedraw: '沒有可以再抽的歌了',
       redrawFailed: '重新抽歌失敗',
       noRemoteOpen: '這個版本的雷虎練唱台無法從這裡開啟歌曲（需要 1.5.2 以上）',
+      leihuYoutubeOff: '雷虎練唱台的 YouTube 下載還沒開啟：在雷虎練唱台 3 秒內點左上角的標題五下開啟（請遵守 YouTube 的使用規範）。開啟前不會匯入新歌。',
       notReady: '這首歌在雷虎練唱台還沒準備好',
       leihuNotRunning: '雷虎練唱台沒有開啟 — 請先開啟它，搜尋會用到它的歌詞網站和 YouTube 工具。',
       leihuPythonMissing: '在 {root} 找不到雷虎練唱台的 Python',

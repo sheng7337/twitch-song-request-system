@@ -13,6 +13,7 @@ const TABLES = {
   'shared/i18n-viewer.js': require('../shared/i18n-viewer'),
   'dashboard/i18n-dashboard.js': require('../dashboard/i18n-dashboard'),
   'dashboard/i18n-links.js': require('../dashboard/i18n-links'),
+  'dashboard/i18n-prompter.js': require('../dashboard/i18n-prompter'),
 };
 
 // The setup wizard keeps its own table (STRINGS in setup/i18n.js)
@@ -48,7 +49,7 @@ test('every string table has the same keys and placeholders in English and Chine
 
 test('every key a page uses exists', () => {
   for (const t of Object.values(TABLES)) I18N.register(t);
-  const pages = ['dashboard/index.html', 'dashboard/links.html', 'overlay/index.html', 'clip-player/index.html'];
+  const pages = ['dashboard/index.html', 'dashboard/links.html', 'dashboard/prompter.html', 'overlay/index.html', 'clip-player/index.html'];
   for (const page of pages) {
     const src = read(page);
     const keys = [

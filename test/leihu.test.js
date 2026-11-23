@@ -15,11 +15,17 @@ test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 const leihu = { up: true, songs: [], jobs: [], remote: false, candidates: [], search: [] };
 const posts = [];
 const searches = [];
+const overlayAsks = [];
 const axiosStub = {
   get: async (url, opts = {}) => {
     if (!leihu.up) throw new Error('connect ECONNREFUSED');
     if (url.endsWith('/api/songs')) return { data: leihu.songs };
-    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}), ...(leihu.ytPause ? { yt_pause: leihu.ytPause } : {}) } };
+    if (url.endsWith('/api/status')) return { data: { jobs: leihu.jobs, ...(leihu.remote ? { remote: { seq: 0 } } : {}), ...(leihu.ytPause ? { yt_pause: leihu.ytPause } : {}), ...(leihu.yt != null ? { yt: leihu.yt } : {}), ...(leihu.queuedTotal != null ? { queued_total: leihu.queuedTotal } : {}) } };
+    if (url.endsWith('/api/overlay') && leihu.overlay) {   // like Leihu: the lines only for another version
+      overlayAsks.push(opts.params || {});
+      const { lines, ...rest } = leihu.overlay;
+      return { data: (opts.params || {}).ver === String(rest.ver) ? rest : { ...rest, lines } };
+    }
     const job = url.match(/\/api\/jobs\/(\w+)$/);
     if (job) return { data: { id: job[1], ahead: (leihu.ahead || {})[job[1]] || 0 } };
     if (url.endsWith('/lyrics/candidates')) return { data: { results: leihu.candidates } };
@@ -418,4 +424,66 @@ test('a failed download is not retried while Leihu has just paused YouTube', asy
   sheet.pop();
   leihu.songs = [];
   leihu.ytPause = null;
+});
+
+test('a song waiting past the 30 jobs Leihu lists is processing, unless Leihu reported an error', async () => {
+  leihu.songs = [{ id: 'dddddddddd', title: 't', source_url: 'https://www.youtube.com/watch?v=3znMCsScCxo', steps: { ...done, pitch: false } }];
+  leihu.jobs = Array.from({ length: 30 }, (_, i) => ({ song: `other${i}`, status: 'queued', kind: 'process' }));
+  leihu.queuedTotal = 31;
+  queueState.queue = [entry(sheet[0])];
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'processing');
+  leihu.jobs = [...leihu.jobs, { song: 'dddddddddd', status: 'error', kind: 'process', error: 'boom' }];
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'failed');
+  leihu.jobs = [];
+  leihu.queuedTotal = 0;   // every waiting job listed: not in it = failed
+  await L.refresh();
+  assert.strictEqual(statusOf(sheet[0]).state, 'failed');
+  leihu.queuedTotal = null;
+  leihu.songs = [];
+});
+
+test("Leihu 2.3.1+ with YouTube downloads off: nothing is imported, and it says how to turn them on", async () => {
+  const fresh = { title: 'Fresh', artist: 'y', key: '', url: 'https://youtu.be/fReShSoNg01', tab: 'English' };
+  sheet.push(fresh);
+  queueState.queue = [entry(fresh)];
+  leihu.songs = [];
+  leihu.jobs = [];
+  leihu.yt = false;
+  await L.refresh();
+  assert.strictEqual(L.getStatus().youtubeOff, true);
+  posts.length = 0;
+  await L.prepare(entry(fresh));
+  assert.deepStrictEqual(posts, []);
+  assert.strictEqual(statusOf(fresh).state, 'missing');   // not marked failed: imported once turned on
+  await assert.rejects(L.startBulk(), e => e.messageCode === 'leihuYoutubeOff');
+  await assert.rejects(L.importForSong('nEwViDeO001', { title: 'x', artist: '' }, '國語'), e => e.messageCode === 'leihuYoutubeOff');
+
+  leihu.yt = true;
+  await L.refresh();
+  assert.strictEqual(L.getStatus().youtubeOff, false);
+  await L.prepare(entry(fresh));
+  assert.strictEqual(posts[0].url, 'http://127.0.0.1:8765/api/youtube');
+  leihu.yt = null;
+  sheet.pop();
+});
+
+test("the prompter gets Leihu's lyrics once per version, with the song's length; offline when Leihu is", async () => {
+  leihu.up = true;
+  leihu.songs = [{ id: 'promptsong1', title: 'P', source_url: 'https://youtu.be/pRoMpTeR001', steps: done, lyrics_text: LYR, duration: 245.3 }];
+  leihu.jobs = [];
+  const lines = [{ t: 1, end: 3, text: 'first' }, { t: 3, end: 6, text: 'second' }];
+  leihu.overlay = { sid: 'promptsong1', title: 'P', artist: 'A', key: -2, t: 12.5, playing: true, rate: 1, color: true, ver: 7, lines };
+  await L.refresh();
+  const first = await L.playback();
+  assert.deepStrictEqual(first, { online: true, sid: 'promptsong1', title: 'P', artist: 'A', key: -2, t: 12.5, playing: true,
+    rate: 1, color: true, ver: 7, duration: 245.3, lines });
+  const again = await L.playback('7');
+  assert.strictEqual(again.lines, undefined, 'the page already has version 7');
+  assert.strictEqual(overlayAsks[overlayAsks.length - 1].ver, '7');
+  leihu.up = false;
+  assert.deepStrictEqual(await L.playback('7'), { online: false });
+  leihu.up = true;
+  leihu.overlay = null;
 });

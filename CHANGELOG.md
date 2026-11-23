@@ -35,12 +35,19 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 - **🎤 忘了切唱歌模式的提醒**：雷虎練唱台在不是唱歌的模式下播放歌曲時（例如聊天模式的 BGM 還開著），控制台最上面會出現提醒和
   「**切到 🎤 唱歌**」按鈕；按了才會切換，直播畫面不會自己改變。哪些模式算唱歌，在「🎛 模式」→ 編輯 →「**🎤 唱歌用**」設定；
   原本會暫停 Clip 的模式預設勾選。需要雷虎練唱台 1.4.3 以上。
+- **📱 提詞機：在平板上看歌詞和聊天室**：給防噴罩擋住螢幕時用。平板或手機（和電腦連同一個 Wi-Fi）開 `http://<這台電腦>:3000/prompter`，
+  會顯示雷虎練唱台正在播的歌詞（跟著唱的位置上色）、歌曲進度條和聊天室；直放時聊天室在下面，橫放時在右邊。
+  歌詞和聊天室的字可以各自放大縮小，也可以隱藏聊天室。只是顯示，不會改到雷虎練唱台或直播。網址在「🎤 雷虎練唱台 → ⚙」。
 
 #### 修正
 
 - 一個兌換項目同時有特效和其他功能時，兩邊都可能標成完成或退還，互相蓋掉。現在只有主要用途會處理。
 - 交給點歌系統管理的項目，換裝和特效的設定現在也會跟著換到複本（之前只有點歌和隨機點歌會）。
 - 手機上的分頁列改成可以左右滑動，不會把分頁名稱擠成直的。
+- 雷虎練唱台排隊的工作很多時（例如直播中它暫停背景處理），排在第 30 個以後的歌在歌單卡片上會顯示成失敗；現在只有雷虎練唱台
+  真的回報錯誤才算失敗，其他都顯示處理中。
+- 雷虎練唱台 2.3.1 起，YouTube 下載預設關閉：點歌系統會說明怎麼開啟（在雷虎練唱台 3 秒內點左上角標題五下），開啟前不會匯入，
+  歌也不會被標成失敗。
 
 ### English
 
@@ -71,6 +78,10 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
   (e.g. a talking mode's BGM still on), a banner at the top of the dashboard says so, with **Switch to 🎤 Sing**;
   nothing on stream changes until you click. Which modes are for singing: 🎛 Modes → Edit → **🎤 For singing**,
   ticked by default on modes that hold clips. Needs Leihu 1.4.3+.
+- **📱 Prompter: lyrics and chat on a tablet**: for when a mic shield hides the screen. On a tablet or phone on the
+  same Wi-Fi, open `http://<this PC>:3000/prompter`: Leihu's lyrics as they play (filled as you sing), the song's
+  progress and the chat — below in portrait, beside in landscape. Lyrics and chat each have their own text size, and
+  the chat can be hidden. It only shows; nothing on it changes Leihu or the stream. Its address: 🎤 Leihu → ⚙.
 
 #### Fixes
 
@@ -79,6 +90,10 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 - A reward handed over to the app now keeps its outfit and effect settings on the copy too (before, only song
   request and random song did).
 - On a phone the tab bar scrolls sideways instead of squeezing the tab names into a column.
+- With many jobs waiting in Leihu (e.g. while it pauses background work during a stream), songs past the 30th
+  showed as failed on the queue cards; now only an error Leihu reports counts as failed, the rest show processing.
+- From Leihu 2.3.1, YouTube downloads start off: the song queue says how to turn them on (click Leihu's title, top
+  left, five times within 3 seconds); until then nothing is imported, and songs aren't marked failed.
 
 ---
 

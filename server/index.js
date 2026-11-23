@@ -489,6 +489,10 @@ app.get('/api/clip-stream', async (req, res) => {
 app.get('/api/leihu/status', (req, res) => res.json(leihu.getStatus()));
 app.get('/api/leihu/library', (req, res) => res.json(leihu.getLibrary()));
 app.get('/api/sing-check', (req, res) => res.json(singCheck.state()));   // Leihu playing outside a 🎤 mode
+// The prompter (dashboard/prompter.html): Leihu's lyrics and position for a tablet behind the mic shield
+app.get('/api/prompter', async (req, res) => res.json(await leihu.playback(req.query.ver)));
+app.get('/api/prompter/addresses', (req, res) => res.json(lanAddresses().map(ip => `http://${ip}:${PORT}/prompter`)));
+app.get('/prompter', (req, res) => res.redirect('/dashboard/prompter.html'));
 
 // Manual link for a song imported into Leihu as an audio file. id: null unlinks.
 app.post('/api/leihu/link', async (req, res) => {
@@ -1122,6 +1126,17 @@ wss.on('connection', (ws, req) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
+
+// This PC's addresses another device on the network can open (IPv4, not loopback or a link-local one)
+function lanAddresses() {
+  const out = [];
+  for (const list of Object.values(require('os').networkInterfaces())) {
+    for (const a of list || []) {
+      if ((a.family === 'IPv4' || a.family === 4) && !a.internal && !a.address.startsWith('169.254.')) out.push(a.address);
+    }
+  }
+  return out;
+}
 
 async function start() {
   console.log('\n🎵 VTuber Song Queue starting...\n');
