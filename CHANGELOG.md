@@ -13,13 +13,15 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 ### 繁體中文
 
-**搭配**：Node.js LTS · 雷虎練唱台 1.6.x–2.0.x（以 2.0.0 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30
+**搭配**：Node.js LTS · 雷虎練唱台 1.6.x–2.3.x（以 2.3.4 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30
 以上 · 換裝需要 veadotube mini 2.1 以上。
 
 #### ⚠ 需要動手
 
 - **重新啟動**程式（關掉後再執行 `start.bat`／`start_zh.bat`），並重新整理控制台。
 - 兌換項目的設定搬到新的「**🎟️ 兌換**」分頁；原本的設定都會保留，不用重設。
+- 想讓片尾名單也感謝用在 Power-ups 的小奇點：到「💬 聊天室 → ⚙ → 片尾名單」按「**重新授權 →**」，讓 Twitch 多給一項權限
+  （讀取小奇點）。不授權也沒關係，其他都照常。
 
 #### 新功能
 
@@ -48,16 +50,21 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
   真的回報錯誤才算失敗，其他都顯示處理中。
 - 雷虎練唱台 2.3.1 起，YouTube 下載預設關閉：點歌系統會說明怎麼開啟（在雷虎練唱台 3 秒內點左上角標題五下），開啟前不會匯入，
   歌也不會被標成失敗。
+- `!endingtk` 片尾名單：贈送訂閱的觀眾在「感謝訂閱」的名字後面會標出送了幾份（🎁×5）；收到的觀眾一樣列在「感謝訂閱」。
+- `!endingtk` 片尾名單：用在 Power-ups（訊息特效、放大表情、慶祝特效）和連擊的小奇點，現在也算進「感謝小奇點」
+  （之前只算聊天室裡的 Cheer）。需要重新授權一次，見上面。
 
 ### English
 
-**Works with:** Node.js LTS · Leihu Singsing 1.6.x–2.0.x (checked with 2.0.0) · for modes, Streamlabs
+**Works with:** Node.js LTS · Leihu Singsing 1.6.x–2.3.x (checked with 2.3.4) · for modes, Streamlabs
 Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 
 #### ⚠ Action needed
 
 - **Restart** the app (close it, run `start.bat` / `start_zh.bat` again) and refresh the dashboard.
 - Reward settings moved to the new **🎟️ Rewards** tab; what you had set up is kept, nothing to redo.
+- For the ending roll to thank Bits spent on Power-ups: 💬 Chat → ⚙ → Ending roll → **Authorize again →**, so
+  Twitch gives one more permission (reading Bits). Without it everything else works as before.
 
 #### What's new
 
@@ -94,6 +101,10 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
   showed as failed on the queue cards; now only an error Leihu reports counts as failed, the rest show processing.
 - From Leihu 2.3.1, YouTube downloads start off: the song queue says how to turn them on (click Leihu's title, top
   left, five times within 3 seconds); until then nothing is imported, and songs aren't marked failed.
+- `!endingtk` ending roll: a viewer who gifted subs shows how many after their name under Subscribers (🎁×5);
+  the viewers they gifted are listed there too.
+- `!endingtk` ending roll: Bits spent on Power-ups (message effects, gigantified emotes, celebrations) and combos now
+  count under Cheers (before, only cheers in chat did). Needs authorizing once more, see above.
 
 ---
 

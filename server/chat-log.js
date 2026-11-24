@@ -16,6 +16,9 @@
 //         For the chat on stream's own wording (not in older logs): tier ('1000' | '2000' | '3000' |
 //         'prime'), months (a resub's total), count (subs in a community gift), bitsTier,
 //         charity { name, amount, currency }
+//   { kind: 'notice', notice: 'bits_use', id, at, user, system, text, bits, use, powerUp? }
+//       — Bits spent without a cheer in chat (channel.bits.use): use 'power_up' | 'combo' | …; powerUp:
+//         'message_effect' | 'celebration' | 'gigantify_an_emote'. Cheers stay on their chat message (bits).
 //   { kind: 'follow', id, at, user }
 //   { kind: 'delete', at, ids? | user? | all? }   — a mod deleted messages; applied on load
 //   { kind: 'redeem-status', at, id, status }      — a redemption done or refunded later; in the
@@ -172,6 +175,21 @@ function fromNotice(e, at = Date.now()) {
   return rec;
 }
 
+// channel.bits.use (v1), but not cheers: those are counted from their chat message. null for a cheer.
+function fromBitsUse(e, at = Date.now()) {
+  if (!e || !e.bits || e.type === 'cheer') return null;
+  const user = { ...userOf(e, ''), color: '', badges: [] };
+  const powerUp = e.power_up?.type || '';
+  const what = e.type === 'power_up' ? 'a Power-up' : e.type === 'combo' ? 'a combo' : String(e.type || 'something');
+  const rec = {
+    kind: 'notice', notice: 'bits_use', id: `b${e.user_id || 'x'}-${at}`, at, user,
+    system: `${user.name} used ${e.bits} Bits on ${what}`, text: e.message?.text || '',
+    bits: e.bits, use: String(e.type || ''),
+  };
+  if (powerUp) rec.powerUp = powerUp;
+  return rec;
+}
+
 // channel.follow (v2)
 function fromFollow(e, at = Date.now()) {
   return { kind: 'follow', id: `f${e.user_id}-${at}`, at, user: { ...userOf(e, ''), color: '', badges: [] } };
@@ -217,6 +235,11 @@ function addNotice(event) {
   if (event.broadcaster_user_login) channel = event.broadcaster_user_login;
   if ((event.notice_type || '').startsWith('shared_chat_')) return null;
   return add(fromNotice(event));
+}
+
+function addBitsUse(event) {
+  const rec = fromBitsUse(event);
+  return rec ? add(rec) : null;
 }
 
 function addFollow(event) {
@@ -372,4 +395,4 @@ function flush() {
   return writing;
 }
 
-module.exports = { init, addChat, addRedemption, addNotice, addFollow, onModeration, setRedeemStatus, markFirst, setAnnounced, getRecent, load, loadSince, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, songsIn, dayOf };
+module.exports = { init, addChat, addRedemption, addNotice, addFollow, addBitsUse, onModeration, setRedeemStatus, markFirst, setAnnounced, getRecent, load, loadSince, days, prune, flush, fromChat, fromRedemption, fromNotice, fromFollow, fromBitsUse, songsIn, dayOf };

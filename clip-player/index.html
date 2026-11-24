@@ -296,9 +296,12 @@
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
     letter-spacing: 0.04em;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    align-items: baseline;
+    gap: 0.3em;
   }
+  .sp-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .sp-gift { flex: none; font-family: 'Segoe UI', sans-serif; font-size: 0.7em; color: #ffd27a; }   /* any theme: gold on the roll's own picture, like its white names */
 
   .sp-login {
     font-family: 'Segoe UI', sans-serif;
@@ -577,7 +580,16 @@
 
     const name = document.createElement('div');
     name.className = 'sp-name';
-    name.textContent = broadcaster.displayName || broadcaster.login;
+    const nameText = document.createElement('span');
+    nameText.className = 'sp-name-text';
+    nameText.textContent = broadcaster.displayName || broadcaster.login;
+    name.appendChild(nameText);
+    if (broadcaster.gifts > 0) {   // !endingtk: subs this viewer gifted
+      const gift = document.createElement('span');
+      gift.className = 'sp-gift';
+      gift.textContent = '🎁×' + broadcaster.gifts;
+      name.appendChild(gift);
+    }
     textBlock.appendChild(name);
 
     const login = document.createElement('div');

@@ -18,10 +18,12 @@ let chatHandler = null;       // set by index.js via setChatHandler
 let moderationHandler = null; // set by index.js via setModerationHandler (deleted / cleared chat)
 let noticeHandler = null;     // set by index.js via setNoticeHandler (subs, gifts, raids as chat shows them)
 let followHandler = null;     // set by index.js via setFollowHandler
+let bitsHandler = null;       // set by index.js via setBitsHandler (Bits used: cheers, Power-ups, combos)
 let rewardHandler = null;     // set by index.js via setRewardHandler
 let streamHandler = null;     // set by index.js via setStreamHandler (stream went live / ended)
 let reconnectHandler = null;  // set by index.js via setReconnectHandler (back after the connection dropped)
 let follows = null;           // new followers: 'on' | 'no-permission' (authorized before it was asked) | 'failed'
+let bitsUse = null;           // Bits used (for Power-ups): 'on' | 'no-permission' (authorized before bits:read) | 'failed'
 
 // Deduplicate EventSub notifications — Twitch guarantees at-least-once delivery
 // so the same message_id can arrive more than once after reconnects.
@@ -230,6 +232,22 @@ async function subscribeToEvents(sid) {
     note(err);
     console.warn('[twitch] Could not subscribe to new followers:', err.response?.data?.message || err.message);
   }
+
+  // Bits spent on Power-ups and combos (no cheer in chat): needs bits:read. Like followers, an
+  // authorization from before goes on without; the Chat settings offer to authorize again.
+  try {
+    await axios.post(`${TWITCH_API}/eventsub/subscriptions`, {
+      type: 'channel.bits.use', version: '1',
+      condition: { broadcaster_user_id: broadcasterId },
+      transport: { method: 'websocket', session_id: sid },
+    }, { headers });
+    bitsUse = 'on';
+    console.log('[twitch] Subscribed to Bits used');
+  } catch (err) {
+    bitsUse = err.response?.status === 403 ? 'no-permission' : 'failed';
+    note(err);
+    console.warn('[twitch] Could not subscribe to Bits used:', err.response?.data?.message || err.message);
+  }
   if (lost) throw lost;
 }
 
@@ -332,6 +350,8 @@ function connectEventSub(url) {
         if (noticeHandler) noticeHandler(msg.payload.event);
       } else if (subType === 'channel.follow') {
         if (followHandler) followHandler(msg.payload.event);
+      } else if (subType === 'channel.bits.use') {
+        if (bitsHandler) bitsHandler(msg.payload.event);
       } else if (REWARD_TYPES.includes(subType)) {
         if (rewardHandler) rewardHandler(subType, msg.payload.event);
       } else if (STREAM_TYPES.includes(subType)) {
@@ -383,6 +403,10 @@ function setFollowHandler(fn) {
   followHandler = fn;
 }
 
+function setBitsHandler(fn) {
+  bitsHandler = fn;
+}
+
 function setRewardHandler(fn) {
   rewardHandler = fn;
 }
@@ -406,6 +430,10 @@ function replayRedemption(event) {
 
 function followStatus() {
   return follows;
+}
+
+function bitsStatus() {
+  return bitsUse;
 }
 
 // After setup authorizes again: the close handler reconnects, and the new session subscribes
@@ -441,4 +469,4 @@ async function connect() {
   connectEventSub();
 }
 
-module.exports = { connect, reconnect, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus, ensureFreshToken, setEnvValue };
+module.exports = { connect, reconnect, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setBitsHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus, bitsStatus, ensureFreshToken, setEnvValue };

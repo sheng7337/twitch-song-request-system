@@ -13,7 +13,7 @@ const { isAllowedRequest } = require('./request-guard');
 const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
 const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw, setRedemptionHook, forgetRedemption } = require('./queue');
-const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus } = require('./twitch');
+const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setBitsHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus, bitsStatus } = require('./twitch');
 const { registerCommand, handleChatEvent } = require('./chat-router');
 const chatLog = require('./chat-log');
 const chatBadges = require('./chat-badges');
@@ -169,6 +169,10 @@ setNoticeHandler((event) => {
 });
 setFollowHandler((event) => {
   try { chatLog.addFollow(event); } catch (err) { console.error('[chat-log] Could not log a follow:', err.message); }
+});
+// Bits spent on Power-ups / combos: thanked with the cheers by !endingtk
+setBitsHandler((event) => {
+  try { chatLog.addBitsUse(event); } catch (err) { console.error('[chat-log] Could not log Bits used:', err.message); }
 });
 // Redemptions done or refunded (Chat tab, Twitch's queue, or songs leaving the queue: redemptions.js)
 setRewardHandler((type, event) => {
@@ -953,7 +957,7 @@ app.post('/api/modes/connection', modRoute(async (b) => {
 // !endingtk: whether new followers come in (needs moderator:read:followers), and who it would thank now
 app.get('/api/credits', async (req, res) => {
   const groups = await endingCredits.gather();
-  res.json({ follows: followStatus(), lastAt: endingCredits.lastRunAt() || null, groups: groups.map(g => ({ key: g.key, count: g.people.length })) });
+  res.json({ follows: followStatus(), bits: bitsStatus(), lastAt: endingCredits.lastRunAt() || null, groups: groups.map(g => ({ key: g.key, count: g.people.length })) });
 });
 
 // ── Channel-point redemptions (redemptions.js) ─────────────────────────────────

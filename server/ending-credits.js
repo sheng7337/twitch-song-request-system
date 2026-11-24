@@ -1,6 +1,7 @@
 // server/ending-credits.js
 // !endingtk — the !tk sponsor roll for the whole stream, one heading per group: raiders,
-// subscribers (gifters and the viewers they gifted), cheerers, new followers, channel-point
+// subscribers (gifters, with how many they gifted, and the viewers they gifted), cheerers (cheers and
+// Bits spent on Power-ups / combos), new followers, channel-point
 // redeemers, song requesters and the top chatters, since the last !endingtk (at most
 // WINDOW_MS back, so the first one covers this stream only).
 //
@@ -34,14 +35,19 @@ function saveRunAt(at) {
   }
 }
 
-// Records → [{ key, people: [{ id, login, displayName, avatarUrl? }] }] (the card shape !tk sends),
-// empty groups left out.
+// Records → [{ key, people: [{ id, login, displayName, avatarUrl?, gifts? }] }] (the card shape !tk sends),
+// empty groups left out. gifts: subs a viewer gifted (the clip player shows 🎁×n after the name).
 // Each group lists a viewer once, in order of first appearance (cheers: most bits first,
 // chatters: most messages first). The broadcaster and bots are left out.
 function collect(records, { since = 0, broadcasterId = '', songRewards = new Set() } = {}) {
   const groups = Object.fromEntries(GROUPS.map(k => [k, new Map()]));
   const bits = new Map();
   const said = new Map();
+  // Gifted subs per gifter: single gifts, plus each gift of several — its community_sub_gift count, or
+  // its sub_gift lines when Twitch's count is missing (older logs) or lower
+  const single = new Map(), community = new Map(), communityLines = new Map();
+  const bump = (m, k, n = 1) => m.set(k, (m.get(k) || 0) + n);
+  const keyOf = u => u.id || (u.login || '').toLowerCase();
   const add = (key, u, extra) => {
     if (!u || !(u.id || u.login)) return;
     if (u.id && u.id === broadcasterId) return;
@@ -56,8 +62,15 @@ function collect(records, { since = 0, broadcasterId = '', songRewards = new Set
     else if (r.kind === 'notice') {
       if (r.notice === 'raid') add('raiders', r.user, r.avatar ? { avatarUrl: r.avatar } : {});
       else if (SUB_NOTICES.has(r.notice)) {
-        if (!r.anonymous) add('subs', r.user);
+        if (!r.anonymous) {
+          add('subs', r.user);
+          if (r.notice === 'community_sub_gift') bump(community, keyOf(r.user), Number(r.count) || 0);
+          if (r.notice === 'sub_gift') bump(r.communityGift ? communityLines : single, keyOf(r.user));
+        }
         if (r.recipient) add('subs', r.recipient);
+      } else if (r.notice === 'bits_use' && r.bits) {   // Power-ups / combos (twitch.js channel.bits.use)
+        add('cheers', r.user);
+        bump(bits, r.user.id || r.user.login, r.bits);
       }
     } else if (r.kind === 'chat' && !r.deleted) {
       if (r.bits) { add('cheers', r.user); bits.set(r.user.id || r.user.login, (bits.get(r.user.id || r.user.login) || 0) + r.bits); }
@@ -68,6 +81,11 @@ function collect(records, { since = 0, broadcasterId = '', songRewards = new Set
     }
   }
   const byCount = (counts) => (a, b) => (counts.get(b.id || b.login) || 0) - (counts.get(a.id || a.login) || 0);
+  for (const p of groups.subs.values()) {
+    const k = p.id || p.login.toLowerCase();
+    const n = (single.get(k) || 0) + Math.max(community.get(k) || 0, communityLines.get(k) || 0);
+    if (n) p.gifts = n;
+  }
   return GROUPS.map(key => {
     let people = [...groups[key].values()];
     if (key === 'cheers') people.sort(byCount(bits));

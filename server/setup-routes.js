@@ -132,8 +132,9 @@ router.post('/start-device-auth', async (req, res) => {
       params: {
         client_id: clientId,
         // moderator:read:followers: new followers for !endingtk (not in chat); user:write:chat: the Chat tab's message box;
-        // the last four: the Chat tab's ban / timeout, Shoutout, raid and pin buttons (chat-mod.js)
-        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages',
+        // the next four: the Chat tab's ban / timeout, Shoutout, raid and pin buttons (chat-mod.js);
+        // bits:read: Bits spent on Power-ups for !endingtk (not cheers in chat)
+        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages bits:read',
       }
     });
     deviceAuthState = {

@@ -1283,6 +1283,7 @@
       <p class="setting-hint" data-i18n="dash.chat.creditsHint"></p>
       <p class="setting-hint" id="credits-now"></p>
       <p class="setting-hint" id="credits-follows"></p>
+      <p class="setting-hint" id="credits-bits"></p>
     </section>
   </div>
 </div>
@@ -3217,6 +3218,7 @@ async function sendChatMessage(e) {
 async function loadCredits() {
   const now = document.getElementById('credits-now');
   const follows = document.getElementById('credits-follows');
+  const bits = document.getElementById('credits-bits');
   try {
     const c = await (await fetch('/api/credits')).json();
     now.textContent = c.groups.length
@@ -3225,9 +3227,14 @@ async function loadCredits() {
     follows.innerHTML = c.follows === 'on' ? esc(t('dash.chat.followsOn'))
       : c.follows === 'no-permission' ? `${esc(t('dash.chat.followsNoPermission'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a>`
       : c.follows === 'failed' ? esc(t('dash.chat.followsFailed')) : '';
+    // Bits spent on Power-ups (bits:read, asked for since 2026.11-4)
+    bits.innerHTML = c.bits === 'on' ? esc(t('dash.chat.bitsOn'))
+      : c.bits === 'no-permission' ? `${esc(t('dash.chat.bitsNoPermission'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a>`
+      : c.bits === 'failed' ? esc(t('dash.chat.bitsFailed')) : '';
   } catch(_) {
     now.textContent = '';
     follows.textContent = '';
+    bits.textContent = '';
   }
 }
 

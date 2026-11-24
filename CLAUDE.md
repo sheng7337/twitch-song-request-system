@@ -78,7 +78,8 @@ vtuber-song-queue/
 │   ├── sponsor-voice.js   Generates the Japanese sponsor-roll voice line on first run
 │   ├── messages.js        Message codes for errors/notes the web pages show translated
 │   ├── node-check.js      Is Node.js below the secure minimum (`secureNode` in package.json)
-│   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json)
+│   ├── ending-credits.js  Who !endingtk thanks, from the chat log (groups, avatars, ending-credits.json);
+│                          subs cards carry `gifts` (🎁×n); `bits_use` notices (channel.bits.use, bits:read) count as cheers
 │   ├── ending-raid.js     Raid with the ending roll: times the roll and the raid so it goes 10 s after the roll
 │   ├── redemptions.js     Redemptions done / refunded (Chat tab, queue songs); taking over rewards made on Twitch
 │   ├── first-chat.js      Anonymous read-only IRC: Twitch's first-msg flag → chat-log markFirst

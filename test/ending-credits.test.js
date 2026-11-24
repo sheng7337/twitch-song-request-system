@@ -84,6 +84,43 @@ test('groups in roll order: each viewer once per group; song rewards count as re
   assert.strictEqual(groups[1].people[1].displayName, 'Gifter 聖誕老人', 'cards get displayName, as !tk sends');
 });
 
+test('gifters stay under subscribers with how many subs they gifted; their recipients too', () => {
+  const gifter = u('5', 'pup');
+  const records = [
+    { kind: 'notice', id: 'g0', at: 10, user: u('4', 'subber'), notice: 'resub' },
+    // a gift of 5, as Twitch sends it: the count once, then one line per recipient
+    { kind: 'notice', id: 'g1', at: 11, user: gifter, notice: 'community_sub_gift', count: 5 },
+    ...[1, 2, 3, 4, 5].map(i => ({ kind: 'notice', id: 'g1' + i, at: 11, user: gifter, notice: 'sub_gift', communityGift: 'c1', recipient: u('6' + i, 'got' + i) })),
+    // and later one more, to one viewer
+    { kind: 'notice', id: 'g2', at: 12, user: gifter, notice: 'sub_gift', recipient: u('70', 'later') },
+    // an older log: the gift of several has no count, its lines are counted
+    { kind: 'notice', id: 'g3', at: 13, user: u('8', 'old'), notice: 'community_sub_gift' },
+    ...[1, 2].map(i => ({ kind: 'notice', id: 'g3' + i, at: 13, user: u('8', 'old'), notice: 'sub_gift', communityGift: 'c3', recipient: u('9' + i, 'oldgot' + i) })),
+    // anonymous: no card for the gifter, the recipient still gets one
+    { kind: 'notice', id: 'g4', at: 14, user: u('0', 'ananonymousgifter'), notice: 'sub_gift', anonymous: true, recipient: u('99', 'anongot') },
+  ];
+  const [subs] = credits.collect(records);
+  assert.strictEqual(subs.key, 'subs');
+  assert.deepStrictEqual(subs.people.map(p => [p.login, p.gifts || 0]), [
+    ['subber', 0], ['pup', 6], ['got1', 0], ['got2', 0], ['got3', 0], ['got4', 0], ['got5', 0], ['later', 0],
+    ['old', 2], ['oldgot1', 0], ['oldgot2', 0], ['anongot', 0],
+  ]);
+});
+
+test('Bits spent on Power-ups and combos count with the cheers; cheers are not counted twice', () => {
+  const at = 1000;
+  const powerUp = log.fromBitsUse({ user_id: '30', user_login: 'sparkle', user_name: 'Sparkle', bits: 50, type: 'power_up',
+    power_up: { type: 'message_effect' }, message: { text: 'hi', fragments: [] } }, at);
+  assert.deepStrictEqual([powerUp.kind, powerUp.notice, powerUp.bits, powerUp.use, powerUp.powerUp, powerUp.user.login],
+    ['notice', 'bits_use', 50, 'power_up', 'message_effect', 'sparkle']);
+  assert.strictEqual(log.fromBitsUse({ user_id: '31', user_login: 'c', bits: 100, type: 'cheer' }, at), null, 'a cheer comes with its chat message');
+  const combo = log.fromBitsUse({ user_id: '32', user_login: 'combo', user_name: 'Combo', bits: 10, type: 'combo' }, at + 1);
+  const records = [chat(at - 1, u('31', 'c'), 'Cheer100', { bits: 100 }), powerUp,
+    { ...powerUp, id: 'b2', at: at + 2, bits: 80 }, combo];
+  const cheers = credits.collect(records).find(g => g.key === 'cheers');
+  assert.deepStrictEqual(cheers.people.map(p => p.login), ['sparkle', 'c', 'combo'], '130 Bits, then 100, then 10');
+});
+
 test('top chatters: most messages first, at most 8 (two pages)', () => {
   const records = [];
   for (let i = 0; i < 12; i++) for (let n = 0; n <= i; n++) records.push(chat(i * 100 + n, u(String(100 + i), `c${i}`), 'hi'));
