@@ -53,6 +53,8 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 - `!endingtk` 片尾名單：贈送訂閱的觀眾在「感謝訂閱」的名字後面會標出送了幾份（🎁×5）；收到的觀眾一樣列在「感謝訂閱」。
 - `!endingtk` 片尾名單：用在 Power-ups（訊息特效、放大表情、慶祝特效）和連擊的小奇點，現在也算進「感謝小奇點」
   （之前只算聊天室裡的 Cheer）。需要重新授權一次，見上面。
+- 🛡 管理 → 🚀 揪團：確認改成一個清楚的框，寫出要揪到哪裡（是否直播中、幾位觀眾、片尾名單何時播），下面有「**🚀 確定出發**」和「**先不要**」；
+  之前是按鈕本身變成問句，看不出要再按一次。
 
 ### English
 
@@ -105,6 +107,9 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
   the viewers they gifted are listed there too.
 - `!endingtk` ending roll: Bits spent on Power-ups (message effects, gigantified emotes, celebrations) and combos now
   count under Cheers (before, only cheers in chat did). Needs authorizing once more, see above.
+- 🛡 Moderate → 🚀 Raid: the confirmation is now a clear box saying where the viewers go (live or not, viewers,
+  when the ending roll plays), with **🚀 Raid now** and **Not now**; before, the button itself turned into a
+  question, and nothing said to click it again.
 
 ---
 

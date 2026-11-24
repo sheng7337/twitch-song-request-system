@@ -344,6 +344,13 @@
   .mod-check { display: flex; align-items: center; gap: 6px; font-size: calc(12px * var(--ts)); color: var(--text-dim); cursor: pointer; }
   .mod-menu .mod-check input { padding: 0; }
   .mod-note { color: var(--warn); font-size: calc(12px * var(--ts)); }
+  /* Raid: where the viewers would go, with its own Go / Not now buttons */
+  .mod-confirm {
+    display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid rgba(var(--warn-rgb), 0.5); background: rgba(var(--warn-rgb), 0.08);
+  }
+  .mod-confirm-text { color: var(--text); font-size: calc(13px * var(--ts)); line-height: 1.45; }
+  .mod-menu .chat-act.go { color: var(--bg); background: var(--warn); border-color: var(--warn); font-weight: 700; }
   .mod-note a { color: var(--info); }
   .chat-compose[hidden], .chat-compose [hidden] { display: none; }
   .chat-replying { display: flex; align-items: center; gap: 6px; font-size: calc(12px * var(--ts)); color: var(--text-dim); margin-bottom: 6px; }
@@ -3578,6 +3585,7 @@ function openModMenu(user, anchor) {
       ? `<div class="mod-note">${esc(t('dash.chat.mod.needAuth'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a></div>` : '');
   placeModMenu(menu, anchor);
   menu.addEventListener('click', (e) => onModMenuClick(e, user, menu));
+  menu.addEventListener('change', (e) => { if (e.target.classList.contains('mod-roll')) closeRaidConfirm(menu); });
   menu.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.classList.contains('mod-n')) { e.preventDefault(); menu.querySelector('.mod-unit + [data-mod]').click(); }
   });
@@ -3588,6 +3596,7 @@ async function onModMenuClick(e, user, menu) {
   const b = e.target.closest('[data-mod]');
   if (!b || b.disabled) return;
   const act = b.dataset.mod;
+  if (act === 'raid-back') { closeRaidConfirm(menu); return; }
   if (act === 'filter') {
     chat.user = chat.user === user.login ? null : user.login;
     chat.userName = user.name;
@@ -3605,20 +3614,21 @@ async function onModMenuClick(e, user, menu) {
     if (!(seconds > 0)) { showToast(t('dash.chat.mod.howLong'), true); menu.querySelector('.mod-n').focus(); return; }
   }
   if (act === 'ban' && !modArmed(b, t('dash.chat.mod.banSure', { name: shown }))) return;
-  const withRoll = act === 'raid' && menu.querySelector('.mod-roll').checked;
-  if (act === 'raid' && !b.classList.contains('sure')) {
-    // Say where the viewers would go before they go (with the ending roll: and when the roll and the raid go)
+  // 🚀 Raid first says where the viewers would go (with the ending roll: when the roll and the raid go),
+  // in a box with its own "Raid now" / "Not now"; "Raid now" goes with what that box said
+  const confirmBox = menu.querySelector('.mod-confirm');
+  const withRoll = act === 'raid-go' ? confirmBox?.dataset.roll === '1' : act === 'raid' && menu.querySelector('.mod-roll').checked;
+  if (act === 'raid') {
     b.disabled = true;
     try {
       const res = await fetch(`/api/chat/mod/${withRoll ? 'raid/roll' : 'channel'}?login=${encodeURIComponent(login)}`);
       const ch = await res.json();
       if (!res.ok) throw new Error(I18N.server(ch, 'dash.toast.requestFailed'));
-      b.disabled = false;
       const sure = t(ch.live ? 'dash.chat.mod.raidSureLive' : 'dash.chat.mod.raidSureOffline', { name: ch.name, n: ch.viewers });
       const when = !withRoll ? '' : ch.rollMs
         ? ' ' + t('dash.chat.mod.raidSureRoll', { roll: modClock(ch.rollIn), length: modClock(ch.rollMs), lands: modClock(ch.landsIn) })
         : ' ' + t('dash.chat.mod.raidSureNoRoll');
-      modArmed(b, sure + when, 10000);
+      showRaidConfirm(menu, sure + when, withRoll);
     } catch (err) {
       b.disabled = false;
       showToast(err.message, true);
@@ -3639,12 +3649,12 @@ async function onModMenuClick(e, user, menu) {
       const reason = r.twitch ? I18N.server(r.twitch, 'dash.toast.requestFailed') : '';
       const key = r.twitch ? (r.clip ? 'shoutoutClipOnly' : 'shoutoutNothing') : (r.clip ? 'shoutoutBoth' : 'shoutoutNoClip');
       showToast(t('dash.chat.mod.' + key, { name: r.name, reason }), !!r.twitch && !r.clip);
-    } else if (act === 'raid' && withRoll) {
+    } else if (act === 'raid-go' && withRoll) {
       const r = await modPost('/api/chat/mod/raid/roll', { login });
       chat.mod.raid = rollRaid(r);
       paintChatBanners();
       showToast(t(r.rollMs ? 'dash.chat.mod.raidRollStarted' : 'dash.chat.mod.raidStarted', { name: r.name, roll: modClock(r.rollAt - Date.now()), lands: modClock(r.landsAt - Date.now()) }));
-    } else if (act === 'raid') {
+    } else if (act === 'raid-go') {
       const r = await modPost('/api/chat/mod/raid', { login });
       chat.mod.raid = { name: r.name, until: Date.now() + RAID_COUNTDOWN_MS };
       paintChatBanners();
@@ -3656,6 +3666,27 @@ async function onModMenuClick(e, user, menu) {
     if (b.classList.contains('sure')) { b.classList.remove('sure'); b.textContent = b.dataset.label; }
     showToast(err.message, true);
   }
+}
+
+// The raid's confirmation box, under the 🎬 tick; 🚀 Raid stays off while it's open
+function showRaidConfirm(menu, text, withRoll) {
+  closeRaidConfirm(menu);
+  const box = document.createElement('div');
+  box.className = 'mod-confirm';
+  box.setAttribute('role', 'alert');
+  box.dataset.roll = withRoll ? '1' : '';
+  box.innerHTML = `<div class="mod-confirm-text">${esc(text)}</div>`
+    + `<div class="mod-row"><button class="chat-act go" data-mod="raid-go">${esc(t('dash.chat.mod.raidGo'))}</button>`
+    + `<button class="chat-act" data-mod="raid-back">${esc(t('dash.chat.mod.raidBack'))}</button></div>`;
+  menu.querySelector('.mod-check').after(box);
+  menu.querySelector('[data-mod="raid"]').disabled = true;
+  box.querySelector('[data-mod="raid-go"]').focus();
+}
+
+function closeRaidConfirm(menu) {
+  menu.querySelector('.mod-confirm')?.remove();
+  const raid = menu.querySelector('[data-mod="raid"]');
+  if (raid && chat.mod.can.raid) raid.disabled = false;
 }
 
 // 📌 on a message: how long it stays pinned
