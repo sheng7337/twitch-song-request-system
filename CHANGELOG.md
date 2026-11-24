@@ -25,6 +25,13 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 #### 新功能
 
+- **🤖 聊天機器人（取代 Nightbot）**：新的「**🤖 機器人**」分頁可以設定自己的**指令**和**定時訊息**。
+  - 指令：名稱和其他名稱、回覆內容、誰可以用（所有人／訂閱者以上／VIP 以上／管理員）、全體和每位觀眾的冷卻時間。
+    回覆可以用 `$(user)` `$(touser)` `$(query)` `$(count)` `$(uptime)` `$(followage)` `$(sheet)`（歌單連結）
+    `$(commands)` `$(pick a|b)` `$(random 1-100)` 等變數；「▶ 試試看」可以先看會說什麼，不會發出去。
+  - 定時訊息：每幾分鐘發一次，可以設定「聊天室至少幾句」才發、只在直播中發；一次只發一則，間隔至少 2 分鐘。
+  - 預設有 `!歌單`（歌單試算表連結）和 `!commands`。用你的 Twitch 帳號發言，只有程式開著時才會運作。
+  - 設定好之後，**記得把 Nightbot 裡相同的指令和定時訊息關掉**，不然會發兩次。
 - **🎟️ 兌換分頁**：頻道上每個兌換項目在這裡設定用途 ——「🎤 點歌」、「🎲 隨機點歌」（和要抽的歌單分頁）、「👕 換裝」或無 ——
   另外可以勾選「🎟️ 特效」，單獨使用或加在主要用途上（例如換裝時加一個音效）。完成和退還由主要用途決定。原本分散在「💬 聊天室 ⚙」
   （交給點歌系統管理）、「👕 換裝」（勾選會換裝的獎勵）和「🔔 通知」（加入兌換項目）的設定都搬到這裡。
@@ -70,6 +77,15 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 
 #### What's new
 
+- **🤖 Chat bot (instead of Nightbot)**: the new **🤖 Bot** tab sets up your own **commands** and **timers**.
+  - Commands: a name and other names, the reply, who may use it (everyone / subscribers and up / VIPs and up /
+    mods), and a cooldown for everyone and for each viewer. Replies can use `$(user)` `$(touser)` `$(query)`
+    `$(count)` `$(uptime)` `$(followage)` `$(sheet)` (the song list link) `$(commands)` `$(pick a|b)`
+    `$(random 1-100)`; **▶ Try** shows what it would say without posting it.
+  - Timers: a message every so many minutes, optionally only after enough chat lines and only while live; one at a
+    time, at least 2 minutes apart.
+  - `!歌單` (the song sheet link) and `!commands` come ready. It posts as your Twitch account, only while the app runs.
+  - Once it's set up, **turn the same commands and timers off in Nightbot**, or chat gets them twice.
 - **🎟️ Rewards tab**: every reward on your channel gets its use here — 🎤 song request, 🎲 random song (and the
   sheet tabs it draws from), 👕 outfit or none — and a 🎟️ Effect tick, on its own or on top of the main use (e.g.
   an outfit change with a sound). The main use decides done and refund. What was spread over 💬 Chat ⚙ (handing

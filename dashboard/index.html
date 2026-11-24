@@ -946,6 +946,27 @@
   .modes-status.err { color: var(--danger); }
   .modes-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .modes-head .col-title { flex: 1; }
+  /* 🤖 Bot tab: one card per command / timer */
+  .bot-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bot-head h3 { flex: 1; }
+  .bot-list { display: flex; flex-direction: column; gap: 8px; }
+  .bot-item { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-card); }
+  .bot-item.off > :not(.mod-confirm) { opacity: 0.6; }
+  .bot-item .al-row .btn { margin-left: 0; }
+  .bot-item .bot-name { width: 9em; font-weight: 700; }
+  .bot-item .bot-aliases { flex: 1; min-width: 8em; max-width: none; }
+  .bot-item .bot-text { width: 100%; resize: vertical; min-height: 2.4em; line-height: 1.4; }
+  .bot-meta { font-size: calc(12px * var(--ts)); color: var(--text-dim); }
+  .bot-meta.right { margin-left: auto; }
+  .bot-preview { font-size: calc(13px * var(--ts)); color: var(--text); overflow-wrap: anywhere; }
+  .bot-preview:empty { display: none; }
+  .bot-warn { color: var(--warn); font-size: calc(13px * var(--ts)); }
+  .bot-warn[hidden] { display: none; }
+  .bot-vars { font-size: calc(13px * var(--ts)); color: var(--text-dim); }
+  .bot-vars summary { cursor: pointer; color: var(--text); }
+  .bot-vars dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin-top: 6px; }
+  .bot-vars dt { font-family: monospace; color: var(--accent); }
+  @media (max-width: 600px) { .bot-vars dl { grid-template-columns: 1fr; } .bot-vars dd { margin-bottom: 4px; } }
   .mode-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; }
   .mode-card.active { border-color: var(--accent); }
   .mode-card.dragging { opacity: 0.6; border-style: dashed; }
@@ -1103,6 +1124,7 @@
   <button class="tab" role="tab" id="tabbtn-outfits" data-tab="outfits" aria-controls="tab-outfits" onclick="showTab('outfits')"><span data-i18n="dash.tab.outfits">👕 Outfits</span><span class="tab-count" id="outfit-count" hidden></span></button>
   <button class="tab" role="tab" id="tabbtn-alerts" data-tab="alerts" aria-controls="tab-alerts" onclick="showTab('alerts')" data-i18n="dash.tab.alerts">🔔 Alerts</button>
   <button class="tab" role="tab" id="tabbtn-rewards" data-tab="rewards" aria-controls="tab-rewards" onclick="showTab('rewards')" data-i18n="dash.tab.rewards">🎟️ Rewards</button>
+  <button class="tab" role="tab" id="tabbtn-bot" data-tab="bot" aria-controls="tab-bot" onclick="showTab('bot')" data-i18n="dash.tab.bot">🤖 Bot</button>
   <!-- The chat beside the other tabs: open / close (placeChat) -->
   <button class="tab dock-btn" id="dock-btn" type="button" onclick="toggleChatDock()" aria-pressed="false">💬<span class="tab-count" id="dock-unread" hidden></span> <span id="dock-arrow">◂</span></button>
 </nav>
@@ -1375,6 +1397,37 @@
       <p class="setting-hint" data-i18n="dash.rewards.intro"></p>
       <div class="reward-rows" id="reward-rows"></div>
       <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
+    </section>
+  </div>
+</div>
+
+<!-- 🤖 Chat bot: commands and timers, instead of Nightbot (server/bot.js) -->
+<div class="tab-page" id="tab-bot" role="tabpanel" aria-labelledby="tabbtn-bot" hidden>
+  <div class="modes-page">
+    <section class="modes-box">
+      <h3 data-i18n="dash.bot.title">🤖 Chat bot</h3>
+      <p class="setting-hint" data-i18n="dash.bot.intro"></p>
+      <p class="bot-warn" id="bot-warn" hidden></p>
+    </section>
+    <section class="modes-box">
+      <div class="bot-head">
+        <h3 data-i18n="dash.bot.commandsTitle">Commands</h3>
+        <button class="btn add" type="button" data-bot="add-command" data-i18n="dash.bot.addCommand">＋ New command</button>
+      </div>
+      <p class="setting-hint" data-i18n="dash.bot.commandsHint"></p>
+      <div class="bot-list" id="bot-commands"></div>
+      <details class="bot-vars">
+        <summary data-i18n="dash.bot.varsTitle">Variables you can put in a reply</summary>
+        <dl id="bot-vars"></dl>
+      </details>
+    </section>
+    <section class="modes-box">
+      <div class="bot-head">
+        <h3 data-i18n="dash.bot.timersTitle">Timers</h3>
+        <button class="btn add" type="button" data-bot="add-timer" data-i18n="dash.bot.addTimer">＋ New timer</button>
+      </div>
+      <p class="setting-hint" data-i18n="dash.bot.timersHint"></p>
+      <div class="bot-list" id="bot-timers"></div>
     </section>
   </div>
 </div>
@@ -2465,7 +2518,7 @@ async function pollLeihu() {
 
 // ── Tabs ── Each tab is a button in .tabs and a .tab-page; #leihu in the address keeps the tab
 // on reload. Planned: OBS / Streamlabs control — add them here and in the markup.
-const TABS = ['queue', 'leihu', 'chat', 'modes', 'outfits', 'alerts', 'rewards'];
+const TABS = ['queue', 'leihu', 'chat', 'modes', 'outfits', 'alerts', 'rewards', 'bot'];
 let currentTab = 'queue';
 
 function showTab(name) {
@@ -2487,6 +2540,7 @@ function showTab(name) {
   if (name === 'outfits') { loadOutfits(); loadOutfitRewards(); }
   if (name === 'alerts') loadAlerts();
   if (name === 'rewards') loadRewards();
+  if (name === 'bot') loadBot();
   paintOutfitPick();
 }
 
@@ -4004,6 +4058,193 @@ const ALERT_AMOUNT = { sub: 'months', gift: 'count', cheer: 'bits', raid: 'viewe
 const ALERT_ICONS = { follow: '💜', sub: '⭐', gift: '🎁', cheer: '💎', raid: '🚀' };
 const ALERT_LAYOUTS = { vertical: '800 × 600', horizontal: '1600 × 300' };
 const alertsView = { status: null };
+
+// ── 🤖 Bot tab (server/bot.js) ── Commands and timers save as soon as a field changes (on leaving it);
+// "▶ Try" shows what the bot would say without posting it. Deleting asks in the card itself.
+const BOT_LEVELS = ['everyone', 'sub', 'vip', 'mod'];
+const BOT_VARS = ['user', 'touser', 'query', 'count', 'channel', 'uptime', 'followage', 'sheet', 'commands', 'pick', 'random'];
+const botView = { status: null };
+
+async function loadBot() {
+  try {
+    const res = await fetch('/api/bot');
+    const st = await res.json();
+    if (!res.ok) throw new Error(I18N.server(st, 'dash.toast.requestFailed'));
+    botView.status = st;
+  } catch (err) { showToast(err.message, true); return; }
+  paintBot();
+}
+
+async function botRequest(method, url, body) {
+  try {
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const out = await res.json();
+    if (!res.ok) throw new Error(I18N.server(out, 'dash.toast.requestFailed'));
+    return out;
+  } catch (err) {
+    showToast(err.message, true);
+    return null;
+  }
+}
+
+function botNum(f, value, [min, max]) {
+  return `<input type="number" class="cooldown-input" data-f="${f}" min="${min}" max="${max}" step="1" value="${Number(value) || 0}">`;
+}
+
+function botCommandCard(c) {
+  const levels = BOT_LEVELS.map(l => `<option value="${l}"${l === c.level ? ' selected' : ''}>${esc(t('dash.bot.level.' + l))}</option>`).join('');
+  const lim = botView.status.limits;
+  return `<div class="bot-item${c.on ? '' : ' off'}" data-id="${esc(c.id)}" data-kind="command">`
+    + `<div class="al-row"><label title="${esc(t('dash.bot.onTip'))}"><input type="checkbox" data-f="on"${c.on ? ' checked' : ''}></label>`
+    + `<input class="modes-input bot-name" data-f="name" value="${esc(c.name)}" placeholder="!command" aria-label="${esc(t('dash.bot.name'))}">`
+    + `<input class="modes-input bot-aliases" data-f="aliases" value="${esc(c.aliases.join(' '))}" placeholder="${esc(t('dash.bot.aliases'))}" aria-label="${esc(t('dash.bot.aliases'))}">`
+    + `<select class="modes-input" data-f="level" title="${esc(t('dash.bot.levelTip'))}">${levels}</select></div>`
+    + `<textarea class="modes-input bot-text" data-f="response" rows="2" maxlength="500" placeholder="${esc(t('dash.bot.responsePlaceholder'))}">${esc(c.response)}</textarea>`
+    + `<div class="al-row"><label title="${esc(t('dash.bot.cooldownTip'))}">${esc(t('dash.bot.cooldown'))} ${botNum('cooldown', c.cooldown, lim.cooldown)} ${esc(t('dash.bot.seconds'))}</label>`
+    + `<label title="${esc(t('dash.bot.userCooldownTip'))}">${esc(t('dash.bot.userCooldown'))} ${botNum('userCooldown', c.userCooldown, lim.userCooldown)} ${esc(t('dash.bot.seconds'))}</label>`
+    + `<span class="bot-meta">${esc(t('dash.bot.used', { n: c.count }))}</span>`
+    + `<span class="bot-meta right"></span>`
+    + `<button class="btn" type="button" data-bot="try">${esc(t('dash.bot.try'))}</button>`
+    + `<button class="btn danger" type="button" data-bot="delete">${esc(t('dash.bot.delete'))}</button></div>`
+    + `<div class="bot-preview"></div></div>`;
+}
+
+// When a timer is next due: by its minutes, then (if set) chat's lines, then live only
+function botTimerNext(tm) {
+  const st = botView.status;
+  if (!tm.on) return t('dash.bot.timerOff');
+  if (!tm.message) return t('dash.bot.timerEmpty');
+  if (tm.liveOnly && !st.live) return t('dash.bot.timerWaitsLive');
+  const when = new Date(Math.max(tm.dueAt, Date.now())).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const lines = tm.minLines ? ' · ' + t('dash.bot.timerLines', { n: Math.min(tm.lines, tm.minLines), min: tm.minLines }) : '';
+  return t('dash.bot.timerNext', { time: when }) + lines;
+}
+
+function botTimerCard(tm) {
+  const lim = botView.status.limits;
+  return `<div class="bot-item${tm.on ? '' : ' off'}" data-id="${esc(tm.id)}" data-kind="timer">`
+    + `<div class="al-row"><label title="${esc(t('dash.bot.onTip'))}"><input type="checkbox" data-f="on"${tm.on ? ' checked' : ''}></label>`
+    + `<input class="modes-input bot-aliases" data-f="name" value="${esc(tm.name)}" maxlength="40" placeholder="${esc(t('dash.bot.timerName'))}" aria-label="${esc(t('dash.bot.timerName'))}">`
+    + `<span class="bot-meta right" data-next>${esc(botTimerNext(tm))}</span></div>`
+    + `<textarea class="modes-input bot-text" data-f="message" rows="2" maxlength="500" placeholder="${esc(t('dash.bot.messagePlaceholder'))}">${esc(tm.message)}</textarea>`
+    + `<div class="al-row"><label>${esc(t('dash.bot.every'))} ${botNum('minutes', tm.minutes, lim.minutes)} ${esc(t('dash.bot.minutes'))}</label>`
+    + `<label title="${esc(t('dash.bot.minLinesTip'))}">${esc(t('dash.bot.minLines'))} ${botNum('minLines', tm.minLines, lim.minLines)} ${esc(t('dash.bot.lines'))}</label>`
+    + `<label><input type="checkbox" data-f="liveOnly"${tm.liveOnly ? ' checked' : ''}> ${esc(t('dash.bot.liveOnly'))}</label>`
+    + `<span class="bot-meta right"></span>`
+    + `<button class="btn" type="button" data-bot="try">${esc(t('dash.bot.try'))}</button>`
+    + `<button class="btn" type="button" data-bot="post" title="${esc(t('dash.bot.postNowTip'))}">${esc(t('dash.bot.postNow'))}</button>`
+    + `<button class="btn danger" type="button" data-bot="delete">${esc(t('dash.bot.delete'))}</button></div>`
+    + `<div class="bot-preview"></div></div>`;
+}
+
+function paintBot() {
+  const st = botView.status;
+  if (!st) return;
+  const warn = document.getElementById('bot-warn');
+  const failed = st.lastError ? t('dash.bot.lastError', { message: I18N.server({ error: st.lastError.message, code: st.lastError.code }, 'dash.toast.requestFailed') }) : '';
+  warn.innerHTML = !st.canSend
+    ? `${esc(t('dash.chat.sendNoPermission'))} <a href="/setup?reauth=1">${esc(t('dash.chat.followsAuthorize'))}</a>`
+    : esc(failed);
+  warn.hidden = !warn.innerHTML;
+  document.getElementById('bot-commands').innerHTML = st.commands.length
+    ? st.commands.map(botCommandCard).join('') : `<p class="setting-hint">${esc(t('dash.bot.noCommands'))}</p>`;
+  document.getElementById('bot-timers').innerHTML = st.timers.length
+    ? st.timers.map(botTimerCard).join('') : `<p class="setting-hint">${esc(t('dash.bot.noTimers'))}</p>`;
+  document.getElementById('bot-vars').innerHTML = BOT_VARS.map(v =>
+    `<dt>${esc(t('dash.bot.var.' + v + 'Code'))}</dt><dd>${esc(t('dash.bot.var.' + v))}</dd>`).join('')
+    + `<dt>${esc(t('dash.bot.reservedCode'))}</dt><dd>${esc(t('dash.bot.reserved', { list: st.reserved.join(' ') }))}</dd>`;
+}
+
+// Timers' "next at" and chat lines, while the tab is open
+setInterval(async () => {
+  if (currentTab !== 'bot' || !botView.status || document.hidden) return;
+  try { botView.status = { ...botView.status, ...(await (await fetch('/api/bot')).json()) }; } catch (_) { return; }
+  for (const tm of botView.status.timers) {
+    const el = document.querySelector(`#bot-timers [data-id="${CSS.escape(tm.id)}"] [data-next]`);
+    if (el) el.textContent = botTimerNext(tm);
+  }
+}, 15000);
+
+const botItem = (el) => el.closest('.bot-item');
+const botUrl = (card) => `/api/bot/${card.dataset.kind === 'timer' ? 'timers' : 'commands'}/${encodeURIComponent(card.dataset.id)}`;
+const botList = (card) => botView.status[card.dataset.kind === 'timer' ? 'timers' : 'commands'];
+
+// A field changed: saved, and the card shows what was kept (the name with its "!", numbers in range)
+document.getElementById('tab-bot').addEventListener('change', async (e) => {
+  const el = e.target;
+  const card = botItem(el);
+  if (!card || !el.dataset.f) return;
+  const value = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
+  const out = await botRequest('POST', botUrl(card), { [el.dataset.f]: value });
+  const list = botList(card);
+  const i = list.findIndex(x => x.id === card.dataset.id);
+  if (!out) {   // refused: back to what is saved
+    const was = list[i];
+    if (was) el.type === 'checkbox' ? (el.checked = !!was[el.dataset.f]) : (el.value = el.dataset.f === 'aliases' ? was.aliases.join(' ') : was[el.dataset.f]);
+    return;
+  }
+  list[i] = { ...list[i], ...out };
+  card.classList.toggle('off', !out.on);
+  if (el.dataset.f === 'name') el.value = out.name;
+  else if (el.dataset.f === 'aliases') el.value = out.aliases.join(' ');
+  else if (el.type === 'number') el.value = out[el.dataset.f];
+  if (card.dataset.kind === 'timer') {
+    if (el.dataset.f === 'minutes' || el.dataset.f === 'on') loadBot();   // when it's next due moved
+    else card.querySelector('[data-next]').textContent = botTimerNext(list[i]);
+  }
+});
+
+document.getElementById('tab-bot').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-bot]');
+  if (!b) return;
+  const act = b.dataset.bot;
+  if (act === 'add-command' || act === 'add-timer') {
+    const timer = act === 'add-timer';
+    const body = timer ? {} : { name: '!' + t('dash.bot.newName') + (botView.status.commands.length + 1) };
+    const out = await botRequest('POST', timer ? '/api/bot/timers' : '/api/bot/commands', body);
+    if (!out) return;
+    await loadBot();
+    const card = document.querySelector(`.bot-item[data-id="${CSS.escape(out.id)}"]`);
+    card?.scrollIntoView({ block: 'nearest' });
+    card?.querySelector(timer ? '[data-f="message"]' : '[data-f="name"]')?.focus();
+    return;
+  }
+  const card = botItem(b);
+  if (!card) return;
+  const preview = card.querySelector('.bot-preview');
+  if (act === 'try') {
+    const field = card.querySelector(card.dataset.kind === 'timer' ? '[data-f="message"]' : '[data-f="response"]');
+    const out = await botRequest('POST', '/api/bot/preview', { text: field.value, id: card.dataset.id });
+    if (out) preview.textContent = out.text ? '💬 ' + out.text : t('dash.bot.saysNothing');
+    return;
+  }
+  if (act === 'post') {
+    b.disabled = true;
+    const out = await botRequest('POST', botUrl(card) + '/post');
+    b.disabled = false;
+    if (out) { showToast(t('dash.bot.posted')); loadBot(); }
+    return;
+  }
+  if (act === 'delete') {
+    if (card.querySelector('.mod-confirm')) return;
+    const item = botList(card).find(x => x.id === card.dataset.id);
+    const name = card.dataset.kind === 'timer' ? (item?.name || t('dash.bot.thisTimer')) : item?.name;
+    const box = document.createElement('div');
+    box.className = 'mod-confirm';
+    box.setAttribute('role', 'alert');
+    box.innerHTML = `<div class="mod-confirm-text">${esc(t('dash.bot.deleteSure', { name }))}</div>`
+      + `<div class="al-row"><button class="btn danger" type="button" data-bot="delete-go">${esc(t('dash.bot.deleteGo'))}</button>`
+      + `<button class="btn" type="button" data-bot="delete-back">${esc(t('dash.bot.deleteBack'))}</button></div>`;
+    card.append(box);
+    box.querySelector('[data-bot="delete-back"]').focus();
+    return;
+  }
+  if (act === 'delete-back') { card.querySelector('.mod-confirm')?.remove(); return; }
+  if (act === 'delete-go') {
+    const out = await botRequest('DELETE', `/api/bot/${encodeURIComponent(card.dataset.id)}`);
+    if (out) loadBot();
+  }
+});
 
 async function loadAlerts() {
   try {

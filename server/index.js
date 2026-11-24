@@ -14,7 +14,8 @@ const { startAutoRefresh } = require('./sheets');
 const { matchSong } = require('./matcher');
 const { registerClient, addSong, addPending, updatePending, acceptPending, skipSong, clearQueue, getState, deleteSong, moveSong, redrawSong, broadcastSettings, broadcastRaw, setRedemptionHook, forgetRedemption } = require('./queue');
 const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setBitsHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus, bitsStatus } = require('./twitch');
-const { registerCommand, handleChatEvent } = require('./chat-router');
+const { registerCommand, handleChatEvent, prefixes: commandPrefixes } = require('./chat-router');
+const bot = require('./bot');
 const chatLog = require('./chat-log');
 const chatBadges = require('./chat-badges');
 const songNotes = require('./song-notes');
@@ -156,9 +157,19 @@ registerStop(registerCommand);
 registerThanks(registerCommand);
 registerEndingThanks(registerCommand);
 songNotes.init(broadcastRaw);   // "last sung" notes for songs named in chat go to the song overlay
+// 🤖 Chat bot (bot.js): the streamer's own commands and timers, posted as the streamer
+bot.init({
+  send: text => chatSend.send(text),
+  session: () => streamSession.get(),
+  language: () => overlayLanguage(),   // $(uptime) / $(followage) words: what viewers see
+  reserved: commandPrefixes,
+  token: () => require('./twitch').ensureFreshToken(),
+});
 setChatHandler((event) => {
   try { chatLog.addChat(event, songNotes.check); } catch (err) { console.error('[chat-log] Could not log a message:', err.message); }
+  if (bot.isOwn(event)) return;   // the bot's own reply or timer: never a command, even if it starts with "!"
   handleChatEvent(event);
+  bot.onChat(event).catch(err => console.error('[bot] Could not answer a command:', err.message));
 });
 setModerationHandler(chatLog.onModeration);
 // Subs, gifts, raids and follows: shown in the Chat tab, thanked by !endingtk (ending-credits.js)
@@ -1008,6 +1019,21 @@ app.post('/api/outfits/settings', (req, res) => {
     res.status(err.messageCode ? 400 : 500).json(errorBody(err));
   }
 });
+
+// 🤖 Chat bot (server/bot.js): commands and timers; "Try" fills a reply in without posting it
+const botRoute = fn => async (req, res) => {
+  try { res.json(await fn(req)); } catch (err) { res.status(err.messageCode ? 400 : 500).json(errorBody(err)); }
+};
+app.get('/api/bot', botRoute(async () => ({ ...bot.status(), canSend: await chatSend.canSend() })));
+app.post('/api/bot/commands', botRoute(req => bot.addCommand(req.body || {})));
+app.post('/api/bot/commands/:id', botRoute(req => bot.updateCommand(req.params.id, req.body || {})));
+app.post('/api/bot/timers', botRoute(req => bot.addTimer(req.body || {})));
+app.post('/api/bot/timers/:id', botRoute(req => bot.updateTimer(req.params.id, req.body || {})));
+app.post('/api/bot/timers/:id/post', botRoute(async req => ({ message: await bot.postNow(req.params.id) })));
+app.delete('/api/bot/:id', botRoute(req => { bot.remove(req.params.id); return { ok: true }; }));
+app.post('/api/bot/preview', botRoute(async req => ({ text: await bot.preview({
+  text: String(req.body?.text || ''), id: String(req.body?.id || ''), query: String(req.body?.query || ''),
+}) })));
 
 // 🔔 Alerts (server/alerts.js): settings, the alert-media files, the latest alerts; test, replay, skip
 app.get('/api/alerts', (req, res) => res.json(alerts.status()));

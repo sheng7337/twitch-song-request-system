@@ -53,6 +53,20 @@
       cheer: ({ name, bits }) => `${name} cheered ${bits} bit${bits === 1 ? '' : 's'}!`,
       giftOne: '{name} gifted a sub!',
     },
+    // 🤖 Chat bot's variables (server/bot.js): $(uptime), $(followage)
+    bot: {
+      offline: 'not live right now',
+      minutes: '{m} min',
+      hoursMinutes: '{h} h {m} min',
+      today: 'today',
+      days: ({ d }) => `${d} day${d === 1 ? '' : 's'}`,
+      months: ({ m }) => `${m} month${m === 1 ? '' : 's'}`,
+      monthsDays: ({ m, d }) => `${m} month${m === 1 ? '' : 's'} ${d} day${d === 1 ? '' : 's'}`,
+      years: ({ y }) => `${y} year${y === 1 ? '' : 's'}`,
+      yearsMonths: ({ y, m }) => `${y} year${y === 1 ? '' : 's'} ${m} month${m === 1 ? '' : 's'}`,
+      notFollowing: '{user} is not following yet',
+      unknown: '(Twitch did not say)',
+    },
   },
   'zh-TW': {
     overlay: {
@@ -97,6 +111,19 @@
       follow: '{name} 追隨了頻道！',
       cheer: ({ name, bits }) => `${name} 送出了 ${bits} 小奇點！`,
       giftOne: '{name} 送出了一份訂閱！',
+    },
+    bot: {
+      offline: '現在沒有在直播',
+      minutes: '{m} 分鐘',
+      hoursMinutes: '{h} 小時 {m} 分鐘',
+      today: '今天',
+      days: ({ d }) => `${d} 天`,
+      months: ({ m }) => `${m} 個月`,
+      monthsDays: ({ m, d }) => `${m} 個月 ${d} 天`,
+      years: ({ y }) => `${y} 年`,
+      yearsMonths: ({ y, m }) => `${y} 年 ${m} 個月`,
+      notFollowing: '{user} 還沒有追隨',
+      unknown: '（Twitch 沒有回應）',
     },
   },
 });

@@ -36,4 +36,9 @@ function handleChatEvent(event) {
   }
 }
 
-module.exports = { registerCommand, handleChatEvent };
+// The registered commands' prefixes ('!so ', '!tk' …): the 🤖 bot's own commands can't take them (bot.js)
+function prefixes() {
+  return commands.map(c => c.prefix);
+}
+
+module.exports = { registerCommand, handleChatEvent, prefixes };
