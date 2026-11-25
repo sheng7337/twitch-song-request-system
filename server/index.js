@@ -16,6 +16,8 @@ const { registerClient, addSong, addPending, updatePending, acceptPending, skipS
 const { connect: connectTwitch, setEventHandler, setChatHandler, setModerationHandler, setNoticeHandler, setFollowHandler, setBitsHandler, setRewardHandler, setStreamHandler, setReconnectHandler, replayRedemption, followStatus, bitsStatus } = require('./twitch');
 const { registerCommand, handleChatEvent, prefixes: commandPrefixes } = require('./chat-router');
 const bot = require('./bot');
+const mood = require('./mood');
+const { songKey } = require('../shared/song-key');
 const chatLog = require('./chat-log');
 const chatBadges = require('./chat-badges');
 const songNotes = require('./song-notes');
@@ -238,6 +240,7 @@ setEventHandler(async (event) => {
   console.log(`[event] Redemption from @${requester}: "${requestText}" (reward: ${rewardId})`);
   try { chatLog.addRedemption(event); } catch (err) { console.error('[chat-log] Could not log a redemption:', err.message); }
   if (outfits.onRedemption(event)) return;   // 👕 waits for the streamer's pick in the dashboard
+  if (require('./reward-uses').useOf(rewardId) === 'mood') { startMoodPick({ requester, text: requestText || '', redemption }); return; }
 
   // Random song reward(s) — each entry in TWITCH_RANDOM_REWARDS can restrict to specific sheet tabs.
   const matchedRandom = parseRandomReward(rewardId);
@@ -284,6 +287,42 @@ setEventHandler(async (event) => {
   }
 });
 
+// 🎭 情境點歌 (mood.js): the redemption waits in Pending Review while Claude picks, then until the streamer
+// sends it (queued + the line posted in chat), picks again or refuses it (refunded, like any pending song).
+mood.init({
+  songs: () => require('./sheets').getSongs().filter(s => songTabs.canRequest(s.tab)),
+  lyrics: (title, artist) => leihu.lyricsFor(title, artist),
+});
+// Picks that were still being made when the app stopped can be picked again
+for (const p of getState().pending) {
+  if (p.mood && p.mood.state === 'thinking') updatePending(p, { mood: { ...p.mood, state: 'failed', code: 'moodInterrupted', error: 'interrupted' } });
+}
+
+function startMoodPick({ requester, text, redemption }) {
+  const entry = addPending({ title: '', artist: '', requester, originalRequest: text || '🎭', confidence: null, redemption });
+  updatePending(entry, { mood: { state: 'thinking', text, tried: [] } });
+  console.log(`[mood] @${requester} asked for a song: "${text}"`);
+  runMoodPick(entry);
+}
+
+// Not the songs queued, sung this stream, waiting in Pending Review, or already offered for this request
+async function runMoodPick(entry) {
+  const { nowPlaying, queue, playedSongs, pending } = getState();
+  const exclude = [nowPlaying, ...queue, ...playedSongs, ...pending.filter(p => p !== entry)]
+    .filter(s => s && s.title).map(s => songKey(s.title, s.artist)).concat(entry.mood.tried || []);
+  try {
+    const p = await mood.pick({ text: entry.mood.text, requester: entry.requester, exclude });
+    updatePending(entry, {
+      title: p.title, artist: p.artist, key: p.key,
+      mood: { ...entry.mood, state: 'picked', lines: p.lines, reason: p.reason, tags: mood.tagsOf(p.title, p.artist), tried: [...(entry.mood.tried || []), p.songKey] },
+    });
+    console.log(`[mood] Picked "${p.title}" for @${entry.requester}`);
+  } catch (err) {
+    console.error('[mood] Could not pick a song:', err.message);
+    updatePending(entry, { mood: { ...entry.mood, state: 'failed', ...errorBody(err) } });
+  }
+}
+
 // ── REST API ──────────────────────────────────────────────────────────────────
 app.get('/api/queue', (req, res) => res.json(getState()));
 app.post('/api/skip', (req, res) => {
@@ -323,11 +362,57 @@ app.post('/api/move', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/accept-pending', (req, res) => {
+app.post('/api/accept-pending', async (req, res) => {
   const { index, title, artist, candidateIndex } = req.body;
   const ci = candidateIndex != null ? Number(candidateIndex) : null;
-  const result = acceptPending(index, title, artist, ci);
+  // 🎭: the song Claude picked, and the line the streamer chose (中文 or English, as they left it) posted once it's queued
+  const entry = getState().pending[index];
+  const picked = entry && entry.mood;
+  if (picked && picked.state !== 'picked') return res.status(400).json(message('moodNotPicked', {}, 'No song picked yet.'));
+  const line = picked ? String(req.body.moodLine ?? picked.lines?.zh ?? '').replace(/[\r\n]+/g, ' ').trim() : '';
+  const result = picked ? acceptPending(index) : acceptPending(index, title, artist, ci);
   if (!result) return res.status(400).json({ error: 'invalid index' });
+  if (!line) return res.json({ ok: true });
+  try {
+    await chatSend.send(line);
+    res.json({ ok: true, posted: true });
+  } catch (err) {
+    res.json({ ok: true, posted: false, ...errorBody(err) });   // queued all the same
+  }
+});
+
+// Permissions the Twitch login lacks (authorized before the app asked for them): the dashboard's banner
+// says which features wait for them and links to authorizing again. Unknown (Twitch not reachable): none.
+app.get('/api/twitch/permissions', async (req, res) => {
+  try {
+    await require('./twitch').ensureFreshToken();
+    const { data } = await axios.get('https://id.twitch.tv/oauth2/validate', {
+      headers: { Authorization: `OAuth ${process.env.TWITCH_USER_ACCESS_TOKEN}` }, timeout: 10000,
+    });
+    const have = new Set(data.scopes || []);
+    res.json({ missing: setupRouter.SCOPES.filter(s => !have.has(s)) });
+  } catch (err) {
+    res.json({ missing: [], unknown: true });
+  }
+});
+
+// 🎭 情境點歌: status (never the key), the key, tagging the songs by mood, picking again for a request
+app.get('/api/mood', (req, res) => res.json(mood.status()));
+app.post('/api/mood/key', (req, res) => {
+  const key = String(req.body?.key || '').trim();
+  if (key && !/^sk-ant-[\w-]{20,}$/.test(key)) return res.status(400).json(message('moodKeyFormat', {}, 'That does not look like an Anthropic API key (sk-ant-…).'));
+  setupRouter.writeEnvValues({ ANTHROPIC_API_KEY: key });
+  res.json(mood.status());
+});
+app.post('/api/mood/tag', async (req, res) => {
+  try { res.json({ ...(await mood.startTagging()), status: mood.status() }); } catch (err) { res.status(err.messageCode ? 400 : 500).json(errorBody(err)); }
+});
+app.post('/api/mood/repick', (req, res) => {
+  const entry = getState().pending[Number(req.body?.index)];
+  if (!entry || !entry.mood) return res.status(400).json({ error: 'invalid index' });
+  if (entry.mood.state === 'thinking') return res.json({ ok: true });
+  updatePending(entry, { title: '', artist: '', mood: { ...entry.mood, state: 'thinking', lines: null, reason: '', code: undefined, error: undefined } });
+  runMoodPick(entry);
   res.json({ ok: true });
 });
 
@@ -1100,6 +1185,20 @@ app.post('/api/rewards/effect', (req, res) => {
   try {
     const { id, title, on } = req.body || {};
     res.json(on ? rewardEffects.attach(String(id || ''), title) : rewardEffects.detach(String(id || '')));
+  } catch (err) {
+    res.status(err.messageCode ? 400 : 500).json(errorBody(err));
+  }
+});
+// A new reward made by the app (so it manages it), with its main use: { title, cost, prompt, textRequired, use }
+app.post('/api/rewards/create', async (req, res) => {
+  try {
+    const { use = '' } = req.body || {};
+    if (!require('./reward-uses').USES.includes(use)) throw new UserError('rewardUseBad', {}, 'use is not valid');
+    const r = await redemptions.createReward(req.body || {});
+    const values = use ? require('./reward-uses').change(r.id, r.title, use) : {};
+    if (Object.keys(values).length) setupRouter.writeEnvValues(values);
+    sendChat({ type: 'rewards-changed' });
+    res.json({ ok: true, ...r });
   } catch (err) {
     res.status(err.messageCode ? 400 : 500).json(errorBody(err));
   }

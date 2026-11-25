@@ -373,6 +373,21 @@ function statusFor(title, artist) {
   return { state: songState(song), id: song.id, leihuTitle: song.title, ...failureOf(song) };
 }
 
+// A sheet song's lyrics in Leihu as plain lines (no timestamps), for 🎭 mood tags (mood.js); '' when Leihu
+// has none or isn't running. The streamer's own lyrics first, then the ones found online, then recognized.
+async function lyricsFor(title, artist) {
+  const st = statusFor(title, artist);
+  if (!st.id || !['ready', 'nolyrics'].includes(st.state)) return '';
+  try {
+    const { data } = await axios.get(`${baseUrl()}/api/songs/${encodeURIComponent(st.id)}/lyrics`, { timeout: 5000 });
+    const lrc = data.lrc || data.online || (data.unreliable ? '' : data.auto) || '';
+    return lrc.split(/\r?\n/).map(l => l.replace(/\[[^\]]*\]/g, '').trim()).filter(Boolean).join('\n');
+  } catch (err) {
+    console.error(`[leihu] Could not read the lyrics of "${title}":`, err.response?.status || err.message);
+    return '';
+  }
+}
+
 // Import a missing song, or render its sheet key once it's ready.
 // Each request is sent at most once per server run; `retry` (the dashboard's
 // Prepare button) lets a failed import be sent again, and asks Leihu 1.6+ to download
@@ -639,7 +654,7 @@ async function open(entry) {
 }
 
 module.exports = {
-  start, getStatus, getLibrary, playback, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
+  start, getStatus, getLibrary, playback, lyricsFor, findByVideo, setLink, prepare, open, refresh, importVideo, importForSong, tabLanguage,
   fillMissingLyrics, failure, youtubeBlocked, baseUrl, videoId, transpose, songKey,
   startBulk, stopBulk, bulkStatus, bulkStep, sheetCounts, launch, closeLeihu,
 };

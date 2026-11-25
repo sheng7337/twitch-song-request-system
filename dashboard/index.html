@@ -517,6 +517,17 @@
   }
   .pending-del:hover { background: rgba(var(--danger-rgb), 0.15); color: var(--danger); border-color: rgba(var(--danger-rgb), 0.5); }
 
+  /* 🎭 情境點歌: Claude's pick waits here for the streamer (song, why, the line for chat) */
+  .pending-card.mood-card { border-left-color: var(--accent); }
+  .mood-state { font-size: calc(13px * var(--ts)); color: var(--text-dim); margin-bottom: 6px; }
+  .mood-state.err { color: var(--danger); }
+  .mood-song { font-size: calc(15px * var(--ts)); color: var(--text); font-weight: 700; }
+  .mood-song small { font-weight: 400; color: var(--text-dim); }
+  .mood-tags { font-size: calc(12px * var(--ts)); color: var(--text-dim); }
+  .mood-reason { font-size: calc(12px * var(--ts)); color: var(--text-dim); margin: 2px 0 6px; }
+  .mood-line { min-height: 3.2em; resize: vertical; line-height: 1.4; margin-bottom: 6px; }
+  .mood-line-label { font-size: calc(12px * var(--ts)); color: var(--text-dim); }
+
   /* 🔍 Find: lyric sites + YouTube search for a song not on the sheet */
   .find-btn {
     flex-shrink: 0; padding: 4px 9px;
@@ -949,6 +960,13 @@
   /* 🤖 Bot tab: one card per command / timer */
   .bot-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .bot-head h3 { flex: 1; }
+  /* 🎟️ Rewards: ＋ New reward */
+  .rw-new { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); }
+  .rw-new[hidden] { display: none; }
+  .rw-new label { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: calc(13px * var(--ts)); color: var(--text-dim); }
+  .rw-new .al-row .btn { margin-left: 0; }
+  .rw-new-wide { width: 100%; }
+  .rw-new-wide .modes-input { flex: 1; min-width: 12em; }
   .bot-list { display: flex; flex-direction: column; gap: 8px; }
   .bot-item { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; background: var(--bg-card); }
   .bot-item.off > :not(.mod-confirm) { opacity: 0.6; }
@@ -1045,6 +1063,8 @@
 
 <!-- Leihu plays while the mode on isn't for singing (server/sing-check.js): switch with one click -->
 <div class="sing-warn" id="sing-warn" role="alert" hidden></div>
+<!-- Twitch permissions the login lacks (authorized before the app asked for them): what waits, and authorize again -->
+<div class="sing-warn" id="perm-warn" role="alert" hidden></div>
 
 <!-- 🎨 Look & overlays (top bar): what isn't one tab's — the dashboard's and the overlays' themes and text
      sizes (shared/themes.css, server/look.js), the overlays' opacity / brightness / language, every overlay's
@@ -1393,10 +1413,45 @@
 <div class="tab-page" id="tab-rewards" role="tabpanel" aria-labelledby="tabbtn-rewards" hidden>
   <div class="modes-page">
     <section class="modes-box">
-      <h3 data-i18n="dash.rewards.title">🎟️ Channel-point rewards</h3>
+      <div class="bot-head">
+        <h3 data-i18n="dash.rewards.title">🎟️ Channel-point rewards</h3>
+        <button class="btn add" type="button" id="rw-new-open" data-i18n="dash.rewards.new">＋ New reward</button>
+      </div>
       <p class="setting-hint" data-i18n="dash.rewards.intro"></p>
+      <form class="rw-new" id="rw-new" hidden>
+        <div class="al-row">
+          <label><span data-i18n="dash.rewards.newName">Name</span> <input class="modes-input" name="title" maxlength="45" required></label>
+          <label><span data-i18n="dash.rewards.newCost">Points</span> <input type="number" class="cooldown-input" name="cost" min="1" step="1" value="500" required></label>
+          <label><span data-i18n="dash.rewards.col.use">Use</span> <select class="modes-input" name="use"></select></label>
+        </div>
+        <label class="rw-new-wide"><span data-i18n="dash.rewards.newPrompt">Description viewers see (optional)</span>
+          <input class="modes-input" name="prompt" maxlength="200"></label>
+        <label><input type="checkbox" name="textRequired"> <span data-i18n="dash.rewards.newText">Viewers must type something</span></label>
+        <p class="setting-hint" data-i18n="dash.rewards.newHint"></p>
+        <div class="al-row">
+          <button class="btn add" type="submit" data-i18n="dash.rewards.newCreate">＋ Create on Twitch</button>
+          <button class="btn" type="button" id="rw-new-cancel" data-i18n="dash.rewards.newCancel">Cancel</button>
+        </div>
+      </form>
       <div class="reward-rows" id="reward-rows"></div>
       <p class="setting-hint" data-i18n="dash.chat.rewardsHint"></p>
+    </section>
+    <section class="modes-box" id="mood-box">
+      <h3 data-i18n="dash.mood.title">🎭 Mood requests</h3>
+      <p class="setting-hint" data-i18n="dash.mood.intro"></p>
+      <div class="modes-row">
+        <span id="mood-key-state"></span>
+        <input type="password" class="modes-input" id="mood-key" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" data-i18n-aria-label="dash.mood.keyLabel">
+        <button class="btn" type="button" data-mood="save-key" data-i18n="dash.mood.saveKey">Save key</button>
+        <button class="btn danger" type="button" data-mood="clear-key" data-i18n="dash.mood.clearKey">Remove key</button>
+      </div>
+      <p class="setting-hint"><span data-i18n="dash.mood.keyHint"></span> <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a></p>
+      <div class="modes-row">
+        <span id="mood-tag-state"></span>
+        <button class="btn" type="button" data-mood="tag" data-i18n="dash.mood.tag">🏷 Tag songs by mood</button>
+      </div>
+      <p class="setting-hint" data-i18n="dash.mood.tagHint"></p>
+      <p class="setting-hint" id="mood-spent"></p>
     </section>
   </div>
 </div>
@@ -1567,6 +1622,7 @@ function connect() {
     ws.send(JSON.stringify({ type: 'chat-subscribe' }));
     loadWaiting();
     loadSingCheck();
+    loadPermissions();
     loadChat();   // fills in chat missed while disconnected
     loadModes(currentTab === 'modes');
     loadOutfits();
@@ -1695,6 +1751,7 @@ function render() {
   document.getElementById('pending-badge').textContent = pendingList.length;
   document.getElementById('pending-empty').style.display = pendingList.length === 0 ? 'block' : 'none';
   document.getElementById('pending-list').innerHTML = pendingList.map((item, i) => {
+    if (item.mood) return moodCardHtml(item, i);
     const isDragged = !item.originalRequest;  // dragged manually — no viewer input
     const hasMatch = item.confidence !== null;
     const confLabel = hasMatch ? t('dash.pending.match', { n: item.confidence }) : t('dash.pending.noMatch');
@@ -1854,6 +1911,66 @@ function acceptPending(index) {
 
 function pickCandidate(pendingIndex, candidateIndex) {
   api('accept-pending', { index: pendingIndex, candidateIndex });
+}
+
+// ── 🎭 情境點歌 (server/mood.js) ── Claude's pick for a viewer's mood waits here: the song, why (for you only)
+// and the line for chat in 中文 and English, either of which you can change. ✓ 中文 / ✓ English queues the song and
+// posts that line; 🔁 asks for another
+// song; ✕ refunds. What you type in the line survives the list being redrawn (any queue change).
+const moodDrafts = {};
+const moodDraftKey = (item, lang) => `${item.addedAt}|${lang}|${(item.mood.lines || {})[lang] || ''}`;
+
+function moodCardHtml(item, i) {
+  const m = item.mood;
+  const head = `<div class="pending-top"><span class="pending-original" title="${tHtml('dash.pending.viewerTyped', { text: m.text })}">🎭 ❝ ${esc(m.text || t('dash.mood.noText'))}</span></div>`
+    + `<div class="pending-req">@${esc(item.requester)}</div>`;
+  const repick = `<button class="find-btn" onclick="moodRepick(${i})" title="${esc(t('dash.mood.repickTitle'))}"${m.state === 'thinking' ? ' disabled' : ''}>${esc(t('dash.mood.repick'))}</button>`;
+  const refuse = `<button class="pending-del" onclick="deleteSong('pending',${i})" title="${esc(t('dash.mood.refuseTitle'))}">✕</button>`;
+  let body;
+  if (m.state === 'thinking') {
+    body = `<div class="mood-state">${esc(t('dash.mood.thinking'))}</div><div class="pending-actions">${repick}${refuse}</div>`;
+  } else if (m.state === 'failed') {
+    body = `<div class="mood-state err">${esc(I18N.server(m, 'dash.toast.requestFailed'))}</div><div class="pending-actions">${repick}${refuse}</div>`;
+  } else {
+    const lines = m.lines || {};
+    const box = (lang) => {
+      const key = moodDraftKey(item, lang);
+      return `<label class="mood-line-label" for="mood-line-${lang}-${i}">${esc(t('dash.mood.line.' + lang))}</label>`
+        + `<textarea class="pending-field mood-line" id="mood-line-${lang}-${i}" data-mood-draft="${esc(key)}" maxlength="500">${esc(moodDrafts[key] ?? lines[lang] ?? '')}</textarea>`;
+    };
+    const tags = m.tags ? `<div class="mood-tags">${esc(m.tags.tags.join('、'))} · ${esc(m.tags.about)}</div>` : '';
+    body = `<div class="mood-song">${esc(item.title)}${item.artist ? ` <small>${esc(item.artist)}</small>` : ''}</div>${tags}`
+      + (m.reason ? `<div class="mood-reason">💭 ${esc(m.reason)}</div>` : '')
+      + `<div class="mood-line-label">${esc(t('dash.mood.lineLabel'))}</div>` + box('zh') + box('en')
+      + `<div class="pending-actions"><button class="accept-btn" onclick="moodSend(${i}, 'zh')">${esc(t('dash.mood.sendZh'))}</button>`
+      + `<button class="accept-btn" onclick="moodSend(${i}, 'en')">${esc(t('dash.mood.sendEn'))}</button>${repick}${refuse}</div>`;
+  }
+  return `<div class="pending-card mood-card" id="pending-card-${i}">${head}${body}</div>`;
+}
+
+document.getElementById('pending-list').addEventListener('input', (e) => {
+  if (e.target.dataset.moodDraft) moodDrafts[e.target.dataset.moodDraft] = e.target.value;
+});
+
+async function moodPost(url, body) {
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = await res.json();
+    if (!res.ok) throw new Error(I18N.server(out, 'dash.toast.requestFailed'));
+    return out;
+  } catch (err) { showToast(err.message, true); return null; }
+}
+
+async function moodSend(i, lang) {
+  const box = document.getElementById(`mood-line-${lang}-${i}`);
+  const out = await moodPost('/api/accept-pending', { index: i, moodLine: box ? box.value : undefined });
+  if (!out) return;
+  if (out.posted === false) showToast(t('dash.mood.notPosted', { message: I18N.server(out, 'dash.toast.requestFailed') }), true);
+  else showToast(t(out.posted ? 'dash.mood.sent' : 'dash.mood.queued'));
+}
+
+function moodRepick(i) {
+  moodPost('/api/mood/repick', { index: i });
 }
 
 // ── 🔍 Find: songs not on the sheet ────────────────────────────────────────────
@@ -2539,7 +2656,7 @@ function showTab(name) {
   if (name === 'modes') loadModes(true);
   if (name === 'outfits') { loadOutfits(); loadOutfitRewards(); }
   if (name === 'alerts') loadAlerts();
-  if (name === 'rewards') loadRewards();
+  if (name === 'rewards') { loadRewards(); loadMood(); }
   if (name === 'bot') loadBot();
   paintOutfitPick();
 }
@@ -3332,7 +3449,7 @@ function paintRewards() {
   const page = `https://dashboard.twitch.tv/${ch ? `u/${encodeURIComponent(ch)}/` : ''}viewer-rewards/channel-points/rewards`;
   const rows = rewardsView.rewards.map(r => {
     const song = r.role === 'song';
-    const uses = ['', 'song', 'random', 'outfit'].map(u =>
+    const uses = ['', 'song', 'random', 'outfit', 'mood'].map(u =>
       `<option value="${u}"${r.role === u ? ' selected' : ''}>${esc(t('dash.rewards.use.' + (u || 'none')))}</option>`).join('');
     const go = (tab, label) => `<a class="btn reward-go" href="#${tab}" data-rw-go="${tab}" title="${esc(t(label))}" aria-label="${esc(t(label))}">⚙</a>`;
     // name · cost · use · effect · manage, then the lines under the row
@@ -3346,6 +3463,7 @@ function paintRewards() {
     const under = (r.role === 'random' || song ? `<div class="reward-more">${esc(t(song ? 'dash.rewards.songTabs' : 'dash.rewards.tabs'))} ${offeredTabs().map(n =>
           `<label><input type="checkbox" data-rw-tab="${esc(n)}"${(r.tabs || []).includes(n) ? ' checked' : ''}> ${esc(n)}</label>`).join('')}</div>` : '')
       + (song && !r.needsText ? `<div class="reward-warn">${esc(t('dash.rewards.needsText'))}</div>` : '')
+      + (r.role === 'mood' && !r.needsText ? `<div class="reward-warn">${esc(t('dash.rewards.moodNeedsText'))}</div>` : '')
       + (song ? `<div class="reward-more">${esc(t('dash.rewards.songFixed'))}</div>` : '')
       // 🎤 / 🎲 / 👕 give points back (song removed, nothing to draw, outfit dropped): only on a managed, queued reward
       + (r.role && r.skipsQueue ? `<div class="reward-warn">${esc(t('dash.rewards.skipWarn', { why: t('dash.rewards.why.' + r.role) }))}</div>`
@@ -3368,6 +3486,43 @@ function paintRewards() {
     ? `<div class="reward-head" aria-hidden="true">${['name', 'cost', 'use', 'effect', 'manage'].map(c => `<span>${esc(t('dash.rewards.col.' + c))}</span>`).join('')}</div>` + rows
     : esc(t('dash.chat.rewardsNone'));
 }
+
+// ＋ New reward: made on Twitch by the app (so the app manages it), with its main use. 🎤 and 🎭 need the
+// viewer's words, so choosing them ticks "must type something".
+const rwNew = document.getElementById('rw-new');
+function openNewReward(open) {
+  rwNew.hidden = !open;
+  document.getElementById('rw-new-open').hidden = open;
+  if (!open) return;
+  rwNew.reset();
+  rwNew.elements.use.innerHTML = ['', 'song', 'random', 'outfit', 'mood'].map(u =>
+    `<option value="${u}">${esc(t('dash.rewards.use.' + (u || 'none')))}</option>`).join('');
+  rwNew.elements.title.focus();
+}
+document.getElementById('rw-new-open').addEventListener('click', () => openNewReward(true));
+document.getElementById('rw-new-cancel').addEventListener('click', () => openNewReward(false));
+rwNew.elements.use.addEventListener('change', (e) => {
+  if (['song', 'mood'].includes(e.target.value)) rwNew.elements.textRequired.checked = true;
+});
+rwNew.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = rwNew.elements;
+  const body = { title: f.title.value.trim(), cost: Number(f.cost.value), use: f.use.value, prompt: f.prompt.value.trim(), textRequired: f.textRequired.checked };
+  const btn = rwNew.querySelector('[type="submit"]');
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/rewards/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = await res.json();
+    if (!res.ok) throw new Error(I18N.server(out, 'dash.toast.requestFailed'));
+    showToast(t('dash.rewards.newDone', { name: out.title }));
+    openNewReward(false);
+    await loadRewards();
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // A row's main use, its 🎲 tabs, its 🎟️ effect
 document.getElementById('reward-rows').addEventListener('change', async (e) => {
@@ -4059,6 +4214,53 @@ const ALERT_ICONS = { follow: '💜', sub: '⭐', gift: '🎁', cheer: '💎', r
 const ALERT_LAYOUTS = { vertical: '800 × 600', horizontal: '1600 × 300' };
 const alertsView = { status: null };
 
+// ── 🎭 情境點歌 settings (🎟️ Rewards tab) ── the key (the page never gets it back, only whether it's set),
+// tagging the songs by mood (one batch; checked every minute while it runs), what it has cost so far
+const moodView = { status: null };
+
+async function loadMood() {
+  try { moodView.status = await (await fetch('/api/mood')).json(); } catch (_) { return; }
+  paintMood();
+}
+
+function paintMood() {
+  const st = moodView.status;
+  if (!st) return;
+  document.getElementById('mood-key-state').textContent = t(st.hasKey ? 'dash.mood.keySet' : 'dash.mood.keyMissing');
+  document.querySelector('[data-mood="clear-key"]').hidden = !st.hasKey;
+  const job = st.job;
+  document.getElementById('mood-tag-state').textContent = job
+    ? t('dash.mood.tagging', { n: job.count, time: new Date(job.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+    : t('dash.mood.tagged', { n: st.tagged, total: st.songs })
+      + (st.lastJob && st.lastJob.failed ? ' · ' + t('dash.mood.tagFailed', { n: st.lastJob.failed }) : '');
+  const tagBtn = document.querySelector('[data-mood="tag"]');
+  tagBtn.disabled = !!job || !st.hasKey;
+  document.getElementById('mood-spent').textContent = t('dash.mood.spent', { usd: st.spent.usd.toFixed(2), picks: st.spent.picks, tagged: st.spent.tagged });
+}
+
+setInterval(() => { if (currentTab === 'rewards' && moodView.status && moodView.status.job && !document.hidden) loadMood(); }, 60000);
+
+document.getElementById('mood-box').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-mood]');
+  if (!b) return;
+  const act = b.dataset.mood;
+  if (act === 'save-key' || act === 'clear-key') {
+    const input = document.getElementById('mood-key');
+    const key = act === 'clear-key' ? '' : input.value.trim();
+    if (act === 'save-key' && !key) { input.focus(); return; }
+    const out = await moodPost('/api/mood/key', { key });
+    input.value = '';
+    if (out) { moodView.status = out; paintMood(); showToast(t(key ? 'dash.mood.keySaved' : 'dash.mood.keyRemoved')); }
+    return;
+  }
+  if (act === 'tag') {
+    b.disabled = true;
+    const out = await moodPost('/api/mood/tag', {});
+    if (out) { moodView.status = out.status; showToast(out.count ? t('dash.mood.tagStarted', { n: out.count }) : t('dash.mood.tagNothing')); }
+    paintMood();
+  }
+});
+
 // ── 🤖 Bot tab (server/bot.js) ── Commands and timers save as soon as a field changes (on leaving it);
 // "▶ Try" shows what the bot would say without posting it. Deleting asks in the card itself.
 const BOT_LEVELS = ['everyone', 'sub', 'vip', 'mod'];
@@ -4679,6 +4881,30 @@ async function loadModes(live) {
 // Another dashboard (or this one) switched or edited a mode
 // ── Leihu playing outside a 🎤 mode (server/sing-check.js) ──
 // A banner with a button for each singing mode; ✕ hides it until the next song.
+// Each missing permission names what it's for; ✕ hides the banner until the page is opened again
+const PERM_FEATURES = {
+  'user:write:chat': 'chat', 'moderator:read:followers': 'followers', 'bits:read': 'bits',
+  'moderator:manage:banned_users': 'mod', 'moderator:manage:shoutouts': 'mod', 'channel:manage:raids': 'mod', 'moderator:manage:chat_messages': 'mod',
+  'channel:read:redemptions': 'rewards', 'channel:manage:redemptions': 'rewards', 'user:read:chat': 'chatRead',
+};
+const permWarn = { missing: [], hidden: false };
+async function loadPermissions() {
+  try { permWarn.missing = (await (await fetch('/api/twitch/permissions')).json()).missing || []; } catch { return; }
+  paintPermWarn();
+}
+function paintPermWarn() {
+  const box = document.getElementById('perm-warn');
+  const features = [...new Set(permWarn.missing.map(s => PERM_FEATURES[s] || 'other'))];
+  if (!features.length || permWarn.hidden) { box.hidden = true; return; }
+  box.innerHTML = `<span class="sing-warn-text">⚠ ${esc(t('dash.permWarn.text', { list: features.map(f => t('dash.permWarn.feature.' + f)).join(t('dash.permWarn.sep')) }))}</span>`
+    + `<a class="btn" href="/setup?reauth=1">${esc(t('dash.permWarn.authorize'))}</a>`
+    + `<button class="btn" type="button" data-perm-dismiss title="${esc(t('dash.permWarn.dismiss'))}" aria-label="${esc(t('dash.permWarn.dismiss'))}">✕</button>`;
+  box.hidden = false;
+}
+document.getElementById('perm-warn').addEventListener('click', (e) => {
+  if (e.target.closest('[data-perm-dismiss]')) { permWarn.hidden = true; paintPermWarn(); }
+});
+
 const singWarn = { last: { wrong: false }, dismissed: null };
 async function loadSingCheck() {
   try { onSingCheck(await (await fetch('/api/sing-check')).json()); } catch {}

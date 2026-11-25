@@ -122,6 +122,13 @@ router.post('/validate-client-id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// What the app asks Twitch for. moderator:read:followers: new followers for !endingtk (not in chat);
+// user:write:chat: the Chat tab's message box, the 🤖 bot, 🎭 lines; the next four: the Chat tab's ban / timeout,
+// Shoutout, raid and pin buttons (chat-mod.js); bits:read: Bits spent on Power-ups for !endingtk (not cheers in chat).
+// A setup from before one was added lacks it: the dashboard says so (GET /api/twitch/permissions)
+const SCOPES = ['channel:read:redemptions', 'channel:manage:redemptions', 'user:read:chat', 'user:write:chat', 'moderator:read:followers',
+  'moderator:manage:banned_users', 'moderator:manage:shoutouts', 'channel:manage:raids', 'moderator:manage:chat_messages', 'bits:read'];
+
 // POST /setup/api/start-device-auth
 router.post('/start-device-auth', async (req, res) => {
   const clientId = process.env.TWITCH_CLIENT_ID || readEnv().TWITCH_CLIENT_ID;
@@ -131,10 +138,7 @@ router.post('/start-device-auth', async (req, res) => {
     const response = await axios.post('https://id.twitch.tv/oauth2/device', null, {
       params: {
         client_id: clientId,
-        // moderator:read:followers: new followers for !endingtk (not in chat); user:write:chat: the Chat tab's message box;
-        // the next four: the Chat tab's ban / timeout, Shoutout, raid and pin buttons (chat-mod.js);
-        // bits:read: Bits spent on Power-ups for !endingtk (not cheers in chat)
-        scopes: 'channel:read:redemptions channel:manage:redemptions user:read:chat user:write:chat moderator:read:followers moderator:manage:banned_users moderator:manage:shoutouts channel:manage:raids moderator:manage:chat_messages bits:read',
+        scopes: SCOPES.join(' '),
       }
     });
     deviceAuthState = {
@@ -463,3 +467,4 @@ router.post('/save-history', (req, res) => {
 module.exports = router;
 module.exports.setConfigChangeCallback = setConfigChangeCallback;
 module.exports.writeEnvValues = writeEnvValues;
+module.exports.SCOPES = SCOPES;

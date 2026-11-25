@@ -128,6 +128,36 @@ function copyOf(r) {
   return body;
 }
 
+// A new reward from the 🎟️ Rewards tab (Create Custom Rewards): made by the app, so the app manages it.
+// Starts on, in Twitch's queue (so it can be refunded), with Twitch's default color.
+const PROMPT_MAX = 200;   // Twitch's limit
+function newRewardBody({ title, cost, prompt, textRequired } = {}) {
+  const name = String(title || '').trim();
+  if (!name) throw new UserError('rewardTitleMissing', {}, 'A reward needs a name');
+  if ([...name].length > TITLE_MAX) throw new UserError('rewardTitleLong', { max: TITLE_MAX }, `Reward names are at most ${TITLE_MAX} characters`);
+  const points = Math.round(Number(cost));
+  if (!Number.isFinite(points) || points < 1) throw new UserError('rewardCostBad', {}, 'The cost must be at least 1 point');
+  const text = String(prompt || '').replace(/[\r\n]+/g, ' ').trim();
+  if ([...text].length > PROMPT_MAX) throw new UserError('rewardPromptLong', { max: PROMPT_MAX }, `The description is at most ${PROMPT_MAX} characters`);
+  return { title: name, cost: points, prompt: text, is_enabled: true, is_user_input_required: !!textRequired, should_redemptions_skip_request_queue: false };
+}
+
+async function createReward(input) {
+  const body = newRewardBody(input);
+  let data;
+  try {
+    ({ data } = await axios.post(API, body, { ...await helix(), params: { broadcaster_id: broadcaster() } }));
+  } catch (err) {
+    const reason = err.response?.data?.message || err.message;
+    if (/DUPLICATE/i.test(reason)) throw new UserError('rewardTitleTaken', { title: body.title }, `There is already a reward called "${body.title}"`);
+    throw new UserError('rewardCreateFailed', { message: reason }, `Twitch did not create the reward: ${reason}`);
+  }
+  manageable.at = 0;
+  const r = data.data[0];
+  console.log(`[redemptions] Created the reward "${r.title}" (${r.cost} points)`);
+  return { id: r.id, title: r.title };
+}
+
 // The reward's main use (reward-uses.js): 'song' | 'random' | 'outfit' | ''
 const roleOf = (id) => require('./reward-uses').useOf(id);
 
@@ -289,7 +319,7 @@ function songRewardIds() {
 }
 
 module.exports = {
-  manageableIds, channelLogin, setStatus, settle, listRewards,
+  manageableIds, channelLogin, setStatus, settle, listRewards, newRewardBody, createReward,
   startTakeover, finishTakeover, cancelTakeover, onRewardRemoved, originalsOf, songRewardIds, copyOf, tempTitle,
   missedSince, missedFrom,
 };

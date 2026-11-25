@@ -1,7 +1,7 @@
 // server/reward-uses.js
 // What each channel-point reward is for (the 🎟️ Rewards tab): one main use — 🎤 song request
 // (TWITCH_REWARD_ID, exactly one), 🎲 random song (TWITCH_RANDOM_REWARDS, each with the sheet tabs it
-// draws from) or 👕 outfit (OUTFIT_REWARDS) — or none. A 🎟️ reward effect (reward-effects.js) can be
+// draws from), 👕 outfit (OUTFIT_REWARDS) or 🎭 情境點歌 (MOOD_REWARDS, mood.js) — or none. A 🎟️ reward effect (reward-effects.js) can be
 // added to any reward, with a main use or without. The main use alone marks a redemption done or
 // refunds it; without one, the effect does.
 //
@@ -11,17 +11,20 @@
 const { UserError } = require('./messages');
 const songTabs = require('./song-tabs');
 
-const USES = ['', 'song', 'random', 'outfit'];
+const USES = ['', 'song', 'random', 'outfit', 'mood'];
 
 const randomList = (env) => { try { const l = JSON.parse(env.TWITCH_RANDOM_REWARDS || '[]'); return Array.isArray(l) ? l : []; } catch { return []; } };
-const outfitList = (env) => (env.OUTFIT_REWARDS || '').split(',').map(s => s.trim()).filter(Boolean);
+const idList = (v) => (v || '').split(',').map(s => s.trim()).filter(Boolean);
+const outfitList = (env) => idList(env.OUTFIT_REWARDS);
+const moodList = (env) => idList(env.MOOD_REWARDS);
 
-// '' | 'song' | 'random' | 'outfit'
+// '' | 'song' | 'random' | 'outfit' | 'mood'
 function useOf(id, env = process.env) {
   if (!id) return '';
   if (id === env.TWITCH_REWARD_ID) return 'song';
   if (randomList(env).some(r => r.id === id)) return 'random';
   if (outfitList(env).includes(id)) return 'outfit';
+  if (moodList(env).includes(id)) return 'mood';
   return '';
 }
 
@@ -57,6 +60,10 @@ function change(id, title, use, tabs, env = process.env) {
   const outfit = outfitList(env);
   if (use === 'outfit' && !outfit.includes(id)) values.OUTFIT_REWARDS = [...outfit, id].join(',');
   else if (use !== 'outfit' && outfit.includes(id)) values.OUTFIT_REWARDS = outfit.filter(x => x !== id).join(',');
+
+  const mood = moodList(env);
+  if (use === 'mood' && !mood.includes(id)) values.MOOD_REWARDS = [...mood, id].join(',');
+  else if (use !== 'mood' && mood.includes(id)) values.MOOD_REWARDS = mood.filter(x => x !== id).join(',');
   return values;
 }
 
@@ -68,6 +75,8 @@ function moved(oldId, newId, env = process.env) {
   if (random.some(r => r.id === oldId)) values.TWITCH_RANDOM_REWARDS = JSON.stringify(random.map(r => r.id === oldId ? { ...r, id: newId } : r));
   const outfit = outfitList(env);
   if (outfit.includes(oldId)) values.OUTFIT_REWARDS = outfit.map(x => x === oldId ? newId : x).join(',');
+  const mood = moodList(env);
+  if (mood.includes(oldId)) values.MOOD_REWARDS = mood.map(x => x === oldId ? newId : x).join(',');
   return values;
 }
 

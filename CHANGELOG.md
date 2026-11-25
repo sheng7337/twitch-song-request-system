@@ -20,7 +20,7 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 - **重新啟動**程式（關掉後再執行 `start.bat`／`start_zh.bat`），並重新整理控制台。
 - 兌換項目的設定搬到新的「**🎟️ 兌換**」分頁；原本的設定都會保留，不用重設。
-- 想讓片尾名單也感謝用在 Power-ups 的小奇點：到「💬 聊天室 → ⚙ → 片尾名單」按「**重新授權 →**」，讓 Twitch 多給一項權限
+- 想讓片尾名單也感謝用在 Power-ups 的小奇點：控制台上方會出現權限提示，按「**重新授權 →**」，讓 Twitch 多給一項權限
   （讀取小奇點）。不授權也沒關係，其他都照常。
 
 #### 新功能
@@ -32,6 +32,15 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
   - 定時訊息：每幾分鐘發一次，可以設定「聊天室至少幾句」才發、只在直播中發；一次只發一則，間隔至少 2 分鐘。
   - 預設有 `!歌單`（歌單試算表連結）和 `!commands`。用你的 Twitch 帳號發言，只有程式開著時才會運作。
   - 設定好之後，**記得把 Nightbot 裡相同的指令和定時訊息關掉**，不然會發兩次。
+- **🎭 情境點歌（AI 依心情選歌）**：觀眾兌換設成「🎭 情境點歌」的項目、寫下心情（例如「今天好寂寞」），
+  Claude（Anthropic 的 AI）會從歌單挑一首，並寫一句要發到聊天室的話（中文和英文各一句）。**一定要你看過才會送出**：
+  選好的歌在「待審核」等你，可以修改，按「✓ 加入佇列，發中文」或「發英文」才會加入佇列並把那一句發到聊天室；也可以「🔁 換一首」，或按 ✕ 退還點數。
+  - 到「🎟️ 兌換」分頁把一個兌換項目設為「🎭 情境點歌」（記得在 Twitch 開啟「要求觀眾輸入文字」），並在下方輸入你的
+    Anthropic API 金鑰（使用你自己的 Anthropic 帳號計費，每次選歌約 0.01–0.05 美元）。
+  - 「🏷 幫歌曲標記心情」：Claude 讀雷虎練唱台裡的歌詞，幫每首歌記下心情，選歌會更準（整批半價，幾百首約 1–3 美元，做一次就好）。
+- **⚠ 缺少 Twitch 權限的提示**：Twitch 授權是在某項功能加入之前做的，控制台上方會說明哪些功能因此無法使用，並提供「重新授權 →」。
+- **＋ 新增兌換項目**：在「🎟️ 兌換」分頁直接建立新的兌換項目（名稱、點數、用途、說明、是否要輸入文字）。
+  由 App 建立，所以一建立就由點歌系統管理（可以完成和退還），不用再「交給點歌系統管理」。
 - **🎟️ 兌換分頁**：頻道上每個兌換項目在這裡設定用途 ——「🎤 點歌」、「🎲 隨機點歌」（和要抽的歌單分頁）、「👕 換裝」或無 ——
   另外可以勾選「🎟️ 特效」，單獨使用或加在主要用途上（例如換裝時加一個音效）。完成和退還由主要用途決定。原本分散在「💬 聊天室 ⚙」
   （交給點歌系統管理）、「👕 換裝」（勾選會換裝的獎勵）和「🔔 通知」（加入兌換項目）的設定都搬到這裡。
@@ -72,8 +81,8 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 
 - **Restart** the app (close it, run `start.bat` / `start_zh.bat` again) and refresh the dashboard.
 - Reward settings moved to the new **🎟️ Rewards** tab; what you had set up is kept, nothing to redo.
-- For the ending roll to thank Bits spent on Power-ups: 💬 Chat → ⚙ → Ending roll → **Authorize again →**, so
-  Twitch gives one more permission (reading Bits). Without it everything else works as before.
+- For the ending roll to thank Bits spent on Power-ups: press **Authorize again →** in the permission notice at the
+  top of the dashboard, so Twitch gives one more permission (reading Bits). Without it everything else works as before.
 
 #### What's new
 
@@ -86,6 +95,20 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
     time, at least 2 minutes apart.
   - `!歌單` (the song sheet link) and `!commands` come ready. It posts as your Twitch account, only while the app runs.
   - Once it's set up, **turn the same commands and timers off in Nightbot**, or chat gets them twice.
+- **🎭 Mood requests (情境點歌, AI picks a song for a mood)**: a viewer redeems a reward set to 🎭 and writes how
+  they feel ("I'm feeling lonely today"); Claude (Anthropic's AI) picks one song from your list and writes a line for
+  chat, in 中文 and in English. **Nothing goes out before you've seen it**: the pick waits in Pending Review, where you
+  can change the lines and press **✓ Queue + post 中文** or **English** to queue the song and post that line, **🔁 Another** for a different song, or ✕ to refund.
+  - In the **🎟️ Rewards** tab, set a reward to 🎭 Mood request (turn on "Require Viewer to Enter Text" for it on
+    Twitch) and enter your Anthropic API key below the list (billed to your own Anthropic account, about
+    US$0.01–0.05 per pick).
+  - **🏷 Tag songs by mood**: Claude reads the lyrics in Leihu Singsing and notes each song's moods, for better picks
+    (one batch at half price, roughly US$1–3 for a few hundred songs, once).
+- **⚠ Missing Twitch permissions notice**: when the Twitch authorization is older than a feature that needs it, the
+  top of the dashboard says which features can't work and offers **Authorize again →**.
+- **＋ New reward**: create a reward right in the **🎟️ Rewards** tab (name, points, use, description, whether
+  viewers type something). The app makes it, so the app manages it from the start (done and refund) — no
+  taking over needed.
 - **🎟️ Rewards tab**: every reward on your channel gets its use here — 🎤 song request, 🎲 random song (and the
   sheet tabs it draws from), 👕 outfit or none — and a 🎟️ Effect tick, on its own or on top of the main use (e.g.
   an outfit change with a sound). The main use decides done and refund. What was spread over 💬 Chat ⚙ (handing
