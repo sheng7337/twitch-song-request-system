@@ -165,6 +165,10 @@ async function raid(login) {
     data = await helix('post', '/raids', { params: { from_broadcaster_id: me(), to_broadcaster_id: user.id } });
   } catch (err) {
     const name = user.name;
+    // Kept in the log: a refused raid otherwise leaves no trace (Twitch counts it all the same)
+    console.error(`[chat-mod] Raid to ${name} refused: ${err.status ? `${err.status} ` : ''}${err.reason || err.message}`);
+    // Twitch allows 10 raid requests per 10 minutes, refused ones included
+    if (err.messageCode === 'modTooFast') throw new UserError('modRaidTooFast', {}, 'Twitch allows 10 raid tries per 10 minutes — try again in a few minutes.');
     if (err.status === 409) throw new UserError('modRaidBusy', {}, 'A raid is already on its way — cancel it first.');
     if (err.status === 404) throw new UserError('modUserNotFound', { login: user.login }, `No Twitch user named "${user.login}".`);
     if (err.status === 400 && /block|accept/i.test(err.reason)) throw new UserError('modRaidRefused', { name }, `${name} doesn't accept raids from your channel.`);

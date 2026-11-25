@@ -66,6 +66,7 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 - 交給點歌系統管理的項目，換裝和特效的設定現在也會跟著換到複本（之前只有點歌和隨機點歌會）。
 - 手機上的分頁列改成可以左右滑動，不會把分頁名稱擠成直的。
 - 暫停清單、🤖 定時訊息、🔔 通知和 🎭 標記心情的時間，現在跟著控制台的語言顯示（之前跟著 Windows 的語言）。
+- 揪團次數用完時，現在會說明 Twitch 每 10 分鐘只能揪團 10 次（被拒絕的也算），而不是只說「操作太頻繁」；被拒絕的揪團也會記在紀錄裡。
 - 雷虎練唱台排隊的工作很多時（例如直播中它暫停背景處理），排在第 30 個以後的歌在歌單卡片上會顯示成失敗；現在只有雷虎練唱台
   真的回報錯誤才算失敗，其他都顯示處理中。
 - 雷虎練唱台 2.3.1 起，YouTube 下載預設關閉：點歌系統會說明怎麼開啟（在雷虎練唱台 3 秒內點左上角標題五下），開啟前不會匯入，
@@ -145,6 +146,8 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
   main use does.
 - Times in the held list, 🤖 timers, 🔔 alerts and 🎭 mood tagging now follow the dashboard's language (before,
   Windows' language).
+- When raids run out, the dashboard now says Twitch allows 10 raid tries per 10 minutes, refused ones included
+  (before, just "too many requests"). Refused raids are also written to the log.
 - A reward handed over to the app now keeps its outfit and effect settings on the copy too (before, only song
   request and random song did).
 - On a phone the tab bar scrolls sideways instead of squeezing the tab names into a column.

@@ -87,6 +87,8 @@ test('raids, cancels, and says why not', async () => {
   await assert.rejects(chatMod.raid('kuma'), { messageCode: 'modRaidBusy' });
   fakeTwitch(() => twitchError(400, 'The targeted channel doesn\'t accept raids from this broadcaster.'));
   await assert.rejects(chatMod.raid('kuma'), { messageCode: 'modRaidRefused', messageParams: { name: 'Kuma' } });
+  fakeTwitch(() => twitchError(429, 'Too Many Requests'));
+  await assert.rejects(chatMod.raid('kuma'), { messageCode: 'modRaidTooFast' }, 'the raid limit, not just "too many requests"');
   fakeTwitch(() => twitchError(404, 'No pending raid'));
   await assert.rejects(chatMod.cancelRaid(), { messageCode: 'modNoRaid' });
 });
