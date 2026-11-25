@@ -39,6 +39,9 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
     Anthropic API 金鑰（使用你自己的 Anthropic 帳號計費，每次選歌約 0.01–0.05 美元）。
   - 「🏷 幫歌曲標記心情」：Claude 讀雷虎練唱台裡的歌詞，幫每首歌記下心情，選歌會更準（整批半價，幾百首約 1–3 美元，做一次就好）。
 - **⚠ 缺少 Twitch 權限的提示**：Twitch 授權是在某項功能加入之前做的，控制台上方會說明哪些功能因此無法使用，並提供「重新授權 →」。
+- **🔊 統一 Clip 音量**：!so 和 !watch 的 Clip 會用差不多的音量播放：太小聲的調大、太大聲的調小，
+  突然很大聲的片段（例如尖叫）會在播放時壓低。Clip 開始前只多等不到 0.1 秒。可以在「💬 聊天室 → ⚙ → Shoutout Clip」關閉。
+  開啟後請在 OBS 重新調一次 Clip 播放器的音量。需要 ffmpeg（裝了雷虎練唱台就有）；沒有的話仍會壓低大聲的片段。
 - **＋ 新增兌換項目**：在「🎟️ 兌換」分頁直接建立新的兌換項目（名稱、點數、用途、說明、是否要輸入文字）。
   由 App 建立，所以一建立就由點歌系統管理（可以完成和退還），不用再「交給點歌系統管理」。
 - **🎟️ 兌換分頁**：頻道上每個兌換項目在這裡設定用途 ——「🎤 點歌」、「🎲 隨機點歌」（和要抽的歌單分頁）、「👕 換裝」或無 ——
@@ -106,6 +109,10 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
     (one batch at half price, roughly US$1–3 for a few hundred songs, once).
 - **⚠ Missing Twitch permissions notice**: when the Twitch authorization is older than a feature that needs it, the
   top of the dashboard says which features can't work and offers **Authorize again →**.
+- **🔊 Even clip volume**: clips from !so and !watch play at about the same volume — quiet ones turned up,
+  loud ones down, and loud moments (a scream) turned down as they play. A clip starts less than 0.1 s later.
+  Turn it off in 💬 Chat → ⚙ → Shoutout clips. Set the clip player's volume in OBS once after updating.
+  Needs ffmpeg (there with Leihu Singsing); without it, loud moments are still turned down.
 - **＋ New reward**: create a reward right in the **🎟️ Rewards** tab (name, points, use, description, whether
   viewers type something). The app makes it, so the app manages it from the start (done and refund) — no
   taking over needed.

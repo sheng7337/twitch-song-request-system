@@ -521,6 +521,18 @@ app.get('/api/hls', async (req, res) => {
 // Downloads all HLS segments server-side and streams them as a single
 // concatenated MPEG-TS blob. The clip player uses a plain <video src> tag —
 // no HLS.js or MSE needed, works in any Chromium 106+ (OBS/Streamlabs CEF).
+// Before sending, ffmpeg measures how loud the clip is (clip-level.js): X-Clip-Level / X-Clip-Gain-Db
+// tell the clip player how far to turn it up or down.
+async function sendClip(res, url, body, type, ext) {
+  const { level, gainDb } = await require('./clip-level').levelFor(url, body, ext);
+  res.set('Content-Type', type);
+  res.set('Content-Length', body.length);
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Expose-Headers', 'X-Clip-Level, X-Clip-Gain-Db');
+  res.set('X-Clip-Level', level);
+  res.set('X-Clip-Gain-Db', String(gainDb));
+  res.send(body);
+}
 app.get('/api/clip-stream', async (req, res) => {
   const { url } = req.query;
   if (!url || !isTwitchHlsUrl(url)) return res.status(403).end();
@@ -533,10 +545,7 @@ app.get('/api/clip-stream', async (req, res) => {
       const r = await axios.get(url, { responseType: 'arraybuffer', headers: { 'Accept': '*/*', 'User-Agent': 'Mozilla/5.0' } });
       const body = Buffer.from(r.data);
       console.log(`[clip-stream] MP4 ${(body.length / 1024 / 1024).toFixed(1)} MB`);
-      res.set('Content-Type', 'video/mp4');
-      res.set('Content-Length', body.length);
-      res.set('Access-Control-Allow-Origin', '*');
-      return res.send(body);
+      return await sendClip(res, url, body, 'video/mp4', 'mp4');
     }
 
     // HLS playlist — fetch segments and concatenate as MPEG-TS
@@ -574,11 +583,7 @@ app.get('/api/clip-stream', async (req, res) => {
     }
     const body = Buffer.concat(chunks);
     console.log(`[clip-stream] ${segmentUrls.length} segments → ${(body.length / 1024 / 1024).toFixed(1)} MB`);
-
-    res.set('Content-Type', 'video/mp2t');
-    res.set('Content-Length', body.length);
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send(body);
+    await sendClip(res, url, body, 'video/mp2t', 'ts');
   } catch (err) {
     console.error('[clip-stream]', err.response?.status ?? 'ERR', err.message);
     if (!res.headersSent) res.status(502).end();
@@ -851,6 +856,7 @@ app.get('/api/settings', (req, res) => {
     chatOverlay: chatOverlaySettings(),
     randomPickMode: songTabs.pickMode(),
     shoutoutClips: require('./newest-clips').clipPool(),
+    clipLevel: require('./clip-level').enabled(),
     practiceTab: songTabs.practiceTab(),
     sheetTabs: require('./sheets').getTabs(),
     ...look.read(),   // themes and text sizes (look.js)
@@ -940,6 +946,12 @@ app.post('/api/settings', async (req, res) => {
   if (req.body.leihuAutoPrepare !== undefined) {
     updates.leihuAutoPrepare = !!req.body.leihuAutoPrepare;
     setupRouter.writeEnvValues({ LEIHU_AUTO_PREPARE: updates.leihuAutoPrepare ? '1' : '0' });
+  }
+
+  // Clips' volume evened out (clip-level.js); off: they play as they are
+  if (req.body.clipLevel !== undefined) {
+    updates.clipLevel = !!req.body.clipLevel;
+    setupRouter.writeEnvValues({ CLIP_LEVEL: updates.clipLevel ? '1' : '0' });
   }
 
   if (req.body.songNotes !== undefined) {

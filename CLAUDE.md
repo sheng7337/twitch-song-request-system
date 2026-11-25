@@ -51,6 +51,8 @@ vtuber-song-queue/
 │                          watchdog, re-subscribes a half-subscribed session, setReconnectHandler({ since })
 │                          after a drop (index.js: stream-session refresh + redemptions.missedSince → replayRedemption)
 │   ├── twitch-clips.js    Clip lookup + signed playback URLs for !so / !watch
+│   ├── clip-level.js      Clips' talking level (median ebur128 short-term, silence out) on /api/clip-stream's buffer → X-Clip-Gain-Db (to -18 LUFS);
+│   │                      the clip player adds the gain + compressor + limiter (Web Audio). CLIP_LEVEL=0 off
 │   ├── setup-routes.js    All /setup/api/* endpoints for the web setup wizard
 │   ├── request-guard.js   Blocks cross-site and DNS-rebinding requests (HTTP + WebSocket)
 │   ├── sheets.js          Reads song list from Google Sheets, caches to song-cache.json

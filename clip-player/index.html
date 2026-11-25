@@ -21,6 +21,7 @@
 
   /* ── Full-screen media elements ── */
   #clip-video,
+  #clip-video-plain,
   #embed-frame {
     position: absolute;
     inset: 0;
@@ -32,7 +33,7 @@
     border: none;
   }
 
-  #clip-video { object-fit: cover; }
+  #clip-video, #clip-video-plain { object-fit: cover; }
 
   /* ── Overlay (fades in/out with each clip) ── */
   #overlay {
@@ -318,6 +319,8 @@
 <body>
 
 <video id="clip-video" playsinline></video>
+<!-- a video file from another site (!watch <link>): the browser won't let its sound through the level chain -->
+<video id="clip-video-plain" playsinline></video>
 <iframe id="embed-frame" frameborder="0"
   allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
   allowfullscreen></iframe>
@@ -357,7 +360,9 @@
 
 <script>
   const overlay    = document.getElementById('overlay');
-  const videoEl    = document.getElementById('clip-video');
+  const mainVideo  = document.getElementById('clip-video');         // clips from the app: through the level chain
+  const plainVideo = document.getElementById('clip-video-plain');   // files from other sites: as they are
+  let videoEl = mainVideo;
   const iframeEl   = document.getElementById('embed-frame');
   const badgeEl    = document.getElementById('badge-label');
   const creditEl   = document.getElementById('credit-name');
@@ -370,6 +375,55 @@
   let clearTimer = null;
   let ws = null;
   let currentMediaId = null; // echoed back so the server can ignore stale end signals
+  let loadToken = 0;         // a clip still loading when the next one (or !stop) comes is dropped
+  let blobUrl = null;
+
+  // ── Clip volume (server/clip-level.js) ──────────────────────────────────────
+  // The app measures each clip (ffmpeg) and says how far to turn it up or down; here that gain, then a
+  // compressor that turns down loud moments (a scream) and a limiter that keeps peaks below -1 dBFS.
+  // Web Audio's compressor adds its own make-up gain ((1 / gain at 0 dB)^0.6); the gain after each takes
+  // it back off, so speech stays where the measurement put it. Until the page may play sound (an
+  // ordinary browser tab before a click) the clip plays as it is; in OBS it always may.
+  const LEVEL = {
+    squash: { threshold: -10, knee: 0, ratio: 6, attack: 0.003, release: 0.3 },   // speech peaks barely; a scream ~10+ dB
+    limit:  { threshold: -1, knee: 0, ratio: 20, attack: 0.001, release: 0.1 },
+  };
+  const makeUpDb = (c) => -0.6 * (c.threshold - c.threshold / c.ratio);   // hard knee: gain at 0 dB in
+  const dbToGain = (db) => Math.pow(10, db / 20);
+  let audioCtx = null, chain = null;
+  try { audioCtx = new AudioContext(); } catch (_) {}
+  function levelChain() {
+    if (chain) return chain;
+    if (!audioCtx) return null;
+    if (audioCtx.state !== 'running') { audioCtx.resume().catch(() => {}); return null; }
+    try {
+      const node = (opts) => {
+        const c = audioCtx.createDynamicsCompressor();
+        for (const k of Object.keys(opts)) c[k].value = opts[k];
+        return c;
+      };
+      const gain = audioCtx.createGain();
+      const squash = node(LEVEL.squash), back1 = audioCtx.createGain();
+      const limit = node(LEVEL.limit), back2 = audioCtx.createGain();
+      audioCtx.createMediaElementSource(mainVideo)
+        .connect(gain).connect(squash).connect(back1).connect(limit).connect(back2).connect(audioCtx.destination);
+      chain = { gain, squash, back1, limit, back2 };
+    } catch (_) { return null; }
+    return chain;
+  }
+  // level: 'on' / 'unmeasured' (no gain, still the compressor and limiter) / 'off' (as it is)
+  function applyLevel(level, gainDb) {
+    const c = levelChain();
+    if (!c) return;
+    const on = level !== 'off';
+    c.gain.gain.value = on ? dbToGain(Math.max(-20, Math.min(12, Number(gainDb) || 0))) : 1;
+    for (const [n, back, opts] of [[c.squash, c.back1, LEVEL.squash], [c.limit, c.back2, LEVEL.limit]]) {
+      n.threshold.value = on ? opts.threshold : 0;
+      n.ratio.value = on ? opts.ratio : 1;
+      back.gain.value = on ? dbToGain(-makeUpDb(opts)) : 1;
+    }
+  }
+  window.__clipLevel = { LEVEL, makeUpDb };   // for checking the chain offline
 
   function sendToServer(msg) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -383,12 +437,12 @@
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
     if (clearTimer)   { clearTimeout(clearTimer);   clearTimer = null; }
 
-    // Reset both media elements before loading new content
-    videoEl.onended = null;
-    videoEl.style.opacity = '0';
+    // Reset the media elements before loading new content
+    const token = ++loadToken;
+    for (const v of [mainVideo, plainVideo]) { v.onended = null; v.style.opacity = '0'; v.src = ''; }
+    if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
     iframeEl.style.opacity = '0';
     iframeEl.src = '';
-    videoEl.src  = '';
 
     // labelKey in the overlay language; older servers only send the English label
     badgeEl.textContent  = msg.labelKey && I18N.has('clip.' + msg.labelKey) ? I18N.t('clip.' + msg.labelKey) : (msg.label || I18N.t('clip.shoutout'));
@@ -411,13 +465,38 @@
       dismissTimer = setTimeout(() => hideMedia(true), timeout);
       startProgressBar(timeout);
     } else {
-      videoEl.src = msg.src;
-      videoEl.play().catch(() => {});
-      videoEl.style.opacity = '1';
-      videoEl.onended = () => hideMedia(true);
       const durationMs = (msg.duration || 30) * 1000;
+      const play = (src) => {
+        videoEl.src = src;
+        videoEl.play().catch(() => {});
+        videoEl.style.opacity = '1';
+        videoEl.onended = () => hideMedia(true);
+        if (dismissTimer) clearTimeout(dismissTimer);
+        dismissTimer = setTimeout(() => hideMedia(true), durationMs + 3000);
+        startProgressBar(durationMs);
+      };
+      // Until it plays: as long as the clip would take, in case loading never ends
       dismissTimer = setTimeout(() => hideMedia(true), durationMs + 3000);
-      startProgressBar(durationMs);
+      const fromApp = new URL(msg.src, location.href).origin === location.origin;
+      videoEl = fromApp ? mainVideo : plainVideo;
+      if (!fromApp) { play(msg.src); }
+      else {
+        // The response says how loud the clip is; the clip plays from memory, already downloaded
+        fetch(msg.src).then(async (r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          const level = r.headers.get('X-Clip-Level') || 'unmeasured';
+          const gainDb = r.headers.get('X-Clip-Gain-Db');
+          const blob = await r.blob();
+          if (token !== loadToken) return;
+          applyLevel(level, gainDb);
+          blobUrl = URL.createObjectURL(blob);
+          play(blobUrl);
+        }).catch(() => {
+          if (token !== loadToken) return;
+          applyLevel('unmeasured', 0);
+          play(msg.src);
+        });
+      }
     }
 
     overlay.classList.add('visible');
@@ -434,13 +513,18 @@
   // notifyServer=true  → natural end / timeout, tell server to advance the queue
   // notifyServer=false → !stop command cleared the queue server-side already
   function hideMedia(notifyServer) {
+    loadToken++;   // a clip still loading doesn't start after this
     overlay.classList.remove('visible');
-    videoEl.style.opacity = '0';
+    for (const v of [mainVideo, plainVideo]) { v.style.opacity = '0'; v.onended = null; }
     iframeEl.style.opacity = '0';
-    videoEl.onended = null;
     iframeEl.onload = null;
     if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
-    clearTimer = setTimeout(() => { clearTimer = null; videoEl.src = ''; iframeEl.src = ''; }, 500);
+    clearTimer = setTimeout(() => {
+      clearTimer = null;
+      for (const v of [mainVideo, plainVideo]) v.src = '';
+      iframeEl.src = '';
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+    }, 500);
     if (notifyServer) notifyEnded();
   }
 

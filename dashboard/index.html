@@ -1325,6 +1325,11 @@
         </select>
       </label>
       <p class="setting-hint" data-i18n="dash.chat.soClipsHint"></p>
+      <label class="setting">
+        <input type="checkbox" id="clip-level" checked onchange="saveClipLevel()" />
+        <span data-i18n="dash.chat.clipLevel">🔊 Even out clip volume</span>
+      </label>
+      <p class="setting-hint" data-i18n="dash.chat.clipLevelHint"></p>
     </section>
     <!-- !endingtk (server/ending-credits.js) -->
     <section>
@@ -2133,6 +2138,7 @@ async function loadSettings() {
     cooldownDays = settings.randomCooldownDays;
     document.getElementById('pick-mode').value = settings.randomPickMode || 'weighted';
     document.getElementById('so-clips').value = settings.shoutoutClips || 'newest';
+    document.getElementById('clip-level').checked = settings.clipLevel !== false;
     sheetTabs = { all: settings.sheetTabs || [], practice: settings.practiceTab || '' };
     paintSheetTabs();
     paintRewards();   // 🎤 / 🎲 rewards' tab ticks
@@ -2304,6 +2310,21 @@ async function saveShoutoutClips() {
     showToast(t('dash.toast.soClipsSet', { name: sel.options[sel.selectedIndex].text }));
   } catch(_) {
     showToast(t('dash.toast.soClipsFailed'), true);
+  }
+}
+
+async function saveClipLevel() {
+  const box = document.getElementById('clip-level');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clipLevel: box.checked }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    showToast(t(box.checked ? 'dash.toast.clipLevelOn' : 'dash.toast.clipLevelOff'));
+  } catch(_) {
+    box.checked = !box.checked;
+    showToast(t('dash.toast.clipLevelFailed'), true);
   }
 }
 
