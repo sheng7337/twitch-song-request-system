@@ -3139,6 +3139,11 @@ function markWords(text, words) {
   return String(text).split(re).map((s, i) => i % 2 ? `<mark>${esc(s)}</mark>` : esc(s)).join('');
 }
 
+// A time of day in the dashboard's language ("11:40 PM" / "下午11:40"), not Windows'
+function clockTime(at) {
+  return new Date(at).toLocaleTimeString(I18N.getLang(), { hour: '2-digit', minute: '2-digit' });
+}
+
 function chatTime(at) {
   const d = new Date(at);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -4224,6 +4229,9 @@ I18N.onChange(() => {
   if (currentTab === 'alerts') { paintAlerts(); paintEffects(); }
   paintLook();
   paintSheetTabs();
+  paintWaiting();   // the held list's times
+  if (currentTab === 'bot') paintBot();
+  if (moodView.status) paintMood();
 });
 
 // ── 🔔 Alerts (server/alerts.js, overlay/alerts.html) ──────────────────────────
@@ -4251,7 +4259,7 @@ function paintMood() {
   document.querySelector('[data-mood="clear-key"]').hidden = !st.hasKey;
   const job = st.job;
   document.getElementById('mood-tag-state').textContent = job
-    ? t('dash.mood.tagging', { n: job.count, time: new Date(job.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+    ? t('dash.mood.tagging', { n: job.count, time: clockTime(job.startedAt) })
     : t('dash.mood.tagged', { n: st.tagged, total: st.songs })
       + (st.lastJob && st.lastJob.failed ? ' · ' + t('dash.mood.tagFailed', { n: st.lastJob.failed }) : '');
   const tagBtn = document.querySelector('[data-mood="tag"]');
@@ -4338,7 +4346,7 @@ function botTimerNext(tm) {
   if (!tm.on) return t('dash.bot.timerOff');
   if (!tm.message) return t('dash.bot.timerEmpty');
   if (tm.liveOnly && !st.live) return t('dash.bot.timerWaitsLive');
-  const when = new Date(Math.max(tm.dueAt, Date.now())).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const when = clockTime(Math.max(tm.dueAt, Date.now()));
   const lines = tm.minLines ? ' · ' + t('dash.bot.timerLines', { n: Math.min(tm.lines, tm.minLines), min: tm.minLines }) : '';
   return t('dash.bot.timerNext', { time: when }) + lines;
 }
@@ -4523,7 +4531,7 @@ function paintAlerts() {
     return html + '</div>';
   }).join('');
   document.getElementById('al-recent').innerHTML = st.recent.length ? st.recent.map(a => {
-    const time = new Date(a.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = clockTime(a.at);
     const amount = ALERT_AMOUNT[a.kind] && a[ALERT_AMOUNT[a.kind]] ? ` · ${a[ALERT_AMOUNT[a.kind]]} ${t('dash.alerts.unit.' + a.kind)}` : '';
     return `<div class="al-recent-row"><span class="st">${esc(time)}</span><span>${ALERT_ICONS[a.kind] || ''} ${esc(a.name || t('dash.alerts.anonymous'))}${esc(amount)}</span>`
       + (a.big ? `<span class="chat-tag">${esc(t('dash.alerts.big'))}</span>` : '') + (a.test ? `<span class="chat-tag">${esc(t('dash.alerts.testTag'))}</span>` : '')
@@ -5004,7 +5012,7 @@ function paintWaiting(flash = false) {
   panel.innerHTML = held.list.map(w => `
     <div class="held-row">
       <span class="held-title">${esc(w.title)}</span>
-      <span class="held-meta">${esc(w.from)} · ${esc(new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</span>
+      <span class="held-meta">${esc(w.from)} · ${esc(clockTime(w.at))}</span>
       <span class="held-actions">
         <button class="chip" type="button" data-held-play="${w.id}">${esc(t('dash.held.play'))}</button>
         <button class="chip" type="button" data-held-drop="${w.id}" title="${esc(t('dash.held.dropTip'))}">${esc(t('dash.held.drop'))}</button>
