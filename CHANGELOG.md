@@ -13,7 +13,7 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 ### 繁體中文
 
-**搭配**：Node.js LTS · 雷虎練唱台 1.6.x–2.3.x（以 2.3.4 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30
+**搭配**：Node.js LTS · 雷虎練唱台 1.6.x–2.3.x（以 2.3.5 確認過）· 模式需要 Streamlabs Desktop 或 OBS Studio 30
 以上 · 換裝需要 veadotube mini 2.1 以上。
 
 #### ⚠ 需要動手
@@ -85,7 +85,7 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 
 ### English
 
-**Works with:** Node.js LTS · Leihu Singsing 1.6.x–2.3.x (checked with 2.3.4) · for modes, Streamlabs
+**Works with:** Node.js LTS · Leihu Singsing 1.6.x–2.3.x (checked with 2.3.5) · for modes, Streamlabs
 Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 
 #### ⚠ Action needed
