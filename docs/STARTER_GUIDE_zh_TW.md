@@ -271,9 +271,9 @@ Node.js 是點歌系統執行時需要的程式，裝一次就好。
 ## 11. 進階功能（選用）
 
 - **雷虎練唱台**（[Leihu Singsing](https://github.com/LeihuTW/Leihu-singsing)）：另一個免費程式，把 YouTube 影片做成去人聲伴奏和歌詞，可以調 KEY。裝在同一台電腦就會自動連上，控制台的「雷虎練唱台」分頁就會顯示它。試算表的 **YTLink** 欄就是給它用的：「雷虎練唱台」分頁的「⚙ 設定」→「① 幫每首歌找 YouTube 連結」→「🔗 找 YouTube 連結」可以自動幫你填
-- **在聊天室發言、禁言／封鎖／Shoutout／揪團／置頂（點觀眾的名字）、完成或退還兌換、把在 Twitch 建立的兌換項目交給系統管理** —— 見 [SETUP_zh_TW.md](../SETUP_zh_TW.md) 的「聊天室分頁」
-- **模式（🎤 唱歌／💬 聊天／☕ 休息）：按一下切換 Streamlabs Desktop 或 OBS 的場景、顯示項目和音訊，並暫停 Clip、在聊天室發言** —— 見 [SETUP_zh_TW.md](../SETUP_zh_TW.md) 的「模式」
-- 完整功能說明：[SETUP_zh_TW.md](../SETUP_zh_TW.md)
+- **在聊天室發言、禁言／封鎖／Shoutout／揪團／置頂（點觀眾的名字）、完成或退還兌換、把在 Twitch 建立的兌換項目交給系統管理** —— 見「[💬 聊天室](tabs/chat_zh_TW.md)」和「[🎟️ 兌換](tabs/rewards_zh_TW.md)」
+- **模式（🎤 唱歌／💬 聊天／☕ 休息）：按一下切換 Streamlabs Desktop 或 OBS 的場景、顯示項目和音訊，並暫停 Clip、在聊天室發言** —— 見「[🎛 模式](tabs/modes_zh_TW.md)」
+- 每個分頁怎麼用：[docs/README_zh_TW.md](README_zh_TW.md)（或控制台的「**❓**」）。安裝和問題排解：[SETUP_zh_TW.md](../SETUP_zh_TW.md)
 
 ---
 

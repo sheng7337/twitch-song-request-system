@@ -206,6 +206,7 @@
   .tab.dock-btn { margin-left: auto; }
   .tab.dock-btn[aria-pressed="true"] { color: var(--accent); }
   .tab.dock-btn[hidden] { display: none; }
+  .tab.dock-btn[hidden] + .help-btn { margin-left: auto; }
   .chat-view { flex: 1; background: var(--bg-panel); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; position: relative; }
   .chat-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .chat-tools input[type="search"] {
@@ -1148,6 +1149,8 @@
   <button class="tab" role="tab" id="tabbtn-bot" data-tab="bot" aria-controls="tab-bot" onclick="showTab('bot')" data-i18n="dash.tab.bot">🤖 Bot</button>
   <!-- The chat beside the other tabs: open / close (placeChat) -->
   <button class="tab dock-btn" id="dock-btn" type="button" onclick="toggleChatDock()" aria-pressed="false">💬<span class="tab-count" id="dock-unread" hidden></span> <span id="dock-arrow">◂</span></button>
+  <!-- ❓ How the open tab works: its page in docs/tabs, in the dashboard's language (openHelp) -->
+  <button class="tab help-btn" id="help-btn" type="button" onclick="openHelp()" data-i18n-title="dash.helpTip" data-i18n-aria-label="dash.helpTip">❓</button>
 </nav>
 
 <!-- Node.js lacks security fixes (server/node-check.js). Closing it hides it until the page is opened again. -->
@@ -2106,13 +2109,23 @@ async function loadHistory() {
   } catch(_) {}
 }
 
-// This copy's version, in the Song Queue ⚙ and on the title's hover
+// This copy's version, in the Song Queue ⚙ and on the title's hover; ❓ opens the docs of this version
+let appVersion = '';
 async function loadVersion() {
   try {
     const { version } = await (await fetch('/api/version')).json();
+    appVersion = version;
     document.getElementById('app-version').textContent = version;
     document.querySelector('.topbar-title').title = version;
   } catch(_) {}
+}
+
+// ❓ The open tab's page (docs/tabs/<tab>.md, _zh_TW in 中文) on GitHub, at this copy's release tag, so it
+// describes the version that's running
+function openHelp() {
+  const ref = /^\d{4}\.\d{2}-\d+$/.test(appVersion) ? 'v' + appVersion : 'master';
+  const page = currentTab + (I18N.getLang() === 'en' ? '' : '_zh_TW');
+  window.open(`https://github.com/sheng7337/twitch-song-request-system/blob/${ref}/docs/tabs/${page}.md`, '_blank', 'noopener');
 }
 
 let nodeStatus = null;

@@ -60,6 +60,17 @@ positions and audio — and can hold clips, post in chat and switch the dashboar
   the most active chatters.
 - **Raid with the ending roll**: the roll is timed so the raid goes 10 seconds after it ends.
 
+### 🎭 Mood requests (情境點歌)
+A viewer writes how they feel; Claude (Anthropic's AI) picks a song from your list and writes a line for chat, in 中文
+and English. Nothing goes out before you've read it. Uses your own Anthropic API key (about US$0.01–0.05 a pick).
+
+### 🤖 Chat bot (instead of Nightbot)
+Your own commands (`!歌單` → your song sheet's link) with variables and cooldowns, and timed messages that wait until
+chat has moved on. They post as your account.
+
+### 📱 Prompter
+Leihu's lyrics as they play and the chat, on a tablet behind the mic shield.
+
 ### 👕 Outfits (veadotube mini)
 Viewers redeem a reward, a card pops up, and you click the outfit to wear; it can go back to your default after a few minutes.
 
@@ -96,7 +107,7 @@ and adjustable text sizes that keep the layout. The dashboard works on a phone t
 
 **Updating**: read **⚠ Action needed** in [the latest release](https://github.com/sheng7337/twitch-song-request-system/releases/latest), then follow [Updating to a new version](docs/STARTER_GUIDE.md#12-updating-to-a-new-version) — your settings aren't overwritten.
 
-> The full guide is [SETUP.md](SETUP.md); setting up by hand without the wizard: [SETUP_MANUAL.md](SETUP_MANUAL.md).
+> How each tab works: [docs/README.md](docs/README.md). Installing and configuration: [SETUP.md](SETUP.md); setting up by hand without the wizard: [SETUP_MANUAL.md](SETUP_MANUAL.md).
 
 ---
 

@@ -64,6 +64,9 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
 - **📱 提詞機：在平板上看歌詞和聊天室**：給防噴罩擋住螢幕時用。平板或手機（和電腦連同一個 Wi-Fi）開 `http://<這台電腦>:3000/prompter`，
   會顯示雷虎練唱台正在播的歌詞（跟著唱的位置上色）、歌曲進度條和聊天室；直放時聊天室在下面，橫放時在右邊。
   歌詞和聊天室的字可以各自放大縮小，也可以隱藏聊天室。只是顯示，不會改到雷虎練唱台或直播。網址在「🎤 雷虎練唱台 → ⚙」。
+- **📖 每個分頁的使用說明**：控制台每個分頁現在都有自己的說明頁（[docs/README_zh_TW.md](docs/README_zh_TW.md)），另外還有 🎭 情境點歌、
+  🎬 Clip 和感謝名單、🖼 疊加層的說明。分頁列右邊的「**❓**」會打開目前分頁的說明（跟著控制台的語言）。`SETUP_zh_TW.md` 現在只放安裝、
+  設定和問題排解。
 
 #### 修正
 
@@ -151,6 +154,9 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
   same Wi-Fi, open `http://<this PC>:3000/prompter`: Leihu's lyrics as they play (filled as you sing), the song's
   progress and the chat — below in portrait, beside in landscape. Lyrics and chat each have their own text size, and
   the chat can be hidden. It only shows; nothing on it changes Leihu or the stream. Its address: 🎤 Leihu → ⚙.
+- **📖 A how-to page for each tab**: every dashboard tab now has its own page ([docs/README.md](docs/README.md)), plus
+  pages for 🎭 mood requests, 🎬 clips and rolls, and 🖼 overlays. **❓** at the right of the tab bar opens the page of the
+  tab you're on (in the dashboard's language). `SETUP.md` is now installing, configuration and fixing problems only.
 
 #### Fixes
 

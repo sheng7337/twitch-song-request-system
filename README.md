@@ -54,6 +54,16 @@
 - `!tk` 感謝名單、`!endingtk` 片尾名單：揪團、訂閱、小奇點、新追隨、兌換、點歌和最活躍的觀眾。
 - **搭配片尾名單揪團**：系統算好時間播片尾名單，名單結束 10 秒後剛好出發。
 
+### 🎭 情境點歌
+觀眾寫下心情，Claude（Anthropic 的 AI）從你的歌單挑一首，並寫一句要發到聊天室的話（中文和英文）。你看過才會送出。
+使用你自己的 Anthropic API 金鑰（每次選歌約 0.01–0.05 美元）。
+
+### 🤖 聊天機器人（取代 Nightbot）
+自己的指令（`!歌單` → 歌單試算表連結），有變數和冷卻時間；定時訊息會等聊天室有人講話才發。用你的帳號發言。
+
+### 📱 提詞機
+在防噴罩後面的平板上看雷虎練唱台正在播的歌詞和聊天室。
+
 ### 👕 換裝（veadotube mini）
 觀眾兌換獎勵後跳出卡片，點一下要穿的衣服；可以設定幾分鐘後換回預設服裝。
 
@@ -90,7 +100,7 @@
 
 **更新到新版本**：到[最新版本](https://github.com/sheng7337/twitch-song-request-system/releases/latest)先看「⚠ 需要動手」，再照[新手入門第 12 章](docs/STARTER_GUIDE_zh_TW.md#12-更新到新版本)的步驟 —— 你的設定不會被覆蓋。
 
-> 完整說明請見 [SETUP_zh_TW.md](SETUP_zh_TW.md)；不用安裝精靈的手動設定見 [SETUP_MANUAL.md](SETUP_MANUAL.md)。
+> 每個分頁怎麼用：[docs/README_zh_TW.md](docs/README_zh_TW.md)。安裝和設定：[SETUP_zh_TW.md](SETUP_zh_TW.md)；不用安裝精靈的手動設定見 [SETUP_MANUAL.md](SETUP_MANUAL.md)。
 
 ---
 

@@ -294,9 +294,9 @@ channel and type a title. It shows up on the dashboard within seconds.
   dashboard's **Leihu Singsing** tab shows it. The sheet's **YTLink** column is for it: that tab's
   **⚙ Settings → ① Find a YouTube link for each song → 🔗 Find YouTube links** can fill it for you
 - **Posting in chat; timeout, ban, Shoutout, raid and pin buttons (click a viewer's name); completing /
-  refunding redemptions; handing a reward made on Twitch over to the app**: see "Chat tab" in [SETUP.md](../SETUP.md)
-- **Modes (🎤 Singing / 💬 Talking / ☕ Break): one click switches Streamlabs Desktop or OBS (scene, what shows, sounds), holds clips and posts in chat**: see "Modes" in [SETUP.md](../SETUP.md)
-- Everything else: [SETUP.md](../SETUP.md)
+  refunding redemptions**: see [💬 Chat](tabs/chat.md); **handing a reward made on Twitch over to the app**: [🎟️ Rewards](tabs/rewards.md)
+- **Modes (🎤 Singing / 💬 Talking / ☕ Break): one click switches Streamlabs Desktop or OBS (scene, what shows, sounds), holds clips and posts in chat**: see [🎛 Modes](tabs/modes.md)
+- How each tab works: [docs/README.md](README.md) (or **❓** in the dashboard). Installing and fixing problems: [SETUP.md](../SETUP.md)
 
 ---
 

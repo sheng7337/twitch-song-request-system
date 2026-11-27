@@ -128,11 +128,13 @@ vtuber-song-queue/
 ├── tools/find-videos.py   Lyric-site + YouTube search, run with Leihu Singsing's bundled Python
 ├── tools/make-song-template.py  Builds docs/song-list-template.xlsx (standard library only)
 ├── docs/                  Starter guide (STARTER_GUIDE.md / _zh_TW.md, images/), song-list-template.xlsx;
-│                          served at /docs (the wizard links the template)
+│                          served at /docs (the wizard links the template). How-to pages: docs/README(_zh_TW).md,
+│                          docs/tabs/<data-tab>(_zh_TW).md (the dashboard's ❓ opens these by tab name),
+│                          docs/features/ (mood-requests, clips-and-rolls, overlays)
 ├── tools/build-han-readings.js  Rebuilds server/data/han-readings.json from Unihan_Readings.txt
 ├── start.ps1 / start_zh.ps1   Every-stream startup: starts server, opens browser when ready
 ├── *.bat                  Double-click launchers (avoid PowerShell execution-policy issues)
-├── SETUP.md / SETUP_zh_TW.md / SETUP_MANUAL.md   User guides (docs/STARTER_GUIDE*.md for newcomers)
+├── SETUP.md / SETUP_zh_TW.md / SETUP_MANUAL.md   Install, configuration, troubleshooting (how tabs work: docs/)
 ├── SKILL.md               Notes on Twitch/Google APIs and PowerShell gotchas
 └── .env.example           All environment variable descriptions (pure ASCII)
 ```
@@ -782,6 +784,9 @@ rewards → history sheet (optional) → OBS instructions → done.
   the same Twitch scopes
 - docs/STARTER_GUIDE*.md walk newcomers through the wizard with screenshots (docs/images, taken with
   fake data): when a wizard step or dashboard label changes, update the guide text (and screenshots)
+- A feature change updates its page in docs/tabs or docs/features, in both languages (same outline: what it's
+  for · set up once · during a stream · ⚙ settings · when something goes wrong). A new tab needs
+  docs/tabs/<data-tab>.md and _zh_TW.md, or its ❓ opens a missing page
 - validate-sheet turns two common first-time errors into plain messages: an .xlsx opened from Drive
   (`sheetIsExcel`) and the Sheets API not enabled (`sheetsApiOff`)
 

@@ -1,7 +1,8 @@
 # 🎵 VTuber Song Queue — Setup Guide
 
 > **New here, with no song list yet?** Start with the [Starter Guide](docs/STARTER_GUIDE.md): every step from
-> scratch, including making your song list. This page is the full reference.
+> scratch, including making your song list. This page is installing, configuration and fixing problems; how each
+> dashboard tab works is in [docs/README.md](docs/README.md).
 
 ## How it works
 
@@ -66,60 +67,49 @@ If you're interrupted partway through, it picks up where you left off.
 
 That's it — no ngrok, no URLs to copy, no `.env` to update. The script starts the
 server and opens the dashboard in a window of its own: a separate copy of Chrome (or Edge), so OBS
-can take Leihu Singsing's sound from it alone (see Leihu Singsing below). Logins and bookmarks of your
+can take Leihu Singsing's sound from it alone (see [Leihu's sound in OBS](docs/tabs/leihu.md#leihus-sound-in-obs)). Logins and bookmarks of your
 usual browser aren't in it; the dashboard needs none. Until setup is done, and on a PC without
 Chrome or Edge, it opens your usual browser instead.
 
 ---
 
-## OBS / Streamlabs Browser Source
+## Using the dashboard
 
-### Song overlay
+Open `http://localhost:3000/dashboard` (`start.bat` opens it for you). How each tab works is on its own page;
+**❓** at the right of the tab bar opens the page of the tab you're on. All pages: [docs/README.md](docs/README.md).
 
-Add the overlay to your scene — do this once:
+| Tab | Page |
+|---|---|
+| 🎵 Song Queue | [docs/tabs/queue.md](docs/tabs/queue.md): panels, Pending Review, matching, random picks, practice tab |
+| 🎤 Leihu Singsing | [docs/tabs/leihu.md](docs/tabs/leihu.md): backing tracks, YouTube link finder, 📱 prompter, Leihu's sound in OBS |
+| 💬 Chat | [docs/tabs/chat.md](docs/tabs/chat.md): to announce, posting, moderating, Shoutout, Raid, Pin |
+| 🎛 Modes | [docs/tabs/modes.md](docs/tabs/modes.md): connecting Streamlabs / OBS, making and editing modes |
+| 👕 Outfits | [docs/tabs/outfits.md](docs/tabs/outfits.md): veadotube mini |
+| 🔔 Alerts | [docs/tabs/alerts.md](docs/tabs/alerts.md): alerts and 🎟️ reward effects |
+| 🎟️ Rewards | [docs/tabs/rewards.md](docs/tabs/rewards.md): each reward's use, new rewards, handing rewards over |
+| 🤖 Bot | [docs/tabs/bot.md](docs/tabs/bot.md): commands and timers, instead of Nightbot |
 
-1. In OBS/Streamlabs, add a new source → **Browser**
-2. URL: `http://localhost:3000/overlay/index.html`
-3. Width: `960`, Height: `1470` (the overlay renders at 2× for sharpness)
-4. Paste this into the **Custom CSS** field:
-   ```css
-   body { background-color: rgba(0, 0, 0, 0) !important; margin: 0px auto; overflow: hidden; }
-   ```
-5. Uncheck **"Shutdown source when not visible"**
-6. In your scene, select the source and resize it down to `480 x 735` (50%) —
-   this is what makes the 2× render look sharper instead of just bigger
+Across tabs: [🎭 Mood requests](docs/features/mood-requests.md) ·
+[🎬 Clips, rolls and raids](docs/features/clips-and-rolls.md) (chat commands, `!tk` backgrounds, clip volume) ·
+[🖼 Overlays and 🎨 Look](docs/features/overlays.md).
 
-The overlay connects automatically when the server is running and updates live.
-Its language (English or 繁體中文) is set in the dashboard: **🎨 Look & overlays** (top) → **Overlay language**.
+---
 
-### Clip player (shoutouts / sponsor roll)
+## OBS / Streamlabs Browser Sources
 
-1. Add a new source → **Browser**
-2. URL: `http://localhost:3000/clip-player/index.html`
-3. Width: `1920`, Height: `1080`
-4. Put it at the top of the scene, covering the whole screen
-5. It stays fully transparent, and shows content only for `!so`, `!watch`, `!tk` and `!endingtk`
+Add each as a **Browser** source; every address starts with `http://localhost:3000`. Details, Custom CSS and
+sizes: [Overlays](docs/features/overlays.md).
 
-### Chat on stream (instead of OneComme)
+| Source | Address | Size |
+|---|---|---|
+| Song list | `/overlay/index.html` | 960 × 1470, scaled to 50% |
+| Clip player (`!so`, `!watch`, `!tk`, `!endingtk`) | `/clip-player/index.html` | 1920 × 1080, on top |
+| Chat on stream (optional) | `/overlay/chat.html?style=panel` (`bubble`, `list`, `row`) | e.g. 960 × 1080, scaled to 50% |
+| Alerts (optional) | `/overlay/alerts.html?layout=vertical` (or `horizontal`) | 800 × 600 (1600 × 300), scaled to 50% |
+| Reward effects (optional) | `/overlay/reward-effects.html` | 1920 × 1080, on top |
+| On break / Starting soon (optional) | `/overlay/break.html` (`?card=opening`) | 960 × 260, scaled to 50% |
 
-Your Twitch chat on stream: the last messages, newest at the bottom, with badges, emotes and cheers,
-channel-point redemptions and subs / gifts / raids / follows.
-
-1. Add a new source → **Browser**
-2. URL, one of three styles (💬 Chat → ⚙ → **Chat on stream** lists them with **Copy**):
-   - `http://localhost:3000/overlay/chat.html?style=panel` — the song list's look
-   - `http://localhost:3000/overlay/chat.html?style=bubble` — speech bubbles
-   - `http://localhost:3000/overlay/chat.html?style=list` — plain lines with an outline, for over a game or video
-   - `http://localhost:3000/overlay/chat.html?style=row` — one horizontal strip, e.g. along the top of the screen:
-     newest on the right, older messages leave on the left
-3. Any size, e.g. Width `960`, Height `1080` (the row: `3840 × 200`), the same **Custom CSS** as the song overlay
-4. In your scene, scale it to 50% (e.g. `480 × 540`) — it renders at 2× for sharp text
-5. 💬 Chat → ⚙ → **Chat on stream**: how many messages, text size, and whether it shows redemptions,
-   subs / raids / follows, `!commands` and bots. Changes show at once.
-
-Messages a mod deletes, and a timed-out or banned viewer's, leave the stream at once. Moving from
-OneComme: run both for one stream, then remove the OneComme source; modes that showed or hid it
-mark it ⚠ — pick the new chat with **Pick a replacement…**, or press 📥 on the mode.
+The dashboard lists each with **Copy**: 🎨 Look & overlays.
 
 ---
 
@@ -128,7 +118,7 @@ mark it ⚠ — pick the new chat with **Pick a replacement…**, or press 📥 
 ### Song list sheet
 Your existing sheet with songs. Every tab is read. Songs in the **practice tab** (🎵 Song Queue → ⚙ → **Sheet tabs**; `待練勿點` until you choose) can't be requested or drawn, but Leihu prepares them. Which tabs song requests and each random reward take: 🎟️ Rewards tab.
 Share it with the service account email → **Viewer** is enough. The YouTube link finder needs
-**Editor** to save links (see [YouTube link finder](#youtube-link-finder)).
+**Editor** to save links (see [the YouTube link finder](docs/tabs/leihu.md#set-up-once)).
 
 Header row must have at minimum:
 
@@ -158,304 +148,8 @@ Share with service account email → **Editor** access.
 
 ## Chat commands
 
-Mods and the broadcaster only — viewers can't trigger them.
-
-| Command | Description |
-|---|---|
-| `!so <user>` | Sends Twitch's Shoutout (while you're live), plays a random clip of that channel (one of its newest 50, or of its 20 most viewed: Chat tab ⚙ → **Shoutout clips**) and adds it to the sponsor roll |
-| `!tk` | Japanese-TV-style sponsor roll of every channel `!so`'d this stream, then clears the list |
-| `!endingtk` | The same roll for everyone who supported this stream, one heading each: raiders, subscribers (gifters and gifted viewers), cheers, new followers, channel-point redeemers, song requesters and the 8 most active chatters — since the last `!endingtk`. Who it would thank now: Chat tab ⚙ |
-| `!watch <url>` | Plays a Twitch clip, a YouTube video or a video file link (mp4/webm) |
-| `!replay` | Replays the last `!so` / `!watch` |
-| `!stop` | Stops what's playing and clears the waiting clips |
-
-**`!tk` / `!endingtk` backgrounds:** put images (jpg / png / gif / webp) in `clip-player/sponsor-bgs/` and restart
-the server — one is picked at random each time. With no images the background is dark.
-The Japanese voice line is generated on first start (local VoiceVox if running, else Google TTS).
-
----
-
-## Dashboard
-
-Open `http://localhost:3000/dashboard` during streams.
-
-| Feature | Description |
-|---|---|
-| 💬 Chat | Live chat with filters, highlighted messages to announce, a message box and redemption buttons — see [Chat tab](#chat-tab) below |
-| Tabs | 🎵 Song Queue (the panels below) and 🎤 Leihu Singsing — Leihu's own screen inside the dashboard. **⚙ Settings** at the right end of its top row opens Leihu's settings and the two steps that get your song list ready; while those run, their progress shows in the header. `#leihu` in the address opens that tab. Leihu only shows on the PC it runs on. **▶ Start Leihu** there (or "Start Leihu with the song queue") runs Leihu without its own window, so it shows only in this tab |
-| 4 panels (2×2) | Left: Now Playing above Up Next · Right: Pending Review above Played |
-| Drag & drop | Move songs between panels or reorder within |
-| ⚙ Settings | Each tab has its own ⚙ at the right end of its top row: Song Queue — the practice tab, random cooldown and pick, clear the queue; Leihu Singsing — its settings and the two steps; Chat — song notes on the overlay, who `!endingtk` would thank now. Each saves on its own |
-| 🎨 Look & overlays | The button at the top, beside EN / 中文 — one place for what isn't a single tab's: five themes — **Neon** (the original), **Daylight**, **High contrast**, **Ocean**, **Cream & coffee** — chosen apart for the dashboard and for the overlays, and text sizes: the dashboard's (85–140%, the same on every browser and phone that opens it), the song list's and the break card's. Overlays change at once on stream and keep their size in OBS (bigger text, fewer songs in the same space). One overlay in another theme: add `?theme=daylight` (`neon`, `daylight`, `contrast`, `ocean`, `coffee`) to its URL. The chat's text size stays under 💬 Chat → ⚙. Also here: the overlays' panel opacity, brightness and language, each overlay's Browser Source address and size with **Copy**, and the version |
-| EN / 中文 | Switches the dashboard, links page and setup wizard together; the overlays follow **🎨 Look & overlays → Overlay language** |
-| ✓ Finished | Moves Now Playing → Played, pulls next song |
-| Pending column | Weak/unmatched requests — edit and accept manually |
-| 🔍 Find (Pending) | For a song that isn't on your sheet: searches lyric sites and YouTube (needs Leihu Singsing running), then **▶ Queue + prepare** or **＋ Add to** your first excluded tab with its link |
-| Manual request bar | Add songs without Channel Points |
-| History info | Each card shows last request date and requester |
-| Key circle | Shows transposition value (+3, -2, etc.) |
-| ♫ badge · 🎤 Sing | Leihu Singsing status of each song — see below |
-
----
-
-## Chat tab
-
-The 💬 Chat tab shows your Twitch chat live, together with channel-point redemptions, subs, raids and
-follows. It's kept on this PC for `CHAT_LOG_DAYS` days (default 30): pick an earlier day from the date
-list. Messages mods delete show struck through.
-
-- **Chat on every tab:** on the other tabs the live chat also shows in a panel on the right, so you can
-  follow it while working with songs, Leihu or modes. Drag its left edge to resize it; **💬** at the right
-  of the tabs hides or shows it (both remembered). The panel is the live chat only: search, filters and
-  earlier days are here in the Chat tab, and while a filter is on the panel says so (**Show all ✕**). It starts
-  hidden in narrow windows; under 900px wide there is no panel, only this tab.
-
-- **Filters:** songs mentioned, commands, mods & VIPs, subscribers, @mentions, first-time
-  chatters, highlighted messages & bits, redemptions, waiting redemptions, and subs, raids & follows.
-  The search box looks in messages and names. Bots are hidden while **Hide bots** is ticked.
-- **To announce:** what to thank or greet on stream is highlighted in amber, right in the chat — subs,
-  resubs and gifted subs (a gift of several subs as one line), raids, cheers, new followers, watch
-  streaks, channel-point redemptions (not song requests: those go to the queue), highlighted messages, first-time chatters, and each viewer's first message this stream
-  (tagged *first words this stream*; bots and you are left out). **✓** on one removes its highlight
-  (on a redemption it's **✓ Announce**, apart from its **✓ Done**).
-  Changed your mind? Point at the row and click **✓ announced** to highlight it again. In the filter
-  row, **To announce: N ↓** jumps to the oldest one still highlighted (showing all chat if a filter
-  hides it), and **✓ Mark all announced** clears them all. A new session starts when your stream goes
-  live; until then, anything not checked off stays highlighted.
-- **First-time chatters** are the viewers Twitch itself highlights: their first message in your channel ever.
-- **Songs mentioned:** **♪** on a sheet song named in chat adds it to the queue with the viewer as
-  requester. It shows when the song was last sung: amber within the random cooldown, 📺 when it was
-  shown on the overlay. The song overlay briefly lists such songs as "title - 99 days ago", coming up
-  from its bottom over the Played list (up to 4 at a time; amber within the cooldown). Turn this off in
-  Chat ⚙ → **📺 Song notes on overlay**.
-- **Posting in chat:** type in the box at the bottom and press Enter — it posts as your Twitch account.
-  **↪ Reply** (shown when you point at a message) answers that message; ✕ or Esc cancels. When Twitch
-  holds a message back (AutoMod, slow mode…), your text stays in the box and the reason is shown.
-  **↗ Twitch chat** still opens Twitch's own chat window.
-- **Moderating:** click a name for its menu: **👤 Only this viewer's messages** (click again to show
-  everyone), **📣 Shoutout**, **🚀 Raid**, **Timeout** (1m / 10m / 1h / 1d, or type a length), **✅ Unban /
-  end timeout** and **🚫 Ban** (asks once more). The reason box is optional and goes with a ban or timeout.
-  **🛡 Moderate** at the top opens the same menu for anyone, by channel name — e.g. to unban someone who
-  isn't in the chat. **Shoutout** sends Twitch's own Shoutout (the follow pop-up) and plays one of their
-  clips, like `!so`; Twitch only allows it while you're live, every 2 minutes (once an hour for the same
-  channel), so outside that the clip still plays and you're told why. **Raid** first shows whether that
-  channel is live and how many viewers it has; click again to go. Twitch then counts down 90 seconds
-  (shown above the chat, with **Cancel raid**). With **🎬 With the ending roll** ticked (the default), the
-  `!endingtk` roll plays so the raid goes 10 seconds after it ends: the app starts the raid and the roll at
-  the right times (the confirm says when) and the roll cuts in over a clip. **Cancel raid**, or someone raiding
-  you meanwhile, stops both. Don't press Raid Now on Twitch, and use this button rather than Twitch's own
-  `/raid`, which the app can't follow. **📌** (shown when you point at a message) pins it to the
-  top of your Twitch chat for 1, 5 or 30 minutes or until the stream ends; the pinned message shows above
-  the chat with **Unpin**. Setups from before these buttons need to authorize again once: the menu links to it.
-- **Redemptions:** a waiting redemption of a reward this app made gets **✓ Done** and **↩ Refund**
-  (Refund asks once more: Twitch can't undo it). Song requests settle themselves: done when you press
-  ✓ Finished (or drag the song to Played), refunded when you remove it from the queue or Pending.
-  **✕ Clear All** leaves them waiting, so the *Waiting redemptions* filter finds them. Twitch lets an
-  app change only the redemptions of rewards it made, so a reward made on Twitch gets **↗ Twitch queue**
-  instead, which opens Twitch's own reward queue.
-- **Chat ⚙:** song notes on the overlay; who `!endingtk` would thank right now, and whether new
-  followers are included. Channel-point rewards are in their own tab (below).
-
-**Updating from an earlier version:** new followers (for `!endingtk`) and posting in chat need Twitch
-permissions that older setups didn't ask for. The Chat tab then shows **Authorize again →**, which
-takes you to the wizard's authorization step once; nothing else changes.
-
----
-
-## Modes (🎛 Modes tab)
-
-Buttons at the top of the dashboard, e.g. **🎤 Singing**, **💬 Talking** and **☕ Break**. One click puts
-Streamlabs Desktop or OBS Studio back the way you saved the mode and does this app's part.
-
-- **Connect once** (🎛 Modes → Streaming app):
-  - **Streamlabs Desktop:** Settings → Remote Control → click the QR code → **Show details**, and copy the
-    token into the dashboard. Never show that QR code on stream.
-  - **OBS Studio 30 or newer:** Tools → WebSocket Server Settings → tick **Enable WebSocket server**. If
-    authentication is on, copy the password from **Show Connect Info**.
-  - Both only work on this PC. The token or password is kept in `.env`.
-- **Making a mode:** set the streaming app up by hand the way it should look, then press **＋ New mode from
-  what's on now** (or one of the 🎤 / 💬 / ☕ starters). The mode saves:
-  - the scene;
-  - which items show in it and in the scenes and groups inside it;
-  - the mute and volume of the sounds heard in those scenes: their sources, plus devices that are in no
-    scene, like Desktop Audio and the mic (% in Streamlabs, dB in OBS, as their mixers show them). Other
-    scenes' sounds are left alone; add one with **＋** if a mode should set it too.
-- **Changing a mode:** **✎ Edit** shows its contents. Click **👁 / 🚫** to show or hide an item and
-  **🔊 / 🔇** to turn a sound on or off (dimmed = off), or set a volume. **✕** leaves an item out, so the mode doesn't touch it.
-  **📥 Save what … shows now into this mode** takes it all again from the streaming app.
-- **Dual Output (Streamlabs):** each item is there once per canvas, listed under "horizontal canvas" and
-  "vertical canvas". Each canvas has its own 👁 and 📍.
-- **📍 Position** (next to 👁; dimmed = off): items with it on are also put back where they were saved
-  (position, size, rotation, crop). Off (the default), they stay where you placed them. A mode never moves
-  anything if the canvas size changed since it was saved; save it again.
-- **This app's part:** a chat message posted when switching to the mode; **⏸ Hold clips**, where clips
-  from `!so`, `!watch`, `!tk` and `!endingtk` wait (up to 10) until you switch to another mode, and one already
-  playing finishes; and a dashboard tab to open. While something waits, the top bar shows **⏸ N waiting**: click it
-  for the list, where **▶ Play now** plays one at once and **✕ Drop** skips it (a `!tk` roll's names go back on the
-  `!tk` list, so the next `!tk` still thanks them).
-- **When things change in the streaming app:**
-  - Renamed items, scenes and sounds are still found.
-  - An item deleted and made again with the same name is found by its name.
-  - Missing ones are skipped while everything else is applied. The notice names them, and the mode's
-    button and editor show ⚠ with **Pick a replacement…** or **✕**.
-  - Items added later aren't touched. The editor lists them under "Not in this mode" with **＋** to add one.
-- **Studio Mode:** in OBS, a mode changes the program scene. In Streamlabs Desktop it may only change the
-  preview; press Transition.
-
----
-
-## Alerts (🔔 Alerts tab)
-
-Follows, subs, gifts, cheers and raids on stream — instead of Streamlabs' Alert Box. One at a time, in
-the overlay theme (🎨 Look & overlays), worded in the overlay language. A gift of several subs is one alert.
-
-1. Add a new source → **Browser**, one of two layouts (🔔 Alerts lists them with **Copy**):
-   - `http://localhost:3000/overlay/alerts.html?layout=vertical` — picture above: Width `800`, Height `600`
-   - `http://localhost:3000/overlay/alerts.html?layout=horizontal` — picture on the left: Width `1600`, Height `300`
-2. Scale it to 50% and place it where you like (it renders at 2x). It's transparent while no alert shows.
-3. Pictures, GIFs, videos and sounds: put the files in the `alert-media` folder (in the song request folder),
-   then press **↻ Read the folder again** and pick them per kind. Without your own files, each kind shows
-   a built-in icon and plays a built-in chime (or pick *(no sound)*). **🔊 Default sound** (above the kinds) is the
-   sound every kind set to *(default: …)* plays — that's every kind at first — so one pick changes them all.
-   Sound files don't need to match: each one is evened out to the same loudness (−16 LUFS) as it plays —
-   the file itself isn't changed — and the 🔊 volume is on top of that. Reward effects' sounds too.
-4. Per kind: on / off, a minimum (bits, raid viewers…), how long it shows, the volume, and a **big version**
-   from an amount up (e.g. raids from 50 viewers): larger, longer, with its own picture and sound
-5. **▶ Test** shows a made-up alert on stream only — nothing is posted to Twitch. **↻ Replay** shows a recent one again.
-
-**Sound:** in the source's properties tick **Control audio via OBS**, and in the mixer (⚙ → **Advanced Audio
-Properties**) set its Audio Monitoring to **Monitor and Output**, so you hear it too. Then the sound is in the mixer
-and follows the source's own volume and mute, so a mode that mutes the source (🎤 singing) shows alerts silently.
-Without it, the sound goes straight to your speakers: it isn't in the mixer, and reaches the stream only through a
-desktop-audio capture. Moving from Streamlabs: run both for one stream with the Alert Box muted, then remove the Alert Box.
-
-### 🎟️ Rewards tab: what each reward is for
-
-Every channel-point reward on your channel, one row each:
-
-- **Use** — its main use: **🎤 Song request**, **🎲 Random song** or **👕 Outfit**, or none. There's always
-  one song-request reward: to move it, choose 🎤 on another reward. 🎤 and 🎲 rewards also tick the sheet tabs they take
-  (none ticked = every tab but the practice tab). A 🎤 reward has to ask viewers to type the song: if it doesn't, the row
-  warns you — turn on **Require Viewer to Enter Text** for it on Twitch.
-- **🎟️ Effect** — a sound or picture (below), on its own or on top of the main use, e.g. an outfit change
-  with a sound. **→ Effect settings** opens it in 🔔 Alerts.
-- **Done / refund** — the main use decides (a song when it's sung or removed, an outfit when you pick one);
-  a reward with only an effect leaves it to the effect.
-- **Let the app manage it** — Twitch lets the app mark done or refund only the rewards it made, so a reward
-  made on Twitch can be handed over: the app makes a hidden copy with the same settings. Delete the original
-  on Twitch (clear its queue first), and the copy takes its name and place, with its use and effect. Only a
-  custom icon has to be uploaded again.
-
-### 🎟️ Reward effects (instead of TriggerFyre)
-
-A channel-point reward plays a sound, a picture / GIF / video, or both. In 🔔 Alerts → **🎟️ Reward effects**:
-
-1. Add a new source → **Browser**: `http://localhost:3000/overlay/reward-effects.html`, Width `1920`, Height `1080`,
-   over your whole scene (on top). It's transparent while nothing plays. Tick **Control audio via OBS** and set
-   Audio Monitoring to **Monitor and Output**, as for alerts above: then it has its own volume and mute in the mixer.
-2. In the **🎟️ Rewards** tab, tick **🎟️ Effect** on the reward. Back here, pick its sounds (several = one at
-   random each time), a picture, GIF or video, where it shows and how big, how long (or as long as the sound),
-   and **Show who redeemed it**. **▶ Test** plays it on stream only.
-3. **Two at once**: one after the other, play together (up to 3), or skip the new one.
-
-When an effect has played, its redemption is marked done. One that doesn't play — **🔇 Off**, skipped, more than
-20 waiting, or **🗑 Clear the queue** — is refunded. A reward that's also a song request, random song or outfit is
-left to that: the effect only plays. **⏸ Pause** (or a mode with **🎟️ Pause reward effects**, e.g.
-🎤 singing) keeps them waiting; they play when it ends. With no reward-effects source open in OBS they wait too,
-and the tab says so. Twitch lets the app mark done or refund only the rewards it manages: a reward made on Twitch
-still plays, and can be handed over in the 🎟️ Rewards tab. Waiting ones aren't kept over a
-restart: they stay in Twitch's own reward queue.
-
-Moving from TriggerFyre: save your sounds and pictures into `alert-media`, set the rewards up here, then turn
-each one off (or delete it) in TriggerFyre — or it plays twice.
-
----
-
-## Outfits (👕 Outfits tab)
-
-Viewers redeem a reward, you pick the outfit: your avatar's state in veadotube mini (2.1 or newer).
-
-1. In veadotube mini → **program settings**, turn on the **WebSocket server**
-2. Dashboard → **👕 Outfits**: your veadotube windows show with a picture of each state. Click one to wear it.
-3. Press **☆** on your usual outfit: it becomes the default, and its window the one redemptions change.
-   With the same avatar in two windows, press ☆ in the right one, once after opening veadotube.
-4. In the **🎟️ Rewards** tab, set the rewards that change the outfit to **👕 Outfit**. Back here, under
-   **Redemptions**, set **Back to the default outfit after** N minutes (0 = it stays until the next redemption)
-5. When one is redeemed, a card with your outfits pops up on any tab: click the one to wear. Rewards made
-   by the app (or taken over in the 🎟️ Rewards tab) are then marked done, or **↩ Refund**; others stay in Twitch's queue.
-
----
-
-## How matching works
-
-| Result | Action |
-|---|---|
-| ≥ 80% confidence | Auto-added to queue |
-| < 80% confidence | Sent to Pending with suggested match |
-| No match | Sent to Pending, blank for manual entry |
-
-Tune in `server/config.js`: `AUTO_ACCEPT_THRESHOLD`, `MATCH_THRESHOLD` (0.2 stricter / 0.6 looser).
-
----
-
-## Random song modes
-
-Choose in 🎵 Song Queue → ⚙ → **Pick**:
-- **Weighted** — favors songs not played recently (recommended)
-- **Pure random**
-
-Songs already in queue/Now Playing/Played, and songs requested within the cooldown
-(⚙ on the dashboard), are always excluded.
-
----
-
-## Leihu Singsing (optional)
-
-[Leihu Singsing](https://github.com/LeihuTW/Leihu-singsing) (雷虎練唱台) is a separate free app that
-turns a YouTube video into a backing track with lyrics, in any key. When it runs on the same PC, the
-dashboard connects to it by itself — nothing to set up. When it isn't running, everything works as before.
-
-- Each queued song gets a **♫ badge**: ready / no lyrics / preparing / failed / prepare / link.
-  **♫ prepare** imports the song from the sheet's YouTube link (column `YTLink`, see below);
-  **♫ link** lets you pick a song you already have in Leihu.
-- Leihu tab ⚙ → **Auto-prepare queued songs** imports songs as they are queued and renders their sheet key
-  ahead of time. It uses the GPU during the stream.
-- **🎤 Sing** (Now Playing) opens the song in Leihu's practice window at its sheet key. Needs Leihu 1.5.2 or newer.
-- When Leihu leaves a sheet song's lyrics blank, or flags that online lyrics fit better than what it
-  recognized, an online lyric is applied — only an exact fit: same title, same artist, same length.
-  Lyrics you picked in Leihu are never replaced.
-- **Leihu's sound as its own OBS source**: in the dashboard's Leihu tab, Leihu plays through the browser,
-  so OBS hears it mixed with every other tab. `start.bat` opens the dashboard in a separate copy of Chrome
-  (or Edge) for this; opened some other way, Leihu tab ⚙ → **🔊 Open the stream window** does the same. In OBS add **Application Audio Capture**, pick the
-  window **點歌控制台 Song Queue (OBS)** and set Window Match Priority to **Window title must match**.
-  - **Music and voice out of sync** (the voice drifts ahead of and behind the music, ~200 ms): Application
-    Audio Capture has no device clock, so its timing can wander. Capture Leihu from an output device instead —
-    a device capture runs on the device's clock, like your mic:
-    - **Audio Output Capture** of the output you listen on (simplest, but every other sound on it — other
-      tabs, Discord, Windows — goes on stream too), or
-    - give Leihu an output of its own (Leihu ⚙ → music output device) and capture that: a **hardware virtual
-      output** if your audio interface has one (e.g. SSL 2 MKII's *Output 3/4 (Virtual)*, mixed into your
-      headphones in SSL 360 — leave monitoring off), or a virtual cable such as **VB-Audio Virtual Cable**
-      (set its capture to *Monitor and Output* to hear it, then set its Sync Offset once for the monitoring delay).
-- **Leihu 2.0's global hotkeys** (Ctrl+Alt+Space play / pause, KEY up / down, next song…, also for a Stream Deck)
-  belong to Leihu's own window: they work when you open Leihu from its shortcut and sing there. Started with
-  **▶ Start Leihu** (no window of its own) there are none, and with both open they act on Leihu's window, not
-  the dashboard's Leihu tab.
-
----
-
-## YouTube link finder
-
-Leihu finds your songs by the YouTube link in the sheet's **YTLink** column. Leihu tab ⚙ →
-**① Find a YouTube link for each song** → **🔗 Find YouTube links** fills that column for you (Leihu Singsing must be running —
-the search uses its lyric sites and YouTube tools):
-
-1. **Step 1 — Editor access:** share the song sheet with the service-account email shown on the page as
-   **Editor**, then click **Check access**. Only saving needs it; searching and reviewing work without it.
-2. **Search songs without a link:** about 8 seconds per song. Stop and resume any time.
-3. **Review:** picks are grouped into *Confident*, *Needs a look* and *Nothing found*. Accept, skip,
-   choose another video or paste a link.
-4. **Save:** writes accepted links into **empty** YTLink cells only. A tab without the column gets one.
+`!so`, `!tk`, `!endingtk`, `!watch`, `!replay` and `!stop`, for mods and the broadcaster:
+[Clips, rolls and raids](docs/features/clips-and-rolls.md). Your own commands: [🤖 Bot](docs/tabs/bot.md).
 
 ---
 
@@ -478,6 +172,14 @@ vtuber-song-queue/
 ├── ending-credits.json       ← when !endingtk last ran
 ├── reward-takeovers.json     ← rewards handed over to the app (🎟️ Rewards tab)
 ├── stream-session.json       ← when the stream last went live (Chat tab, what to announce)
+├── stream-modes.json         ← 🎛 modes
+├── alerts.json               ← 🔔 alert settings
+├── reward-effects.json       ← 🎟️ reward effects
+├── alert-media/              ← your alert and reward-effect pictures and sounds
+├── bot.json                  ← 🤖 bot commands and timers
+├── mood-tags.json            ← 🎭 songs' mood tags and the running cost
+├── mood-picks.jsonl          ← 🎭 the pick log (viewers' words: don't share it)
+├── docs/                     ← how to use each tab (docs/README.md)
 ├── server/                   ← the server (see CLAUDE.md for every file)
 │   └── commands/             ← chat commands (!so, !watch, !replay, !stop, !tk, !endingtk)
 ├── shared/                   ← English / 繁體中文 strings shared by the pages
@@ -487,7 +189,8 @@ vtuber-song-queue/
 │   └── sponsor-bgs/          ← !tk background images
 ├── dashboard/
 │   ├── index.html            ← streamer control panel
-│   └── links.html            ← YouTube link finder
+│   ├── links.html            ← YouTube link finder
+│   └── prompter.html         ← 📱 lyrics and chat on a tablet (/prompter)
 └── tools/find-videos.py      ← link finder search helper (runs with Leihu's Python)
 ```
 
