@@ -54,15 +54,16 @@ test('a finished takeover still counts the original\'s redemptions as song reque
   assert.deepStrictEqual(redemptions.originalsOf(new Set(['new', 'hidden'])), ['old']);
 });
 
-test('the song rewards are the song request reward, the random ones, and the originals they took over', () => {
+test('the song rewards are the song request reward, the random ones, the 🎭 ones, and the originals they took over', () => {
   fs.writeFileSync(process.env.REWARD_TAKEOVERS_FILE, JSON.stringify({ old: { copyId: 'song', title: '點歌券', done: true } }));
-  const saved = { reward: process.env.TWITCH_REWARD_ID, random: process.env.TWITCH_RANDOM_REWARDS };
+  const saved = { reward: process.env.TWITCH_REWARD_ID, random: process.env.TWITCH_RANDOM_REWARDS, mood: process.env.MOOD_REWARDS };
   process.env.TWITCH_REWARD_ID = 'song';
   process.env.TWITCH_RANDOM_REWARDS = JSON.stringify([{ id: 'rnd1', tabs: [] }, { id: 'rnd2', tabs: ['國語'] }]);
+  process.env.MOOD_REWARDS = 'mood1, mood2';
   try {
-    assert.deepStrictEqual([...redemptions.songRewardIds()].sort(), ['old', 'rnd1', 'rnd2', 'song']);
+    assert.deepStrictEqual([...redemptions.songRewardIds()].sort(), ['mood1', 'mood2', 'old', 'rnd1', 'rnd2', 'song']);
   } finally {
-    for (const [k, v] of [['TWITCH_REWARD_ID', saved.reward], ['TWITCH_RANDOM_REWARDS', saved.random]]) {
+    for (const [k, v] of [['TWITCH_REWARD_ID', saved.reward], ['TWITCH_RANDOM_REWARDS', saved.random], ['MOOD_REWARDS', saved.mood]]) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
   }

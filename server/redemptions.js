@@ -311,9 +311,12 @@ function missedFrom(list, since) {
     }));
 }
 
+// The rewards that request a song: 🎤, 🎲 and 🎭 (a mood pick is a song request too): the ending roll's
+// requesters, and not a redemption to thank in the Chat tab
 function songRewardIds() {
   const ids = new Set([process.env.TWITCH_REWARD_ID].filter(Boolean));
   try { for (const r of JSON.parse(process.env.TWITCH_RANDOM_REWARDS || '[]')) if (r.id) ids.add(r.id); } catch {}
+  for (const id of (process.env.MOOD_REWARDS || '').split(',').map(s => s.trim()).filter(Boolean)) ids.add(id);
   for (const id of originalsOf(ids)) ids.add(id);
   return ids;
 }
