@@ -1181,6 +1181,31 @@ app.post('/api/reward-effects/test', (req, res) => {
     res.status(err.messageCode ? 400 : 500).json(errorBody(err));
   }
 });
+// '@reward': the reward's icon on Twitch, fetched once (Twitch's image server only) and kept
+const rewardIcons = new Map();   // icon URL → { type, body }
+let rewardIconUrls = new Map();  // reward ID → icon URL, from the latest rewards list
+async function rewardIconUrl(id, fresh = false) {
+  if (fresh || !rewardIconUrls.has(id)) {
+    const { rewards } = await redemptions.listRewards();
+    rewardIconUrls = new Map(rewards.map(r => [r.id, r.icon]));
+  }
+  return rewardIconUrls.get(id) || '';
+}
+app.get('/api/reward-effects/icon/:id', async (req, res) => {
+  try {
+    const url = await rewardIconUrl(req.params.id);
+    if (!/^https:\/\/static-cdn\.jtvnw\.net\//.test(url)) return res.status(404).end();
+    if (!rewardIcons.has(url)) {
+      const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+      rewardIcons.set(url, { type: r.headers['content-type'] || 'image/png', body: Buffer.from(r.data) });
+    }
+    const icon = rewardIcons.get(url);
+    res.set('Content-Type', icon.type).set('Cache-Control', 'no-cache').send(icon.body);
+  } catch (err) {
+    console.error('[reward-effects] Could not get a reward icon:', err.message);
+    res.status(404).end();
+  }
+});
 app.post('/api/reward-effects/skip', (req, res) => { rewardEffects.skip(); res.json(rewardEffects.status()); });
 app.post('/api/reward-effects/clear', (req, res) => { rewardEffects.clear(); res.json(rewardEffects.status()); });
 
@@ -1189,6 +1214,7 @@ app.post('/api/reward-effects/clear', (req, res) => { rewardEffects.clear(); res
 app.get('/api/rewards', async (req, res) => {
   try {
     const list = await redemptions.listRewards();
+    rewardIconUrls = new Map(list.rewards.map(r => [r.id, r.icon]));   // a changed icon on Twitch: the new one from now
     res.json({ ...list, rewards: list.rewards.map(r => ({ ...r, effect: rewardEffects.hasEffect(r.id) })) });
   } catch (err) {
     res.status(500).json(errorBody(err));

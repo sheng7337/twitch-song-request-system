@@ -90,12 +90,13 @@ function place(el, where, size) {
 function play(e) {
   const el = document.createElement('div');
   el.className = 'fx';
-  if (e.image) el.style.width = `${e.size}vw`;
-  const video = e.image && VIDEO.test(e.image);
-  el.innerHTML = (e.image ? (video ? `<video src="${esc(media(e.image))}" playsinline></video>` : `<img src="${esc(media(e.image))}" alt="">`) : '')
+  const picture = e.icon || e.image;   // icon: the reward's own on Twitch (via the app)
+  if (picture) el.style.width = `${e.size}vw`;
+  const video = !e.icon && e.image && VIDEO.test(e.image);
+  el.innerHTML = (picture ? (video ? `<video src="${esc(media(e.image))}" playsinline></video>` : `<img src="${esc(e.icon || media(e.image))}" alt="">`) : '')
     + (e.name ? `<div class="cap"><div class="who"><b>${esc(e.name)}</b><span class="reward">${esc(e.reward)}</span></div>`
       + (e.text ? `<div class="text">${esc(e.text)}</div>` : '') + '</div>' : '');
-  place(el, e.place || 'center', e.image ? e.size : 30);
+  place(el, e.place || 'center', picture ? e.size : 30);
   const volume = Math.max(0, Math.min(1, (e.volume ?? 80) / 100));
 
   // It ends when its sound and video have both ended (or at its set time); then the server hears of it
@@ -116,7 +117,7 @@ function play(e) {
   const oneEnded = () => { if (--waiting <= 0 && !e.seconds) finish(); };
   // A sound or video that can't play (missing file, or a browser that blocks sound until a click):
   // the picture still shows its usual time
-  const oneFailed = () => { if (--waiting <= 0 && !e.seconds) timers.push(setTimeout(finish, e.image || e.name ? SHOW_SECONDS * 1000 : 0)); };
+  const oneFailed = () => { if (--waiting <= 0 && !e.seconds) timers.push(setTimeout(finish, picture || e.name ? SHOW_SECONDS * 1000 : 0)); };
   const start = (m) => {
     m.volume = volume;
     sounds.push(m);

@@ -46,6 +46,9 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
   開啟後請在 OBS 重新調一次 Clip 播放器的音量。需要 ffmpeg（裝了雷虎練唱台就有）；沒有的話仍會壓低大聲的片段。
 - **＋ 新增兌換項目**：在「🎟️ 兌換」分頁直接建立新的兌換項目（名稱、點數、用途、說明、是否要輸入文字）。
   由 App 建立，所以一建立就由點歌系統管理（可以完成和退還），不用再「交給點歌系統管理」。
+- **🎟️ 兌換特效可以用兌換項目的圖示**：圖片可以選「🎟️ 兌換項目的圖示」，就是 Twitch 上那個項目的圖示（112 × 112；
+  沒有自己的圖示就用 Twitch 預設的）。新加上特效的兌換項目會先用它，大小 10%（圖示很小，放大會糊）。原本的特效不會變。
+  在 Twitch 換了圖示，特效也會跟著換。
 - **🎟️ 兌換分頁**：頻道上每個兌換項目在這裡設定用途 ——「🎤 點歌」、「🎲 隨機點歌」（和要抽的歌單分頁）、「👕 換裝」或無 ——
   另外可以勾選「🎟️ 特效」，單獨使用或加在主要用途上（例如換裝時加一個音效）。完成和退還由主要用途決定。原本分散在「💬 聊天室 ⚙」
   （交給點歌系統管理）、「👕 換裝」（勾選會換裝的獎勵）和「🔔 通知」（加入兌換項目）的設定都搬到這裡。
@@ -123,6 +126,10 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
 - **＋ New reward**: create a reward right in the **🎟️ Rewards** tab (name, points, use, description, whether
   viewers type something). The app makes it, so the app manages it from the start (done and refund) — no
   taking over needed.
+- **🎟️ Reward effects can show the reward's icon**: pick "🎟️ The reward's icon" as the picture: the reward's icon
+  on Twitch (112 × 112; Twitch's standard one when it has none). A reward that gets an effect now starts with it,
+  at 10 % (the icon is small and blurs when larger). Existing effects stay as they are. Change the icon on Twitch
+  and the effect follows.
 - **🎟️ Rewards tab**: every reward on your channel gets its use here — 🎤 song request, 🎲 random song (and the
   sheet tabs it draws from), 👕 outfit or none — and a 🎟️ Effect tick, on its own or on top of the main use (e.g.
   an outfit change with a sound). The main use decides done and refund. What was spread over 💬 Chat ⚙ (handing

@@ -12,6 +12,8 @@
 // Nothing plays while paused (here or by a mode, modes.js) or while no reward-effects overlay is open:
 // redemptions wait. The overlay says when an effect ended; the queue is in memory only — after a restart,
 // waiting redemptions stay in Twitch's queue. Settings are kept in reward-effects.json.
+// The picture '@reward' is the reward's own icon on Twitch (112 × 112, Twitch's standard one when it has
+// none), served by /api/reward-effects/icon/:id; a newly attached effect starts with it, at the smallest size.
 
 const fs = require('fs');
 const path = require('path');
@@ -20,6 +22,7 @@ const { UserError } = require('./messages');
 
 const FILE = process.env.REWARD_EFFECTS_FILE || path.join(__dirname, '..', 'reward-effects.json');   // tests use a temp file
 const SOUND = /\.(mp3|wav|ogg|m4a)$/i;
+const REWARD_ICON = '@reward';
 const PLACES = ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right', 'random'];
 const TOGETHER = ['queue', 'overlap', 'skip'];
 const STATES = ['on', 'paused', 'off'];
@@ -100,7 +103,8 @@ function checkEffect(e, files) {
   if (!Array.isArray(sounds) || sounds.length > SOUNDS_MAX) throw bad(`sounds must be a list of up to ${SOUNDS_MAX}`);
   for (const s of sounds) if (!SOUND.test(String(s)) || !files.includes(String(s))) throw bad(`${s} is not a sound in the alert-media folder`);
   out.sounds = [...new Set(sounds.map(String))];
-  if (e.image) {
+  if (e.image === REWARD_ICON) out.image = REWARD_ICON;
+  else if (e.image) {
     if (SOUND.test(String(e.image)) || !files.includes(String(e.image))) throw bad(`${e.image} is not a picture or video in the alert-media folder`);
     out.image = String(e.image);
   }
@@ -151,7 +155,9 @@ function payload(item) {
   return {
     id: item.id,
     sound: e.sounds.length ? e.sounds[Math.floor(Math.random() * e.sounds.length)] : '',
-    image: e.image, place: e.place, size: e.size, seconds: e.seconds,
+    image: e.image === REWARD_ICON ? '' : e.image,
+    icon: e.image === REWARD_ICON ? `/api/reward-effects/icon/${encodeURIComponent(e.rewardId)}` : '',
+    place: e.place, size: e.size, seconds: e.seconds,
     volume: Math.round(e.volume * data.volume / 100),
     name: e.showName && item.redemption ? item.redemption.name : '',
     text: e.showName && item.redemption ? item.redemption.text : '',
@@ -239,7 +245,8 @@ function clear() {
 // 🎟️ Rewards tab: this reward gets an effect (nothing to play yet: set up in the Alerts tab), or loses it
 function attach(rewardId, title) {
   if (!/^[\w-]{1,100}$/.test(String(rewardId || ''))) throw bad('rewardId is missing');
-  if (!data.effects.some(e => e.rewardId === rewardId)) data.effects.push({ ...EFFECT, rewardId: String(rewardId), title: String(title || '').slice(0, 60) });
+  // the reward's icon to start with: 112 px, so at the smallest size (larger looks blurry)
+  if (!data.effects.some(e => e.rewardId === rewardId)) data.effects.push({ ...EFFECT, rewardId: String(rewardId), title: String(title || '').slice(0, 60), image: REWARD_ICON, size: LIMITS.size[0] });
   save();
   changed();
   return status();
@@ -280,4 +287,4 @@ function _reset() {
   data = load(); queue = []; playing = new Map(); modePaused = false; overlays = 0;
 }
 
-module.exports = { init, status, update, fromRecord, test, ended, skip, clear, setModePause, setOverlays, attach, detach, hasEffect, moveReward, PLACES, _reset };
+module.exports = { init, status, update, fromRecord, test, ended, skip, clear, setModePause, setOverlays, attach, detach, hasEffect, moveReward, PLACES, REWARD_ICON, _reset };

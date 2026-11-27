@@ -201,6 +201,7 @@ async function listRewards() {
       needsText: !!r.is_user_input_required,          // a 🎤 reward needs the viewer's text
       manageable: manageable.ids.has(r.id),
       skipsQueue: !!r.should_redemptions_skip_request_queue,
+      icon: (r.image || r.default_image || {}).url_4x || '',   // 112 × 112; Twitch's standard icon when it has none
       takeover: takeovers[r.id] && !takeovers[r.id].done ? { startedAt: takeovers[r.id].startedAt } : null,
     })).sort((a, b) => (b.role ? 1 : 0) - (a.role ? 1 : 0)),
   };

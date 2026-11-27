@@ -835,6 +835,7 @@
   .fx-state .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--text-strong); background: rgba(var(--accent-rgb), 0.18); }
   .fx-sounds { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
   .fx-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 10px; padding: 1px 2px 1px 8px; font-size: 12px; color: var(--text); }
+  .fx-icon { vertical-align: middle; border-radius: 4px; }
   .fx-chip button { background: none; border: 0; color: var(--text-dim); cursor: pointer; font-size: 11px; padding: 0 4px; }
   .fx-note { font-size: 12px; color: var(--text-dim); }
   .fx-note.warn, .fx-status.warn { color: var(--warn); }
@@ -4657,7 +4658,9 @@ function paintEffects() {
       + e.sounds.map(s => `<span class="fx-chip">${esc(s)}<button type="button" data-fx-unsound="${esc(s)}" title="${esc(t('dash.fx.remove'))}">✕</button></span>`).join('')
       + `<select class="modes-input" data-f="addSound">${files(st.sounds.filter(s => !e.sounds.includes(s)), '', t(e.sounds.length ? 'dash.fx.addAnother' : 'dash.fx.addSound'))}</select></span>`
       + (e.sounds.length > 1 ? `<span class="fx-note">${esc(t('dash.fx.randomOne'))}</span>` : '') + '</div>'
-      + `<div class="al-row"><select class="modes-input" data-f="image" title="${esc(t('dash.alerts.picture'))}">${files(st.pictures, e.image, t('dash.fx.noPicture'))}</select>`
+      + `<div class="al-row"><select class="modes-input" data-f="image" title="${esc(t('dash.alerts.picture'))}">${files(st.pictures, e.image, t('dash.fx.noPicture'))
+        .replace('</option>', `</option><option value="@reward"${e.image === '@reward' ? ' selected' : ''}>${esc(t('dash.fx.rewardIcon'))}</option>`)}</select>`
+      + (e.image === '@reward' && r && r.icon ? `<img class="fx-icon" src="${esc(r.icon)}" alt="" width="28" height="28">` : '')
       + `<label>${esc(t('dash.fx.place'))} <select class="modes-input" data-f="place">${FX_PLACES.map(p =>
         `<option value="${p}"${e.place === p ? ' selected' : ''}>${esc(t('dash.fx.places.' + p))}</option>`).join('')}</select></label>`
       + `<label>${esc(t('dash.fx.size'))} <input type="range" class="opacity-slider" min="10" max="60" step="5" data-f="size" value="${e.size}"${e.image ? '' : ' disabled'}> ${e.size}%</label>`

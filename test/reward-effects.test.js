@@ -142,7 +142,13 @@ test('a reward with a main use too (song, random, outfit): the effect plays but 
 test('attach / detach from the Rewards tab; a taken-over reward\'s copy keeps the effect', () => {
   fx.attach('r9', 'Jingle');
   fx.attach('r9', 'Jingle');   // once
-  assert.deepStrictEqual(fx.status().effects.map(e => [e.rewardId, e.title, e.sounds.length]), [['r9', 'Jingle', 0]]);
+  assert.deepStrictEqual(fx.status().effects.map(e => [e.rewardId, e.title, e.sounds.length, e.image, e.size]), [['r9', 'Jingle', 0, '@reward', 10]],
+    'a new effect starts with the reward\'s icon, at the smallest size');
+  fx.setOverlays(1);
+  const icon = fx.test('r9');
+  assert.deepStrictEqual([icon.image, icon.icon], ['', '/api/reward-effects/icon/r9']);
+  fx.update({ effects: [{ ...fx.status().effects[0], image: 'cat.gif' }] });
+  assert.deepStrictEqual([fx.test('r9').image, fx.test('r9').icon], ['cat.gif', ''], 'a file instead');
   assert.ok(fx.hasEffect('r9'));
   fx.moveReward('r9', 'copy9');
   assert.ok(!fx.hasEffect('r9') && fx.hasEffect('copy9'));
