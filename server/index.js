@@ -300,10 +300,13 @@ for (const p of getState().pending) {
 
 function startMoodPick({ requester, text, redemption }) {
   const entry = addPending({ title: '', artist: '', requester, originalRequest: text || '🎭', confidence: null, redemption });
-  updatePending(entry, { mood: { state: 'thinking', text, tried: [] } });
+  // id: the pick log's lines for this one request (each pick, then sent or refused)
+  updatePending(entry, { mood: { state: 'thinking', text, tried: [], id: require('crypto').randomBytes(4).toString('hex') } });
   console.log(`[mood] @${requester} asked for a song: "${text}"`);
   runMoodPick(entry);
 }
+
+const round4 = (usd) => Math.round((usd || 0) * 10000) / 10000;
 
 // Not the songs queued, sung this stream, waiting in Pending Review, or already offered for this request
 async function runMoodPick(entry) {
@@ -312,6 +315,8 @@ async function runMoodPick(entry) {
     .filter(s => s && s.title).map(s => songKey(s.title, s.artist)).concat(entry.mood.tried || []);
   try {
     const p = await mood.pick({ text: entry.mood.text, requester: entry.requester, exclude });
+    mood.logPick({ id: entry.mood.id, event: 'picked', try: (entry.mood.tried || []).length + 1, requester: entry.requester,
+      text: entry.mood.text, title: p.title, artist: p.artist, reason: p.reason, lines: p.lines, usd: round4(p.usd) });
     updatePending(entry, {
       title: p.title, artist: p.artist, key: p.key,
       mood: { ...entry.mood, state: 'picked', lines: p.lines, reason: p.reason, tags: mood.tagsOf(p.title, p.artist), tried: [...(entry.mood.tried || []), p.songKey] },
@@ -319,6 +324,8 @@ async function runMoodPick(entry) {
     console.log(`[mood] Picked "${p.title}" for @${entry.requester}`);
   } catch (err) {
     console.error('[mood] Could not pick a song:', err.message);
+    mood.logPick({ id: entry.mood.id, event: 'failed', requester: entry.requester, text: entry.mood.text,
+      code: err.messageCode || '', error: err.message, usd: round4(err.usd || 0) });
     updatePending(entry, { mood: { ...entry.mood, state: 'failed', ...errorBody(err) } });
   }
 }
@@ -341,8 +348,10 @@ app.post('/api/add', (req, res) => {
 
 app.post('/api/delete', (req, res) => {
   const { zone, index } = req.body;
+  const gone = zone === 'pending' ? getState().pending[index] : null;
   const result = deleteSong(zone, index);
   if (!result) return res.status(400).json({ error: 'invalid zone or index' });
+  if (gone && gone.mood) mood.logPick({ id: gone.mood.id, event: 'refused', requester: gone.requester, title: gone.title, artist: gone.artist });
   res.json({ ok: true });
 });
 
@@ -372,11 +381,16 @@ app.post('/api/accept-pending', async (req, res) => {
   const line = picked ? String(req.body.moodLine ?? picked.lines?.zh ?? '').replace(/[\r\n]+/g, ' ').trim() : '';
   const result = picked ? acceptPending(index) : acceptPending(index, title, artist, ci);
   if (!result) return res.status(400).json({ error: 'invalid index' });
-  if (!line) return res.json({ ok: true });
+  // the pick log: which line went out (中文, English, or changed by the streamer)
+  const sent = (posted) => picked && mood.logPick({ id: picked.id, event: 'sent', requester: entry.requester, title: entry.title,
+    artist: entry.artist, line, as: line === picked.lines?.zh ? 'zh' : line === picked.lines?.en ? 'en' : line ? 'edited' : 'none', posted });
+  if (!line) { sent(false); return res.json({ ok: true }); }
   try {
     await chatSend.send(line);
+    sent(true);
     res.json({ ok: true, posted: true });
   } catch (err) {
+    sent(false);
     res.json({ ok: true, posted: false, ...errorBody(err) });   // queued all the same
   }
 });

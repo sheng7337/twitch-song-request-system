@@ -11,6 +11,9 @@
 // The viewer's words only ever describe a mood: they're sent as data, Claude can only answer with an ID
 // from the list (checked here), and the streamer reads the line before it's posted.
 // The key is ANTHROPIC_API_KEY in .env (the 🎟️ Rewards tab sets it; never sent back to the page).
+//
+// The pick log (mood-picks.jsonl, one JSON line each): every pick, failed pick, send and refusal, with the
+// viewer's words, the song, Claude's reason and what the pick cost, to look back on after a stream.
 
 const fs = require('fs');
 const path = require('path');
@@ -21,6 +24,7 @@ const { songKey } = require('../shared/song-key');
 
 const Client = Anthropic.default || Anthropic;
 const FILE = process.env.MOOD_TAGS_FILE || path.join(__dirname, '..', 'mood-tags.json');   // tests use a temp file
+const PICKS_FILE = process.env.MOOD_PICKS_FILE || path.join(__dirname, '..', 'mood-picks.jsonl');
 const MODEL = 'claude-opus-5-5';
 const MAX_VIEWER_TEXT = 300;        // characters of the viewer's words sent to Claude
 const MAX_LYRICS = 2500;            // characters of lyrics per song for tagging
@@ -178,18 +182,30 @@ async function pick({ text = '', requester = '', exclude = [] } = {}) {
   } catch (err) {
     throw apiError(err);
   }
-  addCost(message.usage);
+  const usd = addCost(message.usage);
   data.spent.picks++;
   save();
-  const answer = answerOf(message);
-  const song = open.find(s => s.id === String(answer.song_id || '').trim());
-  if (!song) throw new UserError('moodBadPick', {}, 'Claude answered with a song that is not on the list.');
+  let answer, song;
+  try {
+    answer = answerOf(message);
+    song = open.find(s => s.id === String(answer.song_id || '').trim());
+    if (!song) throw new UserError('moodBadPick', {}, 'Claude answered with a song that is not on the list.');
+  } catch (err) {
+    throw Object.assign(err, { usd });   // paid for all the same: the pick log says so
+  }
   const line = (said) => `🎭 @${requester} ${clean(said, MAX_LINE).replace(/^[@!/]+/, '')}`.trim();
   return {
     title: song.title, artist: song.artist || '', key: song.key != null ? String(song.key) : '', songKey: song.songKey,
     lines: { zh: line(answer.message_zh), en: line(answer.message_en) },
     reason: clean(answer.reason, 200),
+    usd,
   };
+}
+
+// One line in the pick log: { at, ...what happened }. A log that can't be written never stops a pick.
+function logPick(record) {
+  const line = JSON.stringify({ at: new Date().toISOString(), ...record });
+  fs.appendFile(PICKS_FILE, line + '\n', (err) => { if (err) console.error('[mood] Could not write the pick log:', err.message); });
 }
 
 // ── Tagging ──
@@ -298,4 +314,4 @@ function _reset() {
   data = { tags: {}, job: null, spent: { usd: 0, picks: 0, tagged: 0 } };
 }
 
-module.exports = { init, pick, startTagging, poll, status, tagsOf, candidates, hasKey, _reset, MODEL };
+module.exports = { init, pick, logPick, startTagging, poll, status, tagsOf, candidates, hasKey, _reset, MODEL, PICKS_FILE };

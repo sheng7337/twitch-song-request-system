@@ -88,7 +88,7 @@ vtuber-song-queue/
 │   ├── chat-send.js       The Chat tab's message box: Helix POST /chat/messages (replies too)
 │   ├── mood.js            🎭 情境點歌: Claude (Opus 5.5, @anthropic-ai/sdk, ANTHROPIC_API_KEY) picks a song for a viewer's
 │                          mood (MOOD_REWARDS); waits in Pending Review (entry.mood) until the streamer sends it (queued +
-│                          line posted), 🔁 / ✕; mood tags from Leihu lyrics via a Message Batch, mood-tags.json
+│                          line posted), 🔁 / ✕; mood tags from Leihu lyrics via a Message Batch, mood-tags.json; logPick → mood-picks.jsonl
 │   ├── bot.js             🤖 Bot tab: the streamer's commands + timers (instead of Nightbot), posted via chat-send; bot.json;
 │                          isOwn() keeps its own posts from running commands; $(…) variables filled once, no fetch / eval
 │   ├── chat-mod.js        The Chat tab's ban / timeout / unban, Twitch Shoutout, raid / cancel, pin / unpin (Helix)
@@ -139,7 +139,7 @@ vtuber-song-queue/
 
 **Never commit** (all gitignored): `.env`, `google-credentials.json`, `song-cache.json`,
 `setup-progress.json`, `queue-state.json`, `song-links.json`, `leihu-home.json`, `chat-logs/`, `link-search.json`, `package-lock.json`,
-`ending-credits.json`, `reward-takeovers.json`, `stream-session.json`, `stream-modes.json`, `alerts.json`, `bot.json`, `mood-tags.json`,
+`ending-credits.json`, `reward-takeovers.json`, `stream-session.json`, `stream-modes.json`, `alerts.json`, `bot.json`, `mood-tags.json`, `mood-picks.jsonl`,
 `reward-effects.json`, `alert-media/`, `logs/`, `.env` backups.
 `setup-progress.json`, `queue-state.json` and `package-lock.json` contain personal info.
 

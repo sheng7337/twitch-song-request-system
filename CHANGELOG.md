@@ -38,6 +38,8 @@ the dashboard under **🎨 Look & overlays** (at the top). Read **⚠ Action nee
   - 到「🎟️ 兌換」分頁把一個兌換項目設為「🎭 情境點歌」（記得在 Twitch 開啟「要求觀眾輸入文字」），並在下方輸入你的
     Anthropic API 金鑰（使用你自己的 Anthropic 帳號計費，每次選歌約 0.01–0.05 美元）。
   - 「🏷 幫歌曲標記心情」：Claude 讀雷虎練唱台裡的歌詞，幫每首歌記下心情，選歌會更準（整批半價，幾百首約 1–3 美元，做一次就好）。
+  - 每次選歌都會記在 `mood-picks.jsonl`：觀眾寫的話、選了哪首、原因、花費，以及你發了中文、英文還是改過的那句，或退還了，
+    方便直播後回顧。
 - **⚠ 缺少 Twitch 權限的提示**：Twitch 授權是在某項功能加入之前做的，控制台上方會說明哪些功能因此無法使用，並提供「重新授權 →」。
 - **🔊 統一 Clip 音量**：!so 和 !watch 的 Clip 會用差不多的音量播放：太小聲的調大、太大聲的調小，
   突然很大聲的片段（例如尖叫）會在播放時壓低。Clip 開始前只多等不到 0.1 秒。可以在「💬 聊天室 → ⚙ → Shoutout Clip」關閉。
@@ -109,6 +111,8 @@ Desktop or OBS Studio 30+ · for outfits, veadotube mini 2.1+.
     US$0.01–0.05 per pick).
   - **🏷 Tag songs by mood**: Claude reads the lyrics in Leihu Singsing and notes each song's moods, for better picks
     (one batch at half price, roughly US$1–3 for a few hundred songs, once).
+  - Every pick is written to `mood-picks.jsonl`: the viewer's words, the song, why, what it cost, and whether you
+    sent the 中文, English or a changed line, or refunded it, to look back on after a stream.
 - **⚠ Missing Twitch permissions notice**: when the Twitch authorization is older than a feature that needs it, the
   top of the dashboard says which features can't work and offers **Authorize again →**.
 - **🔊 Even clip volume**: clips from !so and !watch play at about the same volume — quiet ones turned up,

@@ -25,5 +25,6 @@ stream-modes.json
 alerts.json
 bot.json
 mood-tags.json
+mood-picks.jsonl
 reward-effects.json
 alert-media/

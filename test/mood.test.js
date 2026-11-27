@@ -6,6 +6,7 @@ const path = require('path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mood-'));
 process.env.MOOD_TAGS_FILE = path.join(dir, 'mood-tags.json');
+process.env.MOOD_PICKS_FILE = path.join(dir, 'mood-picks.jsonl');
 const mood = require('../server/mood');
 const uses = require('../server/reward-uses');
 const { songKey } = require('../shared/song-key');
@@ -83,6 +84,23 @@ test('a song that is not on the list, or one not to pick now, is refused; so is 
   await assert.rejects(mood.pick({ text: 'x' }), { messageCode: 'moodBadKey' });
   setup({});
   await assert.rejects(mood.pick({ text: 'x', exclude: list.map(s => s.songKey) }), { messageCode: 'moodNoSongs' });
+});
+
+test('a pick says what it cost, a failed one too; the pick log keeps one line each', async () => {
+  const list = mood.candidates();
+  setup({ song_id: list[0].id, message_zh: 'z', message_en: 'e', reason: 'r' });
+  const p = await mood.pick({ text: 'sad', requester: 'Mika' });
+  assert.ok(Math.abs(p.usd - 0.008) < 1e-9, `1000 in + 200 out = US$0.008, got ${p.usd}`);
+  setup({ song_id: 's99', message_zh: 'z', message_en: 'e', reason: 'r' });
+  await assert.rejects(mood.pick({ text: 'sad' }), (err) => err.messageCode === 'moodBadPick' && Math.abs(err.usd - 0.008) < 1e-9);
+
+  mood.logPick({ id: 'a1', event: 'picked', text: '好累\n', title: '稻香' });
+  mood.logPick({ id: 'a1', event: 'sent', as: 'zh' });
+  await new Promise(r => setTimeout(r, 100));
+  const lines = fs.readFileSync(process.env.MOOD_PICKS_FILE, 'utf8').trim().split('\n').map(l => JSON.parse(l));
+  assert.deepStrictEqual(lines.map(l => [l.id, l.event]), [['a1', 'picked'], ['a1', 'sent']]);
+  assert.strictEqual(lines[0].text, '好累\n', 'one line each, whatever the viewer wrote');
+  assert.ok(!Number.isNaN(Date.parse(lines[0].at)));
 });
 
 test('the line can\'t start a command, and stays one short line', async () => {
